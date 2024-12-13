@@ -5204,12 +5204,12 @@ void _showExportDialog() {
               borderRadius:
                   const BorderRadius.vertical(bottom: Radius.circular(8)),
             ),
-           /* child: Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Obligatorio
                 Row(
-                  children: [
+                  /*children: [
                     const Text('Obligatorio'),
                     Switch(
                       value: data.isRequired,
@@ -5220,7 +5220,7 @@ void _showExportDialog() {
                       },
                       activeColor: const Color(0xFF673AB7),
                     ),
-                  ],
+                  ],*/
                 ),
                 TextButton(
                   onPressed: () {
@@ -5231,7 +5231,7 @@ void _showExportDialog() {
                   child: const Text('Cancelar'),
                 ),
               ],
-            ),*/
+            ),
           ),
         ],
       ),
