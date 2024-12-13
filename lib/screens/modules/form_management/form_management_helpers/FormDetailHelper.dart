@@ -5204,7 +5204,7 @@ void _showExportDialog() {
               borderRadius:
                   const BorderRadius.vertical(bottom: Radius.circular(8)),
             ),
-            child: Row(
+           /* child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Obligatorio
@@ -5231,7 +5231,7 @@ void _showExportDialog() {
                   child: const Text('Cancelar'),
                 ),
               ],
-            ),
+            ),*/
           ),
         ],
       ),
