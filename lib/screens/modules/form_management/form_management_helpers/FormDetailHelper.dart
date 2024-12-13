@@ -5032,7 +5032,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
       return [];
     }
   }
-
+/*
   void _showExportDialog() {
     showDialog(
       context: context,
@@ -5064,7 +5064,42 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         );
       },
     );
-  }
+  }*/
+
+void _showExportDialog() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return ExportFormDialog(
+        onExport: (int signatureCount) async {
+          try {
+            await _formApiService.exportFormAsPDF(
+              context,
+              widget.form['id'],
+              signatureCount: signatureCount,
+              signatureDetails: {
+                'signature1_title': 'Prepared by',
+                'signature1_name': 'John Doe',
+                'signature1_date': 'true',
+              },
+            );
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error al exportar PDF: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      );
+    },
+  );
+}
+
+
+
 
   bool _shouldShowAnswerSelection(String questionType) {
     return !['date', 'datetime', 'text', 'user'].contains(questionType);

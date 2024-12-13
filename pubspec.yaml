@@ -42,6 +42,8 @@ dev_dependencies:
   http: ^1.2.2
   shared_preferences: ^2.3.3
   font_awesome_flutter: ^10.8.0
+  path_provider: ^2.0.0
+  open_file: ^3.2.1
 
 
   # The "flutter_lints" package below contains a set of recommended lints to
