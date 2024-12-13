@@ -5367,7 +5367,7 @@ void _showExportDialog() {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Tarjeta de título del formulario
-                      Card(
+                     /* Card(
                         elevation: 1,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -5405,7 +5405,50 @@ void _showExportDialog() {
                             ),
                           ),
                         ),
-                      ),
+                      ),*/
+
+                      Card(
+  elevation: 1,
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: Container(
+    width: double.infinity, // Asegura que ocupe todo el ancho
+    decoration: const BoxDecoration(
+      border: Border(
+        top: BorderSide(
+          color: Color(0xFF673AB7),
+          width: 8.0,
+        ),
+      ),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center, // Centra horizontalmente
+        children: [
+          Text(
+            formTitle,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w400,
+            ),
+            textAlign: TextAlign.center, // Centra el texto
+          ),
+          const SizedBox(height: 8),
+          Text(
+            formDescription,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center, // Centra el texto (opcional)
+          ),
+        ],
+      ),
+    ),
+  ),
+),
                       const SizedBox(height: 16),
 
                       (formDetails?['questions'] as List? ?? []).isEmpty
