@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-
 import '../../models/Permission_set.dart';
 import '../../screens/login_screen/LoginPage.dart';
 import '../../screens/modules/assign_permissions/PermissionsByRolesScreen.dart';
@@ -12,7 +11,7 @@ import 'PermissionMenuItem.dart';
 import 'drawer_menu_helpers/DrawerMenuNavigationHelper.dart';
 
 class DrawerMenu extends StatefulWidget {
-  //IMPORTANT VARIABLES
+  //INFORMATION VARIABLES AND PERMISSIONS
   final Function(int) onItemTapped;
   final BuildContext parentContext;
   final PermissionSet? permissionSet;
@@ -125,7 +124,6 @@ class _DrawerMenuState extends State<DrawerMenu> {
               ),
 
             // DRAWER MENU USER VIEW USERS
-          
             if (!_isSuperUser &&
                 (widget.permissionSet?.hasPermission('view_users') ?? false))
               PermissionMenuItem(
@@ -144,8 +142,8 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 },
               ),
 
-            // DRAWER MENU PERMMISSION-ROLE ASSIGN
-            // 6-OPTION Form managment - Visible if 'super_user'
+            // DRAWER MENU PERMISSION-ROLE ASSIGN
+            // 6-OPTION Form management - Visible if 'super_user'
             PermissionMenuItem(
               title: 'Assign permissions',
               icon: FontAwesomeIcons.userLock,
@@ -164,11 +162,15 @@ class _DrawerMenuState extends State<DrawerMenu> {
             ),
 
             // DRAWER MENU USER FORM OPTION
-            // //4-OPTION Form managment - Visible if 'view_forms'
+            // //4-OPTION Form management - Visible if 'view_forms'
             PermissionMenuItem(
               title: 'Form Management',
               icon: FontAwesomeIcons.fileCircleCheck,
-              condition: () => _isSuperUser,
+              hasPermission: () =>
+                  (widget.permissionSet?.hasPermission('view_forms') ??
+                      false) &&
+                  (widget.permissionSet?.hasPermission('create_forms') ??
+                      false),
               onTap: () {
                 Navigator.pushReplacement(
                   context,
@@ -181,7 +183,6 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
-
             // Logout Option
             PermissionMenuItem(
               title: 'Log Out',
