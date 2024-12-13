@@ -152,7 +152,7 @@ class _RegisterEnvironmentState extends State<RegisterEnvironment> {
                         vertical: 15.0, horizontal: 18.0),
                   ),
                   maxLines: 3,
-                    style: const TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: 16),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter the description';
@@ -175,9 +175,13 @@ class _RegisterEnvironmentState extends State<RegisterEnvironment> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.save),
-                      SizedBox(width: 8),
-                      Text('Save Environment'),
+                      Icon(
+                        Icons.save,
+                        size: 24,
+                        color: Colors.white,
+                      ),
+                      SizedBox(width: 10),
+                      Text('Save'),
                     ],
                   ),
                 ),
