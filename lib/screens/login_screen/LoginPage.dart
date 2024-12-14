@@ -184,110 +184,67 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isPhoneOnWeb = kIsWeb &&
-        (ui.window.physicalSize.width / ui.window.devicePixelRatio) < 600;
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-    final isWebLandscape = kIsWeb && isLandscape;
-    final isMobile = !kIsWeb;
-    final isWebFullScreen = kIsWeb && !isPhoneOnWeb;
+Widget build(BuildContext context) {
+  final isMobile = MediaQuery.of(context).size.width < 600;
 
-    final scaleFactor = isWebLandscape ? 0.7 : 1.0;
-
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          // Fondo web y móvil
-          if (kIsWeb)
-            Positioned.fill(
-              child: Image.asset(
-                'assets/web_login_background.png',
-                fit: BoxFit.cover,
-              ),
+  return Scaffold(
+    resizeToAvoidBottomInset: false,
+    body: Stack(
+      children: [
+        // Fondo web y móvil
+        Positioned.fill(
+          child: Image.asset(
+            isMobile
+                ? 'assets/login_background.png' // Fondo móvil
+                : 'assets/web_login_background.png', // Fondo web
+            fit: BoxFit.cover,
+          ),
+        ),
+        // Posicionamiento del formulario
+        Positioned(
+          left: 0,
+          right: 0,
+          top: MediaQuery.of(context).size.height * (isMobile ? 0.4 : 0.25),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 20.0 : 300.0, // Márgenes móviles o web
             ),
-          if (!kIsWeb)
-            Positioned.fill(
-              child: Container(
-                color: const Color(0xFFD9F0F6),
-              ),
-            ),
-          // Imagen superior para móvil
-          if (isMobile)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height *
-                    0.45, // Reducido para más espacio arriba
-                child: Image.asset(
-                  'assets/login_background.png',
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          // Posicionamiento del formulario
-          Positioned(
-            left: 0,
-            right: 0,
-            top: kIsWeb
-                ? (isPhoneOnWeb // Caso: Web móvil
-                    ? (isLandscape
-                        ? MediaQuery.of(context).size.height * 0.0
-                        : MediaQuery.of(context).size.height * 0.25)
-                    : MediaQuery.of(context).size.height * 0.12)
-                : (isLandscape
-                    ? MediaQuery.of(context).size.height *
-                        0.5 // Más abajo en landscape móvil
-                    : MediaQuery.of(context).size.height *
-                        0.4), // Normal en portrait móvil
-            child: Transform.scale(
-              scale: scaleFactor,
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isWebFullScreen
-                      ? 300.0 // Márgenes amplios en escritorio
-                      : 20.0, // Márgenes estándar en móvil y web móvil
-                ),
-                child: FormBuilder(
-                  key: _formKey,
-                  child: LoginFields(
-                    usernameController: _usernameController,
-                    passwordController: _passwordController,
-                    usernameFocus: _usernameFocus,
-                    passwordFocus: _passwordFocus,
-                    isLoading: _isLoading,
-                    obscurePassword: _obscurePassword,
-                    usernameError: _usernameError,
-                    passwordError: _passwordError,
-                    onUsernameChanged: (value) {
-                      setState(() {
-                        _usernameError = null;
-                      });
-                    },
-                    onPasswordChanged: (value) {
-                      setState(() {
-                        _passwordError = null;
-                      });
-                    },
-                    onLoginPressed: _handleLogin,
-                    onTogglePasswordVisibility: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                  ),
-                ),
+            child: FormBuilder(
+              key: _formKey,
+              child: LoginFields(
+                usernameController: _usernameController,
+                passwordController: _passwordController,
+                usernameFocus: _usernameFocus,
+                passwordFocus: _passwordFocus,
+                isLoading: _isLoading,
+                obscurePassword: _obscurePassword,
+                usernameError: _usernameError,
+                passwordError: _passwordError,
+                onUsernameChanged: (value) {
+                  setState(() {
+                    _usernameError = null;
+                  });
+                },
+                onPasswordChanged: (value) {
+                  setState(() {
+                    _passwordError = null;
+                  });
+                },
+                onLoginPressed: _handleLogin,
+                onTogglePasswordVisibility: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
+
 }
 
 void showToast(BuildContext context, String message) {
