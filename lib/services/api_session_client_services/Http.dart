@@ -6,8 +6,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class Http {
   //ENDPOINT IP
   final String baseUrl = kIsWeb
-      //? "http://3.129.92.139" // URL WEB
-      //: "http://3.129.92.139"; // URL ANDROID
+        // ? "http://3.129.92.139" // URL WEB
+     // : "http://3.129.92.139"; // URL ANDROID
       ? "http://localhost:5000" // URL WEB
       //? "" // URL WEB
       : "http://10.0.2.2:5000"; // URL ANDROID
