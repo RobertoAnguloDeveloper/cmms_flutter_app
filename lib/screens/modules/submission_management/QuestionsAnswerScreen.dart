@@ -1,16 +1,22 @@
+import 'package:cmms_app/components/drawer_menu/DrawerMenu.dart';
+import 'package:cmms_app/models/Permission_set.dart';
 import 'package:flutter/material.dart';
-import '../../../../services/api_model_services/api_form_services/AnswerApiService.dart';
+import '../../../services/api_model_services/api_form_services/AnswerApiService.dart';
 
 class QuestionsAnswerScreen extends StatefulWidget {
   final int formId; // ID del formulario
   final String formTitle; // Título del formulario
   final String? formDescription; // Descripción del formulario
+  final PermissionSet permissionSet;
+  final Map<String, dynamic> sessionData;
 
   const QuestionsAnswerScreen({
     Key? key,
     required this.formId,
     required this.formTitle,
     this.formDescription,
+       required this.permissionSet,
+    required this.sessionData,
   }) : super(key: key);
 
   @override
@@ -163,9 +169,22 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      /*appBar: AppBar(
         title: Text(widget.formTitle),
         backgroundColor: Colors.blue,
+      ),*/
+
+         appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
+      drawer: DrawerMenu(
+        onItemTapped: (index) {
+          Navigator.pop(context);
+        },
+        parentContext: context,
+        permissionSet: widget.permissionSet,
+        sessionData: widget.sessionData,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())

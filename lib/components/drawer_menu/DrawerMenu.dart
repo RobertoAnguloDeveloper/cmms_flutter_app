@@ -1,4 +1,4 @@
-import 'package:cmms_app/screens/modules/form_management/answer_form_management/QuestionsAnswerScreen.dart';
+import 'package:cmms_app/screens/modules/submission_management/QuestionsAnswerScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
@@ -183,23 +183,24 @@ class _DrawerMenuState extends State<DrawerMenu> {
               },
             ),
 
-      PermissionMenuItem(
-  title: 'Questions Answer',
-  icon: FontAwesomeIcons.questionCircle,
-  condition: () => true, // Si deseas que siempre sea visible
-  onTap: () {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => QuestionsAnswerScreen(
-          formId: 1, // Cambia por un valor dinámico si lo necesitas
-          formTitle: 'Sample Form', // Cambia por un valor dinámico
-          formDescription: 'Answer questions from the selected form', // Cambia por un valor dinámico
-        ),
-      ),
-    );
-  },
-),
+        PermissionMenuItem(
+              title: 'Form Submission',
+              icon: FontAwesomeIcons.clipboardList,
+              condition: () => _isSuperUser,
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => QuestionsAnswerScreen(
+                      formTitle: 'Form Title',
+  formDescription: 'Description of the form',
+  permissionSet: widget.permissionSet!,
+  sessionData: widget.sessionData!, formId: 0,
+                    ),
+                  ),
+                );
+              },
+            ),
             // Logout Option
             PermissionMenuItem(
               title: 'Log Out',
