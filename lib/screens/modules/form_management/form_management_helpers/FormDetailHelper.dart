@@ -1,3 +1,4 @@
+import 'package:cmms_app/screens/modules/form_management/form_management_helpers/form_detail_helper/QuestionCreationCard.dart';
 import 'package:flutter/material.dart';
 import '../../../../services/api_model_services/UserApiService.dart';
 import '../../../../services/api_model_services/api_form_services/AnswerApiService.dart';
@@ -406,137 +407,31 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   }
 
   Widget _buildQuestionCreationCard(int index) {
-    final data = _questionCreations[index];
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(top: 16.0),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Campo de texto para la pregunta
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: data.questionTextController,
-              decoration: const InputDecoration(
-                hintText: 'Pregunta sin título',
-                border: UnderlineInputBorder(),
-                hintStyle: TextStyle(fontSize: 16),
-              ),
-              style: const TextStyle(fontSize: 16),
-            ),
-          ),
-          // Selector de tipo de pregunta
-          if (isLoadingQuestionTypes)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: DropdownButtonFormField<int>(
-                value: data.selectedQuestionTypeId,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-                hint: const Text('Seleccionar tipo de pregunta'),
-                items: questionTypes.map((type) {
-                  final String questionTypeString =
-                      (type['type'] ?? '').toString().toLowerCase();
+  final data = _questionCreations[index];
+  return QuestionCreationCard(
+    questionTextController: data.questionTextController,
+    selectedQuestionTypeId: data.selectedQuestionTypeId,
+    isRequired: data.isRequired,
+    isLoadingQuestionTypes: isLoadingQuestionTypes,
+    questionTypes: questionTypes,
+    onCancel: () {
+      setState(() {
+        _questionCreations.removeAt(index);
+      });
+    },
+    onTypeChanged: (value) {
+      setState(() {
+        data.selectedQuestionTypeId = value;
+      });
+    },
+    onRequiredChanged: (value) {
+      setState(() {
+        data.isRequired = value;
+      });
+    },
+  );
+}
 
-                  IconData icon;
-                  switch (questionTypeString) {
-                    case 'multiple_choices':
-                      icon = Icons.radio_button_checked;
-                      break;
-                    case 'checkbox':
-                      icon = Icons.check_box;
-                      break;
-                    case 'date':
-                      icon = Icons.calendar_today;
-                      break;
-                    case 'datetime':
-                      icon = Icons.access_time;
-                      break;
-                    case 'text':
-                      icon = Icons.short_text;
-                      break;
-                    case 'user':
-                      icon = Icons.person;
-                      break;
-                    case 'signature':
-                      icon = Icons.draw;
-                      break;
-                    default:
-                      icon = Icons.question_answer;
-                  }
-
-                  return DropdownMenuItem<int>(
-                    value: type['id'] as int?,
-                    child: Row(
-                      children: [
-                        Icon(icon, size: 20, color: Colors.grey[700]),
-                        const SizedBox(width: 8),
-                        Text((type['type'] ?? '').toString()),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    data.selectedQuestionTypeId = value;
-                  });
-                },
-              ),
-            ),
-          const SizedBox(height: 16),
-          // Barra inferior con switch y botón cancelar
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(8)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Obligatorio
-                Row(
-                  children: [
-                    const Text('Obligatorio'),
-                    Switch(
-                      value: data.isRequired,
-                      onChanged: (value) {
-                        setState(() {
-                          data.isRequired = value;
-                        });
-                      },
-                      activeColor: const Color.fromARGB(255, 183, 58, 58),
-                    ),
-                  ],
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _questionCreations.removeAt(index);
-                    });
-                  },
-                  child: const Text('Cancelar'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _saveAllQuestions() async {
     try {
