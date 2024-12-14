@@ -36,8 +36,7 @@ class SessionManager {
   static Future<String?> getToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString(_keyToken);
-    print(
-        'Token recuperado de SessionManager: $token'); 
+    print('Token recuperado de SessionManager: $token');
     return token;
   }
 
@@ -68,6 +67,12 @@ class SessionManager {
     } else {
       return null;
     }
+  }
+
+  static Future<bool> isValidSession() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString(_keyToken);
+    return token != null && token.isNotEmpty;
   }
 
   static Future<void> clearSession() async {

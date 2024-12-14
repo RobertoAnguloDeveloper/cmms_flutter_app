@@ -1,29 +1,32 @@
 import 'package:flutter/material.dart';
 import 'models/Permission_set.dart';
-import 'models/user_management_models/User.dart';
 import 'screens/login_screen/LoginPage.dart';
+import 'screens/modules/home/HomePage.dart';
 
 class MyApp extends StatelessWidget {
   final Map<String, dynamic>? sessionData;
   final PermissionSet? permissionSet;
 
-  
-  const MyApp({super.key, this.sessionData, this.permissionSet,});
+  const MyApp({
+    Key? key, 
+    this.sessionData,
+    this.permissionSet,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    if (sessionData != null) {
-      User user = User.fromJson2(sessionData);
-      print("from MyApp");
-      print(user.runtimeType);
-    }
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: LoginPage(),
+      title: 'CMMS App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
+      home: sessionData != null && permissionSet != null
+          ? HomePage(
+              sessionData: sessionData!,
+              permissionSet: permissionSet!,
+            )
+          : const LoginPage(),
     );
   }
 }

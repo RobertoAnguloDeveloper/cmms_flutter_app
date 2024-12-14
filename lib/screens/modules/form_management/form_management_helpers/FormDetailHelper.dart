@@ -40,6 +40,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   final FormApiService _formApiService = FormApiService();
   final AnswerApiService _answerApiService = AnswerApiService();
   final QuestionApiService _formQuestionApiService = QuestionApiService();
+  final ScrollController _scrollController = ScrollController(); // Agregado
   bool isLoading = true;
   bool isDeleting = false;
   bool showMenuButtons = false;
@@ -407,31 +408,30 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   }
 
   Widget _buildQuestionCreationCard(int index) {
-  final data = _questionCreations[index];
-  return QuestionCreationCard(
-    questionTextController: data.questionTextController,
-    selectedQuestionTypeId: data.selectedQuestionTypeId,
-    isRequired: data.isRequired,
-    isLoadingQuestionTypes: isLoadingQuestionTypes,
-    questionTypes: questionTypes,
-    onCancel: () {
-      setState(() {
-        _questionCreations.removeAt(index);
-      });
-    },
-    onTypeChanged: (value) {
-      setState(() {
-        data.selectedQuestionTypeId = value;
-      });
-    },
-    onRequiredChanged: (value) {
-      setState(() {
-        data.isRequired = value;
-      });
-    },
-  );
-}
-
+    final data = _questionCreations[index];
+    return QuestionCreationCard(
+      questionTextController: data.questionTextController,
+      selectedQuestionTypeId: data.selectedQuestionTypeId,
+      isRequired: data.isRequired,
+      isLoadingQuestionTypes: isLoadingQuestionTypes,
+      questionTypes: questionTypes,
+      onCancel: () {
+        setState(() {
+          _questionCreations.removeAt(index);
+        });
+      },
+      onTypeChanged: (value) {
+        setState(() {
+          data.selectedQuestionTypeId = value;
+        });
+      },
+      onRequiredChanged: (value) {
+        setState(() {
+          data.isRequired = value;
+        });
+      },
+    );
+  }
 
   Future<void> _saveAllQuestions() async {
     try {
@@ -513,6 +513,25 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
     super.dispose();
   }
 
+  void _addQuestionCreationCard() {
+    setState(() {
+      _questionCreations.add(
+        _QuestionCreationData(questionTextController: TextEditingController()),
+      );
+    });
+
+    // Espera un frame para asegurarte de que el widget se haya renderizado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final formTitle =
@@ -541,8 +560,13 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0, vertical: 8.0),
+                        controller: _scrollController, // Controlador agregado
+                        padding: const EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          top: 8.0,
+                          bottom: 100.0, // Aumentado para dar más espacio
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -551,8 +575,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                               child: Card(
                                 elevation: 1,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                      16), // Bordes redondeados de la tarjeta
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Container(
                                   width:
@@ -620,37 +643,35 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
                             const SizedBox(height: 16),
 
-                            (formDetails?['questions'] as List? ?? []).isEmpty
-                                ? const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(16.0),
-                                      child: Text(
-                                        'No questions available',
-                                        style: TextStyle(
-                                            fontSize: 16, color: Colors.grey),
-                                      ),
-                                    ),
-                                  )
-                                : QuestionsListWidget(
-                                    questions:
-                                        formDetails?['questions'] as List? ??
-                                            [],
-                                    deleteFormQuestion: _deleteFormQuestion,
-                                    showEditAnswerDialog: _showEditAnswerDialog,
-                                    deleteAnswer: _deleteAnswer,
-                                    shouldShowAnswerSelection:
-                                        _shouldShowAnswerSelection,
-                                    fetchFormDetails: _fetchFormDetails,
-                                    formId: widget.form['id'],
+                            // Listado de preguntas
+                            if ((formDetails?['questions'] as List? ?? [])
+                                .isEmpty)
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Text(
+                                    'No questions available',
+                                    style: TextStyle(
+                                        fontSize: 16, color: Colors.grey),
                                   ),
+                                ),
+                              )
+                            else
+                              QuestionsListWidget(
+                                questions:
+                                    formDetails?['questions'] as List? ?? [],
+                                deleteFormQuestion: _deleteFormQuestion,
+                                showEditAnswerDialog: _showEditAnswerDialog,
+                                deleteAnswer: _deleteAnswer,
+                                shouldShowAnswerSelection:
+                                    _shouldShowAnswerSelection,
+                                fetchFormDetails: _fetchFormDetails,
+                                formId: widget.form['id'],
+                              ),
 
                             // Mostrar todas las cards de creación de pregunta
                             for (int i = 0; i < _questionCreations.length; i++)
                               _buildQuestionCreationCard(i),
-
-                            SizedBox(
-                                height:
-                                    _questionCreations.isNotEmpty ? 80 : 16),
                           ],
                         ),
                       ),
@@ -673,6 +694,15 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                               questionTextController: TextEditingController(),
                             ),
                           );
+                        });
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_scrollController.hasClients) {
+                            _scrollController.animateTo(
+                              _scrollController.position.maxScrollExtent,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                            );
+                          }
                         });
                       },
                       backgroundColor: const Color.fromARGB(255, 34, 118, 186),
@@ -782,20 +812,49 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
               )
             ],
           ),
-          // Botón SAVE si hay preguntas en creación
           if (_questionCreations.isNotEmpty)
             Positioned(
-              bottom: 16,
-              left: 16,
-              right: 16,
-              child: ElevatedButton(
-                onPressed: _saveAllQuestions,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF673AB7),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+              bottom: 20,
+              left: 0,
+              right:
+                  80, // Para dejar espacio para los botones flotantes de la derecha
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ElevatedButton(
+                    onPressed: _saveAllQuestions,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          const Color.fromARGB(255, 23, 99, 161), // Fondo azul
+                      foregroundColor:
+                          Colors.white, // Color del texto y el ícono
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 50, vertical: 20),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize
+                          .min, // Ajustar el tamaño del botón al contenido
+                      children: [
+                        const Icon(
+                          Icons.save, // Ícono de guardar
+                          color: Colors.white, // Ícono blanco
+                          size: 20, // Tamaño del ícono
+                        ),
+                        const SizedBox(
+                            width: 8), // Espaciado entre el ícono y el texto
+                        const Text(
+                          'Save',
+                          style: TextStyle(
+                              fontSize: 20,
+                              color: Colors.white), // Texto blanco
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: const Text('SAVE', style: TextStyle(fontSize: 16)),
               ),
             ),
         ],
