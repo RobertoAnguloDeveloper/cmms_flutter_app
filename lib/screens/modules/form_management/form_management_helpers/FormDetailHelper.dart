@@ -5032,7 +5032,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
       return [];
     }
   }
-
+/*
   void _showExportDialog() {
     showDialog(
       context: context,
@@ -5064,7 +5064,42 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         );
       },
     );
-  }
+  }*/
+
+void _showExportDialog() {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return ExportFormDialog(
+        onExport: (int signatureCount) async {
+          try {
+            await _formApiService.exportFormAsPDF(
+              context,
+              widget.form['id'],
+              signatureCount: signatureCount,
+              signatureDetails: {
+                'signature1_title': 'Prepared by',
+                'signature1_name': 'John Doe',
+                'signature1_date': 'true',
+              },
+            );
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error al exportar PDF: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      );
+    },
+  );
+}
+
+
+
 
   bool _shouldShowAnswerSelection(String questionType) {
     return !['date', 'datetime', 'text', 'user'].contains(questionType);
@@ -5174,7 +5209,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
               children: [
                 // Obligatorio
                 Row(
-                  children: [
+                  /*children: [
                     const Text('Obligatorio'),
                     Switch(
                       value: data.isRequired,
@@ -5185,7 +5220,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                       },
                       activeColor: const Color(0xFF673AB7),
                     ),
-                  ],
+                  ],*/
                 ),
                 TextButton(
                   onPressed: () {
@@ -5332,7 +5367,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Tarjeta de título del formulario
-                      Card(
+                     /* Card(
                         elevation: 1,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -5370,7 +5405,50 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                             ),
                           ),
                         ),
-                      ),
+                      ),*/
+
+                      Card(
+  elevation: 1,
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: Container(
+    width: double.infinity, // Asegura que ocupe todo el ancho
+    decoration: const BoxDecoration(
+      border: Border(
+        top: BorderSide(
+          color: Color(0xFF673AB7),
+          width: 8.0,
+        ),
+      ),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center, // Centra horizontalmente
+        children: [
+          Text(
+            formTitle,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w400,
+            ),
+            textAlign: TextAlign.center, // Centra el texto
+          ),
+          const SizedBox(height: 8),
+          Text(
+            formDescription,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center, // Centra el texto (opcional)
+          ),
+        ],
+      ),
+    ),
+  ),
+),
                       const SizedBox(height: 16),
 
                       (formDetails?['questions'] as List? ?? []).isEmpty

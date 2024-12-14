@@ -6,8 +6,8 @@ import 'SessionManager.dart';
 
 class AuthService {
   static const String baseUrl = kIsWeb
-      //? "http://3.129.92.139" // URL WEB
-      //: "http://3.129.92.139"; // URL ANDROID
+      // ? "http://3.129.92.139" // URL WEB
+      // : "http://3.129.92.139"; // URL ANDROID
       ? "http://localhost:5000" // URL WEB
       //? "" // URL WEB
       : "http://10.0.2.2:5000"; // URL ANDROID
@@ -18,7 +18,7 @@ class AuthService {
       print('Token retrieved: ${token != null}');
 
       if (token == null) {
-        throw Exception('No authentication token found');
+        return {}; // Return empty map instead of throwing exception
       }
 
       final response = await http.get(
@@ -34,11 +34,11 @@ class AuthService {
         print('Raw permissions data: ${data['permissions']}');
         return data;
       } else {
-        throw Exception('Failed to load user data: ${response.statusCode}');
+        return {}; // Return empty map for any error status
       }
     } catch (e) {
       print('Error in getCurrentUser: $e');
-      throw Exception('Error getting current user: $e');
+      return {}; // Return empty map for any error
     }
   }
 }
