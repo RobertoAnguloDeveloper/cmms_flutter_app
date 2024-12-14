@@ -183,68 +183,85 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
-  @override
+@override
 Widget build(BuildContext context) {
-  final isMobile = MediaQuery.of(context).size.width < 600;
+  final screenSize = MediaQuery.of(context).size;
+  final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+  final isWeb = kIsWeb;
 
   return Scaffold(
-    resizeToAvoidBottomInset: false,
-    body: Stack(
-      children: [
-        // Fondo web y móvil
-        Positioned.fill(
-          child: Image.asset(
-            isMobile
-                ? 'assets/login_background.png' // Fondo móvil
-                : 'assets/web_login_background.png', // Fondo web
-            fit: BoxFit.cover,
-          ),
+    // Permitimos scroll cuando el teclado aparece
+    resizeToAvoidBottomInset: true,
+    body: SingleChildScrollView(  // Añadimos scroll
+      child: ConstrainedBox(  // Aseguramos altura mínima
+        constraints: BoxConstraints(
+          minHeight: screenSize.height,
         ),
-        // Posicionamiento del formulario
-        Positioned(
-          left: 0,
-          right: 0,
-          top: MediaQuery.of(context).size.height * (isMobile ? 0.4 : 0.25),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 20.0 : 300.0, // Márgenes móviles o web
-            ),
-            child: FormBuilder(
-              key: _formKey,
-              child: LoginFields(
-                usernameController: _usernameController,
-                passwordController: _passwordController,
-                usernameFocus: _usernameFocus,
-                passwordFocus: _passwordFocus,
-                isLoading: _isLoading,
-                obscurePassword: _obscurePassword,
-                usernameError: _usernameError,
-                passwordError: _passwordError,
-                onUsernameChanged: (value) {
-                  setState(() {
-                    _usernameError = null;
-                  });
-                },
-                onPasswordChanged: (value) {
-                  setState(() {
-                    _passwordError = null;
-                  });
-                },
-                onLoginPressed: _handleLogin,
-                onTogglePasswordVisibility: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
+        child: Stack(
+          children: [
+            // Fondo responsivo
+            Positioned.fill(
+              child: Image.asset(
+                isWeb 
+                    ? 'assets/web_login_background.png'
+                    : 'assets/login_background.png',
+                fit: BoxFit.cover,
+                height: isWeb ? null : screenSize.height * 1.2,
               ),
             ),
-          ),
+            // Contenedor principal
+            Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                margin: EdgeInsets.only(
+                  top: isWeb 
+                      ? 0
+                      : isPortrait 
+                          ? screenSize.height * 0.15
+                          : screenSize.height * 0.1,
+                ),
+                // Añadimos padding para evitar que el contenido toque los bordes
+                padding: EdgeInsets.symmetric(
+                  vertical: 20.0,
+                  horizontal: 16.0,
+                ),
+                child: FormBuilder(
+                  key: _formKey,
+                  child: LoginFields(
+                    usernameController: _usernameController,
+                    passwordController: _passwordController,
+                    usernameFocus: _usernameFocus,
+                    passwordFocus: _passwordFocus,
+                    isLoading: _isLoading,
+                    obscurePassword: _obscurePassword,
+                    usernameError: _usernameError,
+                    passwordError: _passwordError,
+                    onUsernameChanged: (value) {
+                      setState(() {
+                        _usernameError = null;
+                      });
+                    },
+                    onPasswordChanged: (value) {
+                      setState(() {
+                        _passwordError = null;
+                      });
+                    },
+                    onLoginPressed: _handleLogin,
+                    onTogglePasswordVisibility: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     ),
   );
 }
-
 }
 
 void showToast(BuildContext context, String message) {

@@ -34,161 +34,228 @@ class LoginFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: const Offset(0, -300), // Cambiado de -250 a -300 para subir todo
+    final screenSize = MediaQuery.of(context).size;
+    final isLandscape = screenSize.width > screenSize.height;
+    final isMobile = screenSize.width < 600;
+    final isSmallHeight = screenSize.height < 600;
+    final isWebPortrait = kIsWeb && !isLandscape;
+    
+    // Ajustamos dimensiones basadas en el contexto
+    final logoSize = screenSize.width * (
+      isWebPortrait ? 0.3 :  // Logo más grande en web portrait
+      isLandscape ? 0.15 : 
+      (isMobile ? 0.25 : 0.15)
+    );
+    
+    final formWidth = screenSize.width * (isMobile ? 0.85 : 0.3);
+    
+    // Ajustamos espaciado vertical
+    final double topPadding = isWebPortrait 
+        ? screenSize.height * 0.15  // Más espacio superior en web portrait
+        : isLandscape 
+            ? 10 
+            : (isSmallHeight ? screenSize.height * 0.03 : screenSize.height * 0.05);
+        
+    final double spaceBetweenElements = isWebPortrait 
+        ? 25  // Más espacio entre elementos en web portrait
+        : isLandscape || isSmallHeight ? 8 : 15;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.only(top: topPadding),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Transform.translate(
-            offset: const Offset(0, -100),
-            child: Center(
-              child: Image.asset(
-                'assets/logo_item.png',
-                height: 300.0,
-                width: 300.0,
-                fit: BoxFit.contain,
-              ),
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Image.asset(
+            'assets/logo_item.png',
+            height: logoSize,
+            width: logoSize,
+            fit: BoxFit.contain,
+          ),
+          SizedBox(height: spaceBetweenElements * 1.5),
+          Text(
+            "Log in",
+            style: TextStyle(
+              fontSize: isWebPortrait ? 28.0 :  // Texto más grande en web portrait
+                      (isLandscape || isSmallHeight ? 18.0 : 
+                       (isMobile ? 20.0 : 24.0)),
+              color: const Color(0xFF295075),
+              fontWeight: FontWeight.bold,
             ),
           ),
-          Transform.translate(
-            offset: const Offset(0, -50),
+          SizedBox(height: spaceBetweenElements),
+          Container(
+            width: formWidth,
+            padding: EdgeInsets.symmetric(
+              horizontal: isLandscape ? 10 : 20,
+              vertical: isLandscape ? 5 : 10,
+            ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Log in",
-                  style: TextStyle(
-                    fontSize: 24.0,
-                    color: Color(0xFF295075),
-                    fontWeight: FontWeight.bold,
-                  ),
+                _buildTextField(
+                  name: 'username',
+                  controller: usernameController,
+                  focusNode: usernameFocus,
+                  label: "Username",
+                  icon: Icons.person,
+                  error: usernameError,
+                  onChange: onUsernameChanged,
+                  isLandscape: isLandscape,
+                  isWebPortrait: isWebPortrait,
                 ),
-                const SizedBox(height: 10.0),
-                SizedBox(
-                  width: 340.0,
-                  child: FormBuilderTextField(
-                    name: 'username',
-                    controller: usernameController,
-                    focusNode: usernameFocus,
-                    enabled: !isLoading,
-                    decoration: InputDecoration(
-                      labelText: "Username",
-                      errorText: usernameError,
-                      labelStyle: TextStyle(
-                        fontSize: 16.0,
-                        color: Colors.grey[600],
-                      ),
-                      filled: true,
-                      fillColor: kIsWeb
-                          ? Color.fromARGB(255, 222, 242, 255)
-                          : Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                        borderSide: const BorderSide(
-                          color: Color(0xAAE0E0E0),
-                        ),
-                      ),
-                      floatingLabelBehavior: FloatingLabelBehavior.never,
-                      prefixIcon: const Icon(
-                        Icons.person,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    onChanged: onUsernameChanged,
-                  ),
+                SizedBox(height: spaceBetweenElements),
+                _buildTextField(
+                  name: 'password',
+                  controller: passwordController,
+                  focusNode: passwordFocus,
+                  label: "Password",
+                  icon: Icons.lock,
+                  error: passwordError,
+                  isPassword: true,
+                  onChange: onPasswordChanged,
+                  isLandscape: isLandscape,
+                  isWebPortrait: isWebPortrait,
                 ),
-                const SizedBox(height: 8.0),
+                SizedBox(height: spaceBetweenElements * 1.2),
                 SizedBox(
-                  width: 340.0,
-                  child: FormBuilderTextField(
-                    name: 'password',
-                    controller: passwordController,
-                    focusNode: passwordFocus,
-                    enabled: !isLoading,
-                    obscureText: obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: "Password",
-                      errorText: passwordError,
-                      labelStyle: TextStyle(
-                        fontSize: 16.0,
-                        color: Colors.grey[600],
-                      ),
-                      filled: true,
-                      fillColor: kIsWeb
-                          ? const Color.fromARGB(255, 222, 242, 255)
-                          : Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                        borderSide: const BorderSide(
-                          color: Color(0xAAE0E0E0),
-                        ),
-                      ),
-                      floatingLabelBehavior: FloatingLabelBehavior.never,
-                      prefixIcon: const Icon(
-                        Icons.lock,
-                        color: Colors.grey,
-                      ),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscurePassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: Colors.grey,
-                        ),
-                        onPressed: onTogglePasswordVisibility,
-                      ),
-                    ),
-                    onChanged: onPasswordChanged,
-                  ),
-                ),
-                const SizedBox(height: 10.0),
-                SizedBox(
-                  width: 200.0,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : onLoginPressed,
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.black,
-                      backgroundColor: const Color(0xFF295075),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20.0),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (isLoading)
-                          Container(
-                            width: 24,
-                            height: 24,
-                            padding: const EdgeInsets.all(2.0),
-                            child: const CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        else
-                          const Icon(Icons.login,
-                              size: 24.0, color: Colors.white),
-                        const SizedBox(width: 8.0),
-                        Text(
-                          isLoading ? "Logging in..." : "Login",
-                          style: const TextStyle(
-                            fontSize: 16.0,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
+                  width: formWidth * (isLandscape ? 0.5 : 0.7),
+                  height: isWebPortrait ? 50 : // Botón más alto en web portrait
+                         (isLandscape || isSmallHeight ? 40 : 45),
+                  child: _buildLoginButton(
+                    isLandscape: isLandscape,
+                    isWebPortrait: isWebPortrait,
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required String name,
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required String label,
+    required IconData icon,
+    String? error,
+    bool isPassword = false,
+    void Function(String?)? onChange,
+    bool isLandscape = false,
+    bool isWebPortrait = false,
+  }) {
+    return FormBuilderTextField(
+      name: name,
+      controller: controller,
+      focusNode: focusNode,
+      enabled: !isLoading,
+      obscureText: isPassword && obscurePassword,
+      style: TextStyle(fontSize: isWebPortrait ? 18 : 
+                                (isLandscape ? 14 : 16)),
+      decoration: InputDecoration(
+        labelText: label,
+        errorText: error,
+        labelStyle: TextStyle(
+          fontSize: isWebPortrait ? 18 : 
+                   (isLandscape ? 14 : 16),
+          color: Colors.grey[600],
+        ),
+        filled: true,
+        fillColor: kIsWeb
+            ? const Color.fromARGB(255, 222, 242, 255)
+            : Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10.0),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10.0),
+          borderSide: const BorderSide(
+            color: Color(0xAAE0E0E0),
+          ),
+        ),
+        floatingLabelBehavior: FloatingLabelBehavior.never,
+        prefixIcon: Icon(
+          icon,
+          color: Colors.grey,
+          size: isWebPortrait ? 28 : 
+                (isLandscape ? 20 : 24),
+        ),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  obscurePassword
+                      ? Icons.visibility
+                      : Icons.visibility_off,
+                  color: Colors.grey,
+                  size: isWebPortrait ? 28 : 
+                        (isLandscape ? 20 : 24),
+                ),
+                onPressed: onTogglePasswordVisibility,
+              )
+            : null,
+        contentPadding: EdgeInsets.symmetric(
+          vertical: isWebPortrait ? 16 : 
+                   (isLandscape ? 8 : 12),
+          horizontal: isWebPortrait ? 16 : 
+                     (isLandscape ? 8 : 12),
+        ),
+      ),
+      onChanged: onChange,
+    );
+  }
+
+  Widget _buildLoginButton({
+    bool isLandscape = false, 
+    bool isWebPortrait = false
+  }) {
+    return ElevatedButton(
+      onPressed: isLoading ? null : onLoginPressed,
+      style: ElevatedButton.styleFrom(
+        foregroundColor: Colors.black,
+        backgroundColor: const Color(0xFF295075),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.0),
+        ),
+        padding: EdgeInsets.symmetric(
+          vertical: isWebPortrait ? 16 : 
+                   (isLandscape ? 8 : 12),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (isLoading)
+            Container(
+              width: isWebPortrait ? 28 : 
+                     (isLandscape ? 20 : 24),
+              height: isWebPortrait ? 28 : 
+                      (isLandscape ? 20 : 24),
+              padding: const EdgeInsets.all(2.0),
+              child: const CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+          else
+            Icon(
+              Icons.login,
+              size: isWebPortrait ? 28 : 
+                    (isLandscape ? 20 : 24),
+              color: Colors.white
+            ),
+          const SizedBox(width: 8.0),
+          Text(
+            isLoading ? "Logging in..." : "Login",
+            style: TextStyle(
+              fontSize: isWebPortrait ? 18 : 
+                       (isLandscape ? 14 : 16),
+              color: Colors.white,
             ),
           ),
         ],
