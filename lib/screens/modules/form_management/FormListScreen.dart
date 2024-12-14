@@ -128,6 +128,37 @@ class _FormListScreenState extends State<FormListScreen> {
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
+                  : forms.isEmpty
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.list_alt,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No forms available.',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'You can create one using the Add button below.',
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: Colors.grey,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: forms.length,
@@ -145,7 +176,7 @@ class _FormListScreenState extends State<FormListScreen> {
                                   },
                                   borderRadius: BorderRadius.circular(12),
                                   child: Card(
-                                    elevation: 0,
+                                    elevation: 1,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -228,7 +259,7 @@ class _FormListScreenState extends State<FormListScreen> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       padding: const EdgeInsets.all(20),
-                                      elevation: 0,
+                                      elevation: 1,
                                     ),
                                     child: const Icon(
                                       Icons.check_circle_outline,
