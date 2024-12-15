@@ -5,6 +5,9 @@ import 'dart:convert';
 import '../../api_session_client_services/ApiResponseHandler.dart';
 import '../../api_session_client_services/Http.dart';
 import '../../api_session_client_services/SessionManager.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 
 class FormApiService {
   // GET ALL FORMS
@@ -220,6 +223,8 @@ class FormApiService {
     }
   }
 
+
+/*
     // EXPORT FORM AS PDF
   Future<void> exportFormAsPDF(
     BuildContext context,
@@ -267,6 +272,111 @@ class FormApiService {
       }
     } catch (e) {
       throw Exception('Exception while exporting form as PDF: $e');
+    }
+  }*/
+
+
+  Future<void> exportFormAsPDF(
+    BuildContext context,
+    int formId, {
+    required int signatureCount,
+    required Map<String, String> signatureDetails,
+  }) async {
+    try {
+      // No need for MANAGE_EXTERNAL_STORAGE here
+      // Just ensure you have normal storage permission if required (on older Android versions)
+
+      String? token = await SessionManager.getToken();
+
+      final queryParams = {
+        'format': 'pdf',
+        'signature_count': signatureCount.toString(),
+        'signature_space_before': '1',
+        'signature_space_between': '8',
+        'signature_space_date': '1',
+        'signature_space_after': '0',
+        ...signatureDetails,
+      };
+
+      final url = Uri.parse('${Http().baseUrl}/api/export/form/$formId')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/pdf',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        // Use app-specific external storage directory
+        final directory = await getExternalStorageDirectory();
+        if (directory == null) {
+          throw Exception('No external storage directory found');
+        }
+
+        // Create a subdirectory for Downloads inside app external directory
+        final downloadDir = Directory('${directory.path}/Download');
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
+
+        final fileName =
+            'form_${formId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+        final filePath = '${downloadDir.path}/$fileName';
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+
+        if (!context.mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF saved at: $filePath'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Attempt to open the file
+        final openResult = await OpenFile.open(filePath);
+        if (openResult.type != ResultType.done) {
+          // If it fails, let the user know
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open PDF. Please install a PDF viewer.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Download error: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error exporting PDF: $e'),
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _showSaveDialog(BuildContext context, String filePath) async {
+    try {
+      await OpenFile.open(filePath);
+      return true;
+    } catch (e) {
+      if (!context.mounted) return false;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al abrir el archivo: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
     }
   }
 

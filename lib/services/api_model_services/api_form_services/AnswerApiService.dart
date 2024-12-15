@@ -224,4 +224,76 @@ class AnswerApiService {
       throw e;
     }
   }
+
+
+  // nueva modoficiacion para construir el form submission
+
+
+  Future<Map<String, dynamic>> submitFormAnswers(
+      BuildContext context,
+      int formId,
+      List<Map<String, dynamic>> answers,
+      ) async {
+    try {
+      String? token = await SessionManager.getToken();
+
+      final response = await http.post(
+        Uri.parse('${Http().baseUrl}/api/form-submissions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'form_id': formId,
+          'answers': answers,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return json.decode(response.body);
+      } else if (response.statusCode == 401) {
+        final responseData = json.decode(response.body);
+        await ApiResponseHandler.handleExpiredToken(context, responseData);
+        throw Exception('Session expired');
+      } else {
+        final responseData = json.decode(response.body);
+        throw Exception(
+          'Error submitting form: ${responseData['message'] ?? response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Exception while submitting form: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getFormSubmissions(
+      BuildContext context,
+      int formId,
+      ) async {
+    try {
+      String? token = await SessionManager.getToken();
+
+      final response = await http.get(
+        Uri.parse('${Http().baseUrl}/api/form-submissions/$formId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else if (response.statusCode == 401) {
+        final responseData = json.decode(response.body);
+        await ApiResponseHandler.handleExpiredToken(context, responseData);
+        throw Exception('Session expired');
+      } else {
+        throw Exception('Error fetching form submissions');
+      }
+    } catch (e) {
+      throw Exception('Exception while fetching form submissions: $e');
+    }
+  }
 }
+

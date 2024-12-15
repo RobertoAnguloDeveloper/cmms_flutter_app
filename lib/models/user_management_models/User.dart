@@ -1,4 +1,6 @@
 //MODEL USER CLASS
+
+
 class User {
   final int id;
   final String id_type;
@@ -23,7 +25,7 @@ class User {
     required this.username,
     required this.password,
   });
-
+ /*
   factory User.fromJson(Map<String, dynamic>? json) {
     print("from Json");
     print(json);
@@ -40,6 +42,29 @@ class User {
       password: json?['password'],
     );
   }
+*/
+
+factory User.fromJson(Map<String, dynamic>? json) {
+  print("from Json");
+  print(json);
+  return User(
+    id: json?['id'] ?? 0,
+    id_type: json?['id_type'] ?? '',
+    identification: json?['identification'] ?? '',
+    firstName: json?['firstName'] ?? '',
+    lastName: json?['lastName'] ?? '',
+    email: json?['email'] ?? '',
+    role_id: json?['role_id'] is Map 
+       ? json!['role_id']['id'] ?? 0 
+       : (json?['role_id'] ?? 0),
+    environment_id: json?['environment_id'] is Map 
+       ? json!['environment_id']['id'] ?? 0 
+       : (json?['environment_id'] ?? 0),
+    username: json?['username'] ?? '',
+    password: json?['password'] ?? '',
+  );
+}
+
 
   Map<String, dynamic> toJson() {
     return {
