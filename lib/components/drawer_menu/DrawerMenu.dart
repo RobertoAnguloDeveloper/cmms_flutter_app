@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../models/Permission_set.dart';
+import '../../models/submission_management/QuestionsAnswerScreen.dart';
 import '../../screens/login_screen/LoginPage.dart';
 import '../../screens/modules/assign_permissions/PermissionsByRolesScreen.dart';
 import '../../screens/modules/form_management/FormListScreen.dart';
@@ -183,7 +184,24 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
-            // Logout Option
+            PermissionMenuItem(
+              title: 'Form Submission',
+              icon: FontAwesomeIcons.clipboardList,
+              condition: () => _isSuperUser,
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => QuestionsAnswerScreen(
+                      formTitle: 'Form Title',
+                      formDescription: 'Description of the form',
+                      permissionSet: widget.permissionSet!,
+                      sessionData: widget.sessionData!, formId: 0,
+                    ),
+                  ),
+                );
+              },
+            ),// Logout Option
             PermissionMenuItem(
               title: 'Log Out',
               icon: Icons.logout,
