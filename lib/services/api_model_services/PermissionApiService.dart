@@ -107,55 +107,55 @@ class PermissionApiService {
   }
 
   // DELETE PERMISSION
-Future<Map<String, dynamic>> deletePermission(
-    BuildContext context, int permissionId) async {
-  try {
-    String? token = await SessionManager.getToken();
-    final response = await http.delete(
-      Uri.parse('${Http().baseUrl}/api/permissions/$permissionId'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+  Future<Map<String, dynamic>> deletePermission(
+      BuildContext context, int permissionId) async {
+    try {
+      String? token = await SessionManager.getToken();
+      final response = await http.delete(
+        Uri.parse('${Http().baseUrl}/api/permissions/$permissionId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
-    if (response.statusCode == 200 || response.statusCode == 204) {
-      print('Permission deleted successfully.');
-      return {
-        'status': response.statusCode,
-        'message': 'Permission deleted successfully',
-      };
-    } else if (response.statusCode == 400) {
-      final responseData = json.decode(response.body);
-      if (responseData['error'] != null &&
-          responseData['error'].contains('Cannot delete permission')) {
-        // Retornar el error dinámico
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('Permission deleted successfully.');
         return {
           'status': response.statusCode,
-          'error': responseData['error'],
+          'message': 'Permission deleted successfully',
         };
+      } else if (response.statusCode == 400) {
+        final responseData = json.decode(response.body);
+        if (responseData['error'] != null &&
+            responseData['error'].contains('Cannot delete permission')) {
+          // Retornar el error dinámico
+          return {
+            'status': response.statusCode,
+            'error': responseData['error'],
+          };
+        } else {
+          return {
+            'status': response.statusCode,
+            'error':
+                'An unexpected error occurred while deleting the permission',
+          };
+        }
+      } else if (response.statusCode == 401) {
+        final responseData = json.decode(response.body);
+
+        // Manejo del token expirado
+        await ApiResponseHandler.handleExpiredToken(context, responseData);
+        throw Exception('Session expired. Redirecting to login.');
       } else {
-        return {
-          'status': response.statusCode,
-          'error': 'An unexpected error occurred while deleting the permission',
-        };
+        final responseData = json.decode(response.body);
+        throw Exception(
+            'Error deleting permission: ${responseData['message'] ?? response.statusCode}');
       }
-    } else if (response.statusCode == 401) {
-      final responseData = json.decode(response.body);
-
-      // Manejo del token expirado
-      await ApiResponseHandler.handleExpiredToken(context, responseData);
-      throw Exception('Session expired. Redirecting to login.');
-    } else {
-      final responseData = json.decode(response.body);
-      throw Exception(
-          'Error deleting permission: ${responseData['message'] ?? response.statusCode}');
+    } catch (e) {
+      throw Exception('Error deleting permission: $e');
     }
-  } catch (e) {
-    throw Exception('Error deleting permission: $e');
   }
-}
-
 
   //  GET PERMISSIONS BY ROLE
   Future<Map<String, dynamic>> fetchPermissionsByRole(
