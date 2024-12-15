@@ -39,26 +39,38 @@ class LoginFields extends StatelessWidget {
     final isMobile = screenSize.width < 600;
     final isSmallHeight = screenSize.height < 600;
     final isWebPortrait = kIsWeb && !isLandscape;
-    
+
     // Ajustamos dimensiones basadas en el contexto
-    final logoSize = screenSize.width * (
-      isWebPortrait ? 0.3 :  // Logo más grande en web portrait
-      isLandscape ? 0.15 : 
-      (isMobile ? 0.25 : 0.15)
-    );
-    
-    final formWidth = screenSize.width * (isMobile ? 0.85 : 0.3);
-    
+    final logoSize = screenSize.width *
+        (kIsWeb
+            ? (isWebPortrait
+                ? (isMobile
+                    ? 0.45
+                    : 0.3) // En web portrait: más grande si es móvil
+                : 0.15) // Web landscape se mantiene igual
+            : (isLandscape ? 0.23 : 0.37) // No web se mantiene como estaba
+        );
+
+    final formWidth = screenSize.width *
+        (isMobile && !isLandscape
+            ? 0.95 // Más ancho para móvil en portrait
+            : (isMobile ? 0.85 : 0.4) // Mantiene los otros tamaños igual
+        );
+
     // Ajustamos espaciado vertical
-    final double topPadding = isWebPortrait 
-        ? screenSize.height * 0.15  // Más espacio superior en web portrait
-        : isLandscape 
-            ? 10 
-            : (isSmallHeight ? screenSize.height * 0.03 : screenSize.height * 0.05);
-        
-    final double spaceBetweenElements = isWebPortrait 
-        ? 25  // Más espacio entre elementos en web portrait
-        : isLandscape || isSmallHeight ? 8 : 15;
+    final double topPadding = isWebPortrait
+        ? screenSize.height * 0.15 // Más espacio superior en web portrait
+        : isLandscape
+            ? 10
+            : (isSmallHeight
+                ? screenSize.height * 0.03
+                : screenSize.height * 0.05);
+
+    final double spaceBetweenElements = isWebPortrait
+        ? 25 // Más espacio entre elementos en web portrait
+        : isLandscape || isSmallHeight
+            ? 8
+            : 15;
 
     return Container(
       width: double.infinity,
@@ -74,13 +86,16 @@ class LoginFields extends StatelessWidget {
             width: logoSize,
             fit: BoxFit.contain,
           ),
-          SizedBox(height: spaceBetweenElements * 1.5),
+          SizedBox(height: spaceBetweenElements * 0),
           Text(
             "Log in",
             style: TextStyle(
-              fontSize: isWebPortrait ? 28.0 :  // Texto más grande en web portrait
-                      (isLandscape || isSmallHeight ? 18.0 : 
-                       (isMobile ? 20.0 : 24.0)),
+              fontSize: isWebPortrait
+                  ? 28.0
+                  : // Texto más grande en web portrait
+                  (isLandscape || isSmallHeight
+                      ? 18.0
+                      : (isMobile ? 20.0 : 24.0)),
               color: const Color(0xFF295075),
               fontWeight: FontWeight.bold,
             ),
@@ -122,8 +137,10 @@ class LoginFields extends StatelessWidget {
                 SizedBox(height: spaceBetweenElements * 1.2),
                 SizedBox(
                   width: formWidth * (isLandscape ? 0.5 : 0.7),
-                  height: isWebPortrait ? 50 : // Botón más alto en web portrait
-                         (isLandscape || isSmallHeight ? 40 : 45),
+                  height: isWebPortrait
+                      ? 50
+                      : // Botón más alto en web portrait
+                      (isLandscape || isSmallHeight ? 40 : 45),
                   child: _buildLoginButton(
                     isLandscape: isLandscape,
                     isWebPortrait: isWebPortrait,
@@ -155,20 +172,18 @@ class LoginFields extends StatelessWidget {
       focusNode: focusNode,
       enabled: !isLoading,
       obscureText: isPassword && obscurePassword,
-      style: TextStyle(fontSize: isWebPortrait ? 18 : 
-                                (isLandscape ? 14 : 16)),
+      style: TextStyle(fontSize: isWebPortrait ? 18 : (isLandscape ? 14 : 16)),
       decoration: InputDecoration(
         labelText: label,
         errorText: error,
         labelStyle: TextStyle(
-          fontSize: isWebPortrait ? 18 : 
-                   (isLandscape ? 14 : 16),
+          fontSize: isWebPortrait ? 18 : (isLandscape ? 14 : 16),
           color: Colors.grey[600],
         ),
         filled: true,
         fillColor: kIsWeb
             ? const Color.fromARGB(255, 222, 242, 255)
-            : Colors.white,
+            : Color.fromARGB(255, 222, 242, 255),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10.0),
           borderSide: BorderSide.none,
@@ -183,37 +198,29 @@ class LoginFields extends StatelessWidget {
         prefixIcon: Icon(
           icon,
           color: Colors.grey,
-          size: isWebPortrait ? 28 : 
-                (isLandscape ? 20 : 24),
+          size: isWebPortrait ? 28 : (isLandscape ? 20 : 24),
         ),
         suffixIcon: isPassword
             ? IconButton(
                 icon: Icon(
-                  obscurePassword
-                      ? Icons.visibility
-                      : Icons.visibility_off,
+                  obscurePassword ? Icons.visibility : Icons.visibility_off,
                   color: Colors.grey,
-                  size: isWebPortrait ? 28 : 
-                        (isLandscape ? 20 : 24),
+                  size: isWebPortrait ? 28 : (isLandscape ? 20 : 24),
                 ),
                 onPressed: onTogglePasswordVisibility,
               )
             : null,
         contentPadding: EdgeInsets.symmetric(
-          vertical: isWebPortrait ? 16 : 
-                   (isLandscape ? 8 : 12),
-          horizontal: isWebPortrait ? 16 : 
-                     (isLandscape ? 8 : 12),
+          vertical: isWebPortrait ? 16 : (isLandscape ? 8 : 12),
+          horizontal: isWebPortrait ? 16 : (isLandscape ? 8 : 12),
         ),
       ),
       onChanged: onChange,
     );
   }
 
-  Widget _buildLoginButton({
-    bool isLandscape = false, 
-    bool isWebPortrait = false
-  }) {
+  Widget _buildLoginButton(
+      {bool isLandscape = false, bool isWebPortrait = false}) {
     return ElevatedButton(
       onPressed: isLoading ? null : onLoginPressed,
       style: ElevatedButton.styleFrom(
@@ -223,8 +230,7 @@ class LoginFields extends StatelessWidget {
           borderRadius: BorderRadius.circular(20.0),
         ),
         padding: EdgeInsets.symmetric(
-          vertical: isWebPortrait ? 16 : 
-                   (isLandscape ? 8 : 12),
+          vertical: isWebPortrait ? 16 : (isLandscape ? 8 : 12),
         ),
       ),
       child: Row(
@@ -232,10 +238,8 @@ class LoginFields extends StatelessWidget {
         children: [
           if (isLoading)
             Container(
-              width: isWebPortrait ? 28 : 
-                     (isLandscape ? 20 : 24),
-              height: isWebPortrait ? 28 : 
-                      (isLandscape ? 20 : 24),
+              width: isWebPortrait ? 28 : (isLandscape ? 20 : 24),
+              height: isWebPortrait ? 28 : (isLandscape ? 20 : 24),
               padding: const EdgeInsets.all(2.0),
               child: const CircularProgressIndicator(
                 color: Colors.white,
@@ -243,18 +247,14 @@ class LoginFields extends StatelessWidget {
               ),
             )
           else
-            Icon(
-              Icons.login,
-              size: isWebPortrait ? 28 : 
-                    (isLandscape ? 20 : 24),
-              color: Colors.white
-            ),
+            Icon(Icons.login,
+                size: isWebPortrait ? 28 : (isLandscape ? 20 : 24),
+                color: Colors.white),
           const SizedBox(width: 8.0),
           Text(
             isLoading ? "Logging in..." : "Login",
             style: TextStyle(
-              fontSize: isWebPortrait ? 18 : 
-                       (isLandscape ? 14 : 16),
+              fontSize: isWebPortrait ? 18 : (isLandscape ? 14 : 16),
               color: Colors.white,
             ),
           ),

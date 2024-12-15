@@ -45,6 +45,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   bool isDeleting = false;
   bool showMenuButtons = false;
   bool isAnimating = false;
+
   Map<String, dynamic>? formDetails;
 
   // Lista de preguntas en creación
@@ -206,7 +207,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Pregunta eliminada exitosamente'),
+            content: Text('Question successfully deleted'),
             duration: Duration(milliseconds: 1500),
           ),
         );
@@ -217,7 +218,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['error'] ?? 'Error al eliminar la pregunta'),
+            content: Text(result['error'] ?? 'Error deleting the question'),
             duration: const Duration(milliseconds: 1500),
           ),
         );
@@ -251,7 +252,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Respuesta eliminada exitosamente'),
+          content: Text('Response deleted successfully'),
           duration: Duration(milliseconds: 500),
         ),
       );
@@ -262,7 +263,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al eliminar la respuesta: $e'),
+          content: Text('Error deleting the response: $e'),
           duration: const Duration(milliseconds: 1500),
           backgroundColor: Colors.red,
         ),
@@ -287,14 +288,14 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
           await _fetchFormDetails();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Respuesta actualizada exitosamente'),
+              content: Text('Response updated successfully'),
               duration: Duration(milliseconds: 1500),
             ),
           );
         } catch (e) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error al actualizar la respuesta: $e'),
+              content: Text('Error updating the response: $e'),
               duration: const Duration(milliseconds: 1500),
               backgroundColor: Colors.red,
             ),
@@ -441,7 +442,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                  'Por favor complete todas las preguntas antes de guardar.'),
+                  'Please complete all questions before saving.'),
               duration: Duration(seconds: 2),
             ),
           );
@@ -451,7 +452,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
       final formId = widget.form['id'];
       if (formId == null || formId is! int) {
-        throw Exception("El ID del formulario no es válido.");
+        throw Exception("The form ID is not valid.");
       }
 
       int order = (formDetails?['questions']?.length ?? 0) + 1;
@@ -470,7 +471,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         final newQuestionId = createdQuestion['question']['id'] as int;
         if (newQuestionId == null || newQuestionId is! int) {
           // Si no se obtuvo un ID válido, mostramos error
-          throw Exception("La pregunta creada no retornó un ID válido.");
+          throw Exception("The created question did not return a valid ID.");
         }
 
         // Asignar la pregunta al formulario
@@ -484,7 +485,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Preguntas creadas y asignadas exitosamente'),
+          content: Text('Questions created and assigned successfully'),
           duration: Duration(milliseconds: 500),
         ),
       );
@@ -498,7 +499,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error creando las preguntas: $e'),
+          content: Text('Error creating the questions: $e'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -550,315 +551,320 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         elevation: 0,
       ),
       backgroundColor: const Color(0xFFE3F2FD),
-      body: Stack(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Contenedor principal del formulario
-              Expanded(
-                child: isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : SingleChildScrollView(
-                        controller: _scrollController, // Controlador agregado
-                        padding: const EdgeInsets.only(
-                          left: 16.0,
-                          right: 16.0,
-                          top: 8.0,
-                          bottom: 100.0, // Aumentado para dar más espacio
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Tarjeta de título del formulario
-                            Center(
-                              child: Card(
-                                elevation: 1,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Container(
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.9,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
+      body: OrientationBuilder(builder: (context, orientation) {
+        return Stack(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Contenedor principal del formulario
+                Expanded(
+                  child: isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          controller: _scrollController, // Controlador agregado
+                          padding: const EdgeInsets.only(
+                            left: 16.0,
+                            right: 16.0,
+                            top: 8.0,
+                            bottom: 100.0, // Aumentado para dar más espacio
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Tarjeta de título del formulario
+                              Center(
+                                child: Card(
+                                  elevation: 1,
+                                  shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
-                                    border: const Border(
-                                      top: BorderSide(
-                                        color: Color.fromARGB(255, 1, 116, 209),
-                                        width: 8.0,
+                                  ),
+                                  child: Container(
+                                    width:
+                                        MediaQuery.of(context).size.width * 0.9,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: const Border(
+                                        top: BorderSide(
+                                          color:
+                                              Color.fromARGB(255, 1, 116, 209),
+                                          width: 8.0,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  child: Stack(
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(24.0),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              formTitle,
-                                              style: const TextStyle(
-                                                fontSize: 32,
-                                                fontWeight: FontWeight.w400,
+                                    child: Stack(
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.all(24.0),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                formTitle,
+                                                style: const TextStyle(
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.w400,
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              formDescription,
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey[600],
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                formDescription,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[600],
+                                                ),
                                               ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      Positioned(
-                                        top: 16,
-                                        right: 16,
-                                        child: IconButton(
-                                          icon: const Icon(Icons.edit),
-                                          color: Colors.grey[700],
-                                          onPressed: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (BuildContext context) =>
-                                                  FormUpdateDialog(
-                                                form:
-                                                    formDetails ?? widget.form,
-                                                refreshForms: _fetchFormDetails,
-                                              ),
-                                            );
-                                          },
+                                        Positioned(
+                                          top: 16,
+                                          right: 16,
+                                          child: IconButton(
+                                            icon: const Icon(Icons.edit),
+                                            color: Colors.grey[700],
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder:
+                                                    (BuildContext context) =>
+                                                        FormUpdateDialog(
+                                                  form: formDetails ??
+                                                      widget.form,
+                                                  refreshForms:
+                                                      _fetchFormDetails,
+                                                ),
+                                              );
+                                            },
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
 
-                            const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                            // Listado de preguntas
-                            if ((formDetails?['questions'] as List? ?? [])
-                                .isEmpty)
-                              const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: Text(
-                                    'No questions available',
-                                    style: TextStyle(
-                                        fontSize: 16, color: Colors.grey),
+                              // Listado de preguntas
+                              if ((formDetails?['questions'] as List? ?? [])
+                                  .isEmpty)
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Text(
+                                      'No questions available',
+                                      style: TextStyle(
+                                          fontSize: 16, color: Colors.grey),
+                                    ),
                                   ),
+                                )
+                              else
+                                QuestionsListWidget(
+                                  questions:
+                                      formDetails?['questions'] as List? ?? [],
+                                  deleteFormQuestion: _deleteFormQuestion,
+                                  showEditAnswerDialog: _showEditAnswerDialog,
+                                  deleteAnswer: _deleteAnswer,
+                                  shouldShowAnswerSelection:
+                                      _shouldShowAnswerSelection,
+                                  fetchFormDetails: _fetchFormDetails,
+                                  formId: widget.form['id'],
                                 ),
-                              )
-                            else
-                              QuestionsListWidget(
-                                questions:
-                                    formDetails?['questions'] as List? ?? [],
-                                deleteFormQuestion: _deleteFormQuestion,
-                                showEditAnswerDialog: _showEditAnswerDialog,
-                                deleteAnswer: _deleteAnswer,
-                                shouldShowAnswerSelection:
-                                    _shouldShowAnswerSelection,
-                                fetchFormDetails: _fetchFormDetails,
-                                formId: widget.form['id'],
-                              ),
 
-                            // Mostrar todas las cards de creación de pregunta
-                            for (int i = 0; i < _questionCreations.length; i++)
-                              _buildQuestionCreationCard(i),
-                          ],
+                              // Mostrar todas las cards de creación de pregunta
+                              for (int i = 0;
+                                  i < _questionCreations.length;
+                                  i++)
+                                _buildQuestionCreationCard(i),
+                            ],
+                          ),
+                        ),
+                ),
+                // Contenedor para botones flotantes
+                // Contenedor para botones flotantes
+                Container(
+                  width: 80,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      // Botón para añadir preguntas
+                      FloatingActionButton(
+                        heroTag: 'add_question',
+                        onPressed: () {
+                          setState(() {
+                            _questionCreations.add(
+                              _QuestionCreationData(
+                                questionTextController: TextEditingController(),
+                              ),
+                            );
+                          });
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (_scrollController.hasClients) {
+                              _scrollController.animateTo(
+                                _scrollController.position.maxScrollExtent,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          });
+                        },
+                        backgroundColor:
+                            const Color.fromARGB(255, 34, 118, 186),
+                        child: const Icon(
+                          Icons.add,
+                          size: 36,
+                          color: Colors.white,
                         ),
                       ),
-              ),
-              // Contenedor para botones flotantes
-              // Contenedor para botones flotantes
-              Container(
-                width: 80,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    // Botón para añadir preguntas
-                    FloatingActionButton(
-                      heroTag: 'add_question',
-                      onPressed: () {
-                        setState(() {
-                          _questionCreations.add(
-                            _QuestionCreationData(
-                              questionTextController: TextEditingController(),
+                      const SizedBox(height: 16),
+                      // Botón para asignar preguntas
+                      FloatingActionButton(
+                        heroTag: 'assign_question',
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) =>
+                                QuestionSelectionDialog(
+                              refreshQuestions: _fetchFormDetails,
+                              formId: widget.form['id'],
                             ),
                           );
-                        });
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (_scrollController.hasClients) {
-                            _scrollController.animateTo(
-                              _scrollController.position.maxScrollExtent,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeOut,
-                            );
-                          }
-                        });
-                      },
-                      backgroundColor: const Color.fromARGB(255, 34, 118, 186),
-                      child: const Icon(
-                        Icons.add,
-                        size: 36,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Botón para asignar preguntas
-                    FloatingActionButton(
-                      heroTag: 'assign_question',
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) =>
-                              QuestionSelectionDialog(
-                            refreshQuestions: _fetchFormDetails,
-                            formId: widget.form['id'],
-                          ),
-                        );
-                      },
-                      backgroundColor: Colors.white,
-                      child: const Icon(
-                        Icons.assignment,
-                        color: Color.fromARGB(255, 34, 118, 186),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Botón del menú
-                    FloatingActionButton(
-                      heroTag: 'menu_button',
-                      onPressed: isAnimating
-                          ? null // Deshabilita el botón mientras se anima
-                          : () {
-                              setState(() {
-                                isAnimating = true; // Comienza la animación
-                                showMenuButtons = !showMenuButtons;
-                              });
-
-                              // Marca la animación como completada después de su duración
-                              Future.delayed(const Duration(milliseconds: 300),
-                                  () {
-                                setState(() {
-                                  isAnimating =
-                                      false; // Permite volver a presionar el botón
-                                });
-                              });
-                            },
-                      backgroundColor: Colors.white,
-                      shape:
-                          const CircleBorder(), // Asegura que el botón sea perfectamente circular
-                      child: AnimatedRotation(
-                        turns:
-                            showMenuButtons ? 0.5 : 0, // Rotación de la flecha
-                        duration: const Duration(
-                            milliseconds: 300), // Duración de la animación
-                        curve: Curves.easeInOut, // Curva de la animación
+                        },
+                        backgroundColor: Colors.white,
                         child: const Icon(
-                          Icons.keyboard_arrow_down, // Icono de flecha
-                          size:
-                              28, // Tamaño del ícono más pequeño para ajustarse al botón
+                          Icons.assignment,
                           color: Color.fromARGB(255, 34, 118, 186),
                         ),
                       ),
-                      mini:
-                          true, // Hace que el botón sea más pequeño y compacto
-                    ),
+                      const SizedBox(height: 16),
 
-                    // Animación para mostrar/ocultar botones adicionales
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      switchInCurve: Curves.easeInOut,
-                      switchOutCurve: Curves.easeInOut,
-                      child: showMenuButtons
-                          ? Column(
-                              key: const ValueKey("buttonsVisible"),
-                              children: [
-                                const SizedBox(height: 16),
-                                FloatingActionButton(
-                                  heroTag: 'delete_form',
-                                  onPressed: _showDeleteConfirmation,
-                                  backgroundColor: Colors.red,
-                                  child: const Icon(
-                                    Icons.delete,
-                                    color: Colors.white,
-                                  ),
+                      if (orientation == Orientation.portrait)
+                        FloatingActionButton(
+                          heroTag: 'menu_button',
+                          onPressed: isAnimating
+                              ? null
+                              : () {
+                                  setState(() {
+                                    isAnimating = true;
+                                    showMenuButtons = !showMenuButtons;
+                                  });
+
+                                  Future.delayed(
+                                      const Duration(milliseconds: 300), () {
+                                    setState(() {
+                                      isAnimating = false;
+                                    });
+                                  });
+                                },
+                          backgroundColor: Colors.white,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Menu',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color.fromARGB(255, 34, 118, 186),
                                 ),
-                                const SizedBox(height: 16),
-                                FloatingActionButton(
-                                  heroTag: 'export_form',
-                                  onPressed: _showExportDialog,
-                                  backgroundColor:
-                                      const Color.fromARGB(255, 74, 180, 246),
-                                  child: const Icon(
-                                    Icons.ios_share_rounded,
-                                    color: Colors.white,
-                                  ),
+                              ),
+                              AnimatedRotation(
+                                turns: showMenuButtons ? 0.5 : 0,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                                child: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 24,
+                                  color: Color.fromARGB(255, 34, 118, 186),
                                 ),
-                              ],
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
-              )
-            ],
-          ),
-          if (_questionCreations.isNotEmpty)
-            Positioned(
-              bottom: 20,
-              left: 0,
-              right:
-                  80, // Para dejar espacio para los botones flotantes de la derecha
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ElevatedButton(
-                    onPressed: _saveAllQuestions,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          const Color.fromARGB(255, 23, 99, 161), // Fondo azul
-                      foregroundColor:
-                          Colors.white, // Color del texto y el ícono
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 50, vertical: 20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (showMenuButtons ||
+                          orientation == Orientation.landscape)
+                        // Animación para mostrar/ocultar botones adicionales
+                        Column(
+                          children: [
+                            const SizedBox(height: 8),
+                            FloatingActionButton(
+                              heroTag: 'delete_form',
+                              onPressed: _showDeleteConfirmation,
+                              backgroundColor: Colors.red,
+                              child: const Icon(
+                                Icons.delete,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            FloatingActionButton(
+                              heroTag: 'export_form',
+                              onPressed: _showExportDialog,
+                              backgroundColor:
+                                  const Color.fromARGB(255, 74, 180, 246),
+                              child: const Icon(
+                                Icons.ios_share_rounded,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                )
+              ],
+            ),
+            if (_questionCreations.isNotEmpty)
+              Positioned(
+                bottom: 20,
+                left: 0,
+                right:
+                    80, // Para dejar espacio para los botones flotantes de la derecha
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ElevatedButton(
+                      onPressed: _saveAllQuestions,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(
+                            255, 23, 99, 161), // Fondo azul
+                        foregroundColor:
+                            Colors.white, // Color del texto y el ícono
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 50, vertical: 20),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize
-                          .min, // Ajustar el tamaño del botón al contenido
-                      children: [
-                        const Icon(
-                          Icons.save, // Ícono de guardar
-                          color: Colors.white, // Ícono blanco
-                          size: 20, // Tamaño del ícono
-                        ),
-                        const SizedBox(
-                            width: 8), // Espaciado entre el ícono y el texto
-                        const Text(
-                          'Save',
-                          style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.white), // Texto blanco
-                        ),
-                      ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize
+                            .min, // Ajustar el tamaño del botón al contenido
+                        children: [
+                          const Icon(
+                            Icons.save, // Ícono de guardar
+                            color: Colors.white, // Ícono blanco
+                            size: 20, // Tamaño del ícono
+                          ),
+                          const SizedBox(
+                              width: 8), // Espaciado entre el ícono y el texto
+                          const Text(
+                            'Save',
+                            style: TextStyle(
+                                fontSize: 20,
+                                color: Colors.white), // Texto blanco
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
+          ],
+        );
+      }),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }

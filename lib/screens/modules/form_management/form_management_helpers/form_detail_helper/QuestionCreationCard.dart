@@ -24,6 +24,12 @@ class QuestionCreationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final isPortrait = mediaQuery.orientation == Orientation.portrait;
+    final dropdownWidth = isPortrait
+        ? mediaQuery.size.width * 0.4 // Más ancho en portrait
+        : mediaQuery.size.width * 0.25; // Más compacto en landscape
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(top: 16.0),
@@ -34,12 +40,11 @@ class QuestionCreationCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Fila para título y tipo de pregunta
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                // Campo de texto reducido para la pregunta
+                // Campo de texto para la pregunta
                 Expanded(
                   flex: 2,
                   child: TextField(
@@ -53,15 +58,17 @@ class QuestionCreationCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Selector de tipo de pregunta
-                Expanded(
-                  flex: 1,
+                // Selector de tipo de pregunta con tamaño dinámico
+                Container(
+                  width: dropdownWidth,
                   child: isLoadingQuestionTypes
                       ? const Center(
                           child: CircularProgressIndicator(),
                         )
                       : DropdownButtonFormField<int>(
                           value: selectedQuestionTypeId,
+                          isDense: true, // Reduce el espacio vertical
+                          isExpanded: true,
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: Colors.white,
@@ -70,7 +77,6 @@ class QuestionCreationCard extends StatelessWidget {
                               borderSide: const BorderSide(color: Colors.grey),
                             ),
                             enabledBorder: OutlineInputBorder(
-                              //borderRadius: BorderRadius.circular(8),
                               borderSide: const BorderSide(color: Colors.grey),
                             ),
                             contentPadding: const EdgeInsets.symmetric(
@@ -117,7 +123,16 @@ class QuestionCreationCard extends StatelessWidget {
                                 children: [
                                   Icon(icon, size: 20, color: Colors.grey[700]),
                                   const SizedBox(width: 8),
-                                  Text((type['type'] ?? '').toString()),
+                                  // Ajuste para textos largos
+                                  Flexible(
+                                    child: Text(
+                                      (type['type'] ?? '').toString(),
+                                      overflow: TextOverflow
+                                          .ellipsis, // Muestra "..." si el texto es muy largo
+                                      softWrap:
+                                          false, // No permite que el texto envuelva a la siguiente línea
+                                    ),
+                                  ),
                                 ],
                               ),
                             );
@@ -142,15 +157,15 @@ class QuestionCreationCard extends StatelessWidget {
               children: [
                 // Obligatorio
                 Row(
-                  children: [
-                    const Text('Required'),
-                    Switch(
-                      value: isRequired,
-                      onChanged: onRequiredChanged,
-                      activeColor: const Color.fromARGB(255, 9, 68, 196),
+                    // children: [
+                    //   const Text('Required'),
+                    //   Switch(
+                    //     value: isRequired,
+                    //     onChanged: onRequiredChanged,
+                    //     activeColor: const Color.fromARGB(255, 9, 68, 196),
+                    //   ),
+                    // ],
                     ),
-                  ],
-                ),
                 IconButton(
                   onPressed: onCancel,
                   icon: const Icon(Icons.delete_outlined,

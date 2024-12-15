@@ -251,7 +251,7 @@ class _QuestionDialogState extends State<QuestionDialog> {
                     child: TextField(
                       controller: _questionTextController,
                       decoration: const InputDecoration(
-                        hintText: 'Pregunta sin título',
+                        hintText: 'Untitled question',
                         border: UnderlineInputBorder(),
                         hintStyle: TextStyle(fontSize: 16),
                       ),
@@ -397,7 +397,7 @@ class _QuestionDialogState extends State<QuestionDialog> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Pregunta creada exitosamente'),
+          content: Text('Question created successfully'),
           duration: Duration(milliseconds: 500),
         ),
       );
@@ -440,7 +440,7 @@ Future<void> _createDefaultQuestion() async {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Pregunta creada exitosamente'),
+          content: Text('Question created successfully'),
           duration: Duration(milliseconds: 500),
         ),
       );
