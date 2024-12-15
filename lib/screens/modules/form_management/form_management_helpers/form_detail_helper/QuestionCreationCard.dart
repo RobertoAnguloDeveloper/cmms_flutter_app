@@ -63,82 +63,82 @@ class QuestionCreationCard extends StatelessWidget {
                   width: dropdownWidth,
                   child: isLoadingQuestionTypes
                       ? const Center(
-                    child: CircularProgressIndicator(),
-                  )
+                          child: CircularProgressIndicator(),
+                        )
                       : DropdownButtonFormField<int>(
-                    value: selectedQuestionTypeId,
-                    isDense: true, // Reduce el espacio vertical
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.grey),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: Colors.grey),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                    dropdownColor: Colors.white,
-                    hint: const Text('Type'),
-                    items: questionTypes.map((type) {
-                      final String questionTypeString =
-                      (type['type'] ?? '').toString().toLowerCase();
-
-                      IconData icon;
-                      switch (questionTypeString) {
-                        case 'multiple_choices':
-                          icon = Icons.radio_button_checked;
-                          break;
-                        case 'checkbox':
-                          icon = Icons.check_box;
-                          break;
-                        case 'date':
-                          icon = Icons.calendar_today;
-                          break;
-                        case 'datetime':
-                          icon = Icons.access_time;
-                          break;
-                        case 'text':
-                          icon = Icons.short_text;
-                          break;
-                        case 'user':
-                          icon = Icons.person;
-                          break;
-                        case 'signature':
-                          icon = Icons.draw;
-                          break;
-                        default:
-                          icon = Icons.question_answer;
-                      }
-
-                      return DropdownMenuItem<int>(
-                        value: type['id'] as int?,
-                        child: Row(
-                          children: [
-                            Icon(icon, size: 20, color: Colors.grey[700]),
-                            const SizedBox(width: 8),
-                            // Ajuste para textos largos
-                            Flexible(
-                              child: Text(
-                                (type['type'] ?? '').toString(),
-                                overflow: TextOverflow
-                                    .ellipsis, // Muestra "..." si el texto es muy largo
-                                softWrap:
-                                false, // No permite que el texto envuelva a la siguiente línea
-                              ),
+                          value: selectedQuestionTypeId,
+                          isDense: true, // Reduce el espacio vertical
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Colors.grey),
                             ),
-                          ],
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.grey),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                          dropdownColor: Colors.white,
+                          hint: const Text('Type'),
+                          items: questionTypes.map((type) {
+                            final String questionTypeString =
+                                (type['type'] ?? '').toString().toLowerCase();
+
+                            IconData icon;
+                            switch (questionTypeString) {
+                              case 'multiple_choices':
+                                icon = Icons.radio_button_checked;
+                                break;
+                              case 'checkbox':
+                                icon = Icons.check_box;
+                                break;
+                              case 'date':
+                                icon = Icons.calendar_today;
+                                break;
+                              case 'datetime':
+                                icon = Icons.access_time;
+                                break;
+                              case 'text':
+                                icon = Icons.short_text;
+                                break;
+                              case 'user':
+                                icon = Icons.person;
+                                break;
+                              case 'signature':
+                                icon = Icons.draw;
+                                break;
+                              default:
+                                icon = Icons.question_answer;
+                            }
+
+                            return DropdownMenuItem<int>(
+                              value: type['id'] as int?,
+                              child: Row(
+                                children: [
+                                  Icon(icon, size: 20, color: Colors.grey[700]),
+                                  const SizedBox(width: 8),
+                                  // Ajuste para textos largos
+                                  Flexible(
+                                    child: Text(
+                                      (type['type'] ?? '').toString(),
+                                      overflow: TextOverflow
+                                          .ellipsis, // Muestra "..." si el texto es muy largo
+                                      softWrap:
+                                          false, // No permite que el texto envuelva a la siguiente línea
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: onTypeChanged,
                         ),
-                      );
-                    }).toList(),
-                    onChanged: onTypeChanged,
-                  ),
                 ),
               ],
             ),
@@ -150,22 +150,22 @@ class QuestionCreationCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius:
-              const BorderRadius.vertical(bottom: Radius.circular(8)),
+                  const BorderRadius.vertical(bottom: Radius.circular(8)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Obligatorio
                 Row(
-                  // children: [
-                  //   const Text('Required'),
-                  //   Switch(
-                  //     value: isRequired,
-                  //     onChanged: onRequiredChanged,
-                  //     activeColor: const Color.fromARGB(255, 9, 68, 196),
-                  //   ),
-                  // ],
-                ),
+                    // children: [
+                    //   const Text('Required'),
+                    //   Switch(
+                    //     value: isRequired,
+                    //     onChanged: onRequiredChanged,
+                    //     activeColor: const Color.fromARGB(255, 9, 68, 196),
+                    //   ),
+                    // ],
+                    ),
                 IconButton(
                   onPressed: onCancel,
                   icon: const Icon(Icons.delete_outlined,

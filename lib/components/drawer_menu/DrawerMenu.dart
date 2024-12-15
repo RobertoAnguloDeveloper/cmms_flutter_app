@@ -167,8 +167,8 @@ class _DrawerMenuState extends State<DrawerMenu> {
               title: 'Form Management',
               icon: FontAwesomeIcons.fileCircleCheck,
               hasPermission: () =>
-              (widget.permissionSet?.hasPermission('view_forms') ??
-                  false) &&
+                  (widget.permissionSet?.hasPermission('view_forms') ??
+                      false) &&
                   (widget.permissionSet?.hasPermission('create_forms') ??
                       false),
               onTap: () {

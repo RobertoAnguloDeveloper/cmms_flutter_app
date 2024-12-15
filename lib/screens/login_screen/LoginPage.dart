@@ -183,74 +183,47 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isPhoneOnWeb = kIsWeb &&
-        (ui.window.physicalSize.width / ui.window.devicePixelRatio) < 600;
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-    final isWebLandscape = kIsWeb && isLandscape;
-    final isMobile = !kIsWeb;
-    final isWebFullScreen = kIsWeb && !isPhoneOnWeb;
+@override
+Widget build(BuildContext context) {
+  final screenSize = MediaQuery.of(context).size;
+  final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+  final isWeb = kIsWeb;
 
-    final scaleFactor = isWebLandscape ? 0.7 : 1.0;
-
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          // Fondo web y móvil
-          if (kIsWeb)
+  return Scaffold(
+    // Permitimos scroll cuando el teclado aparece
+    resizeToAvoidBottomInset: true,
+    body: SingleChildScrollView(  // Añadimos scroll
+      child: ConstrainedBox(  // Aseguramos altura mínima
+        constraints: BoxConstraints(
+          minHeight: screenSize.height,
+        ),
+        child: Stack(
+          children: [
+            // Fondo responsivo
             Positioned.fill(
               child: Image.asset(
-                'assets/web_login_background.png',
+                isWeb 
+                    ? 'assets/web_login_background.png'
+                    : 'assets/login_background.png',
                 fit: BoxFit.cover,
+                height: isWeb ? null : screenSize.height * 1.2,
               ),
             ),
-          if (!kIsWeb)
-            Positioned.fill(
-              child: Container(
-                color: const Color(0xFFD9F0F6),
-              ),
-            ),
-          // Imagen superior para móvil
-          if (isMobile)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height *
-                    0.45, // Reducido para más espacio arriba
-                child: Image.asset(
-                  'assets/login_background.png',
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          // Posicionamiento del formulario
-          Positioned(
-            left: 0,
-            right: 0,
-            top: kIsWeb
-                ? (isPhoneOnWeb // Caso: Web móvil
-                    ? (isLandscape
-                        ? MediaQuery.of(context).size.height * 0.0
-                        : MediaQuery.of(context).size.height * 0.25)
-                    : MediaQuery.of(context).size.height * 0.12)
-                : (isLandscape
-                    ? MediaQuery.of(context).size.height *
-                        0.5 // Más abajo en landscape móvil
-                    : MediaQuery.of(context).size.height *
-                        0.4), // Normal en portrait móvil
-            child: Transform.scale(
-              scale: scaleFactor,
+            // Contenedor principal
+            Align(
               alignment: Alignment.topCenter,
-              child: Padding(
+              child: Container(
+                margin: EdgeInsets.only(
+                  top: isWeb 
+                      ? 0
+                      : isPortrait 
+                          ? screenSize.height * 0.15
+                          : screenSize.height * 0.1,
+                ),
+                // Añadimos padding para evitar que el contenido toque los bordes
                 padding: EdgeInsets.symmetric(
-                  horizontal: isWebFullScreen
-                      ? 300.0 // Márgenes amplios en escritorio
-                      : 20.0, // Márgenes estándar en móvil y web móvil
+                  vertical: 20.0,
+                  horizontal: 16.0,
                 ),
                 child: FormBuilder(
                   key: _formKey,
@@ -283,11 +256,12 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 void showToast(BuildContext context, String message) {

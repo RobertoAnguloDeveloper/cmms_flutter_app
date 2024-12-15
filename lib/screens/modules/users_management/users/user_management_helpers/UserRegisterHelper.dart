@@ -55,7 +55,7 @@ class UserRegisterHelper {
               }
               return Container(
                 width: 400,
-                height: 840,
+                height: 800,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(30.0),
@@ -147,8 +147,7 @@ class UserRegisterHelper {
                                 },
                                 onChanged: (_) {
                                   setState(() {
-                                    emailError =
-                                        null; 
+                                    emailError = null;
                                   });
                                 },
                               ),
@@ -164,11 +163,9 @@ class UserRegisterHelper {
                                   ),
                                 ),
                                 style: TextStyle(fontSize: 18),
-                                keyboardType: TextInputType
-                                    .number, 
+                                keyboardType: TextInputType.number,
                                 inputFormatters: <TextInputFormatter>[
-                                  FilteringTextInputFormatter
-                                      .digitsOnly, 
+                                  FilteringTextInputFormatter.digitsOnly,
                                 ],
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -182,8 +179,7 @@ class UserRegisterHelper {
                                 controller: controllerUsername,
                                 decoration: InputDecoration(
                                   labelText: 'Username',
-                                  errorText:
-                                      usernameError, 
+                                  errorText: usernameError,
                                   border: OutlineInputBorder(),
                                   contentPadding: EdgeInsets.symmetric(
                                     vertical: 15.0,
@@ -198,8 +194,7 @@ class UserRegisterHelper {
                                 },
                                 onChanged: (_) {
                                   setState(() {
-                                    usernameError =
-                                        null; 
+                                    usernameError = null;
                                   });
                                 },
                               ),
@@ -325,15 +320,14 @@ class UserRegisterHelper {
                               } else if (response['error'] ==
                                   'Username already exists') {
                                 setState(() {
-                                  usernameError =
-                                      'Username already exists'; 
+                                  usernameError = 'Username already exists';
                                 });
-                               } else if (response['error'] ==
+                              } else if (response['error'] ==
                                   'Email already exists') {
                                 setState(() {
                                   emailError = 'Email already exists';
                                 });
-                              }  else {
+                              } else {
                                 // SnackBarUtil.showCustomSnackBar(
                                 //   context: context,
                                 //   message:
@@ -351,7 +345,7 @@ class UserRegisterHelper {
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
                               const Color.fromARGB(255, 34, 118, 186),
-                              foregroundColor: Colors.white,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             vertical: 15.0,
                             horizontal: 40.0,
@@ -359,13 +353,17 @@ class UserRegisterHelper {
                           textStyle: const TextStyle(fontSize: 20),
                         ),
                         child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.save, size: 24),
-                      SizedBox(width: 10),
-                      Text('Save User'),
-                    ],
-                  ),
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              Icons.save,
+                              size: 24,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 10),
+                            Text('Save'),
+                          ],
+                        ),
                       ),
                     ),
                   ],

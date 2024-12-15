@@ -1,10 +1,10 @@
+import 'package:cmms_app/screens/modules/form_management/form_management_helpers/form_detail_helper/QuestionCreationCard.dart';
 import 'package:flutter/material.dart';
 import '../../../../services/api_model_services/UserApiService.dart';
 import '../../../../services/api_model_services/api_form_services/AnswerApiService.dart';
 import '../../../../services/api_model_services/api_form_services/FormApiService.dart';
 import '../../../../services/api_model_services/api_form_services/QuestionApiService.dart';
 import 'FormUpdateDialog.dart';
-import 'form_detail_helper/QuestionCreationCard.dart';
 import 'form_detail_helper/QuestionsListWidget.dart';
 import 'form_dialogs/ExportFormDialog.dart';
 import 'form_dialogs/FormDialogs.dart';
@@ -69,7 +69,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
     try {
       final details =
-      await _formApiService.fetchFormById(context, widget.form['id']);
+          await _formApiService.fetchFormById(context, widget.form['id']);
       if (mounted) {
         setState(() {
           formDetails = details;
@@ -177,7 +177,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
       BuildContext context, int formQuestionId) async {
     try {
       final bool? shouldDelete =
-      await FormDialogs.showDeleteQuestionDialog(context);
+          await FormDialogs.showDeleteQuestionDialog(context);
 
       if (shouldDelete != true) return;
 
@@ -466,7 +466,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         };
 
         final createdQuestion =
-        await _formQuestionApiService.createQuestion(context, questionData);
+            await _formQuestionApiService.createQuestion(context, questionData);
         // Asegurar que createdQuestion contenga un 'id' int
         final newQuestionId = createdQuestion['question']['id'] as int;
         if (newQuestionId == null || newQuestionId is! int) {
@@ -536,10 +536,10 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   @override
   Widget build(BuildContext context) {
     final formTitle =
-    (formDetails?['title'] ?? widget.form['title'] ?? 'Untitled Form')
-        .toString();
+        (formDetails?['title'] ?? widget.form['title'] ?? 'Untitled Form')
+            .toString();
     final formDescription =
-    (formDetails?['description'] ?? 'No description').toString();
+        (formDetails?['description'] ?? 'No description').toString();
 
     return Scaffold(
       appBar: AppBar(
@@ -562,126 +562,126 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                   child: isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
-                    controller: _scrollController, // Controlador agregado
-                    padding: const EdgeInsets.only(
-                      left: 16.0,
-                      right: 16.0,
-                      top: 8.0,
-                      bottom: 100.0, // Aumentado para dar más espacio
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Tarjeta de título del formulario
-                        Center(
-                          child: Card(
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Container(
-                              width:
-                              MediaQuery.of(context).size.width * 0.9,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: const Border(
-                                  top: BorderSide(
-                                    color:
-                                    Color.fromARGB(255, 1, 116, 209),
-                                    width: 8.0,
+                          controller: _scrollController, // Controlador agregado
+                          padding: const EdgeInsets.only(
+                            left: 16.0,
+                            right: 16.0,
+                            top: 8.0,
+                            bottom: 100.0, // Aumentado para dar más espacio
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Tarjeta de título del formulario
+                              Center(
+                                child: Card(
+                                  elevation: 1,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
-                                ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(24.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  child: Container(
+                                    width:
+                                        MediaQuery.of(context).size.width * 0.9,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: const Border(
+                                        top: BorderSide(
+                                          color:
+                                              Color.fromARGB(255, 1, 116, 209),
+                                          width: 8.0,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Stack(
                                       children: [
-                                        Text(
-                                          formTitle,
-                                          style: const TextStyle(
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.w400,
+                                        Padding(
+                                          padding: const EdgeInsets.all(24.0),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                formTitle,
+                                                style: const TextStyle(
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.w400,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                formDescription,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          formDescription,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
+                                        Positioned(
+                                          top: 16,
+                                          right: 16,
+                                          child: IconButton(
+                                            icon: const Icon(Icons.edit),
+                                            color: Colors.grey[700],
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder:
+                                                    (BuildContext context) =>
+                                                        FormUpdateDialog(
+                                                  form: formDetails ??
+                                                      widget.form,
+                                                  refreshForms:
+                                                      _fetchFormDetails,
+                                                ),
+                                              );
+                                            },
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  Positioned(
-                                    top: 16,
-                                    right: 16,
-                                    child: IconButton(
-                                      icon: const Icon(Icons.edit),
-                                      color: Colors.grey[700],
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder:
-                                              (BuildContext context) =>
-                                              FormUpdateDialog(
-                                                form: formDetails ??
-                                                    widget.form,
-                                                refreshForms:
-                                                _fetchFormDetails,
-                                              ),
-                                        );
-                                      },
+                                ),
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Listado de preguntas
+                              if ((formDetails?['questions'] as List? ?? [])
+                                  .isEmpty)
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Text(
+                                      'No questions available',
+                                      style: TextStyle(
+                                          fontSize: 16, color: Colors.grey),
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
+                                )
+                              else
+                                QuestionsListWidget(
+                                  questions:
+                                      formDetails?['questions'] as List? ?? [],
+                                  deleteFormQuestion: _deleteFormQuestion,
+                                  showEditAnswerDialog: _showEditAnswerDialog,
+                                  deleteAnswer: _deleteAnswer,
+                                  shouldShowAnswerSelection:
+                                      _shouldShowAnswerSelection,
+                                  fetchFormDetails: _fetchFormDetails,
+                                  formId: widget.form['id'],
+                                ),
+
+                              // Mostrar todas las cards de creación de pregunta
+                              for (int i = 0;
+                                  i < _questionCreations.length;
+                                  i++)
+                                _buildQuestionCreationCard(i),
+                            ],
                           ),
                         ),
-
-                        const SizedBox(height: 16),
-
-                        // Listado de preguntas
-                        if ((formDetails?['questions'] as List? ?? [])
-                            .isEmpty)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Text(
-                                'No questions available',
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.grey),
-                              ),
-                            ),
-                          )
-                        else
-                          QuestionsListWidget(
-                            questions:
-                            formDetails?['questions'] as List? ?? [],
-                            deleteFormQuestion: _deleteFormQuestion,
-                            showEditAnswerDialog: _showEditAnswerDialog,
-                            deleteAnswer: _deleteAnswer,
-                            shouldShowAnswerSelection:
-                            _shouldShowAnswerSelection,
-                            fetchFormDetails: _fetchFormDetails,
-                            formId: widget.form['id'],
-                          ),
-
-                        // Mostrar todas las cards de creación de pregunta
-                        for (int i = 0;
-                        i < _questionCreations.length;
-                        i++)
-                          _buildQuestionCreationCard(i),
-                      ],
-                    ),
-                  ),
                 ),
                 // Contenedor para botones flotantes
                 // Contenedor para botones flotantes
@@ -713,7 +713,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                           });
                         },
                         backgroundColor:
-                        const Color.fromARGB(255, 34, 118, 186),
+                            const Color.fromARGB(255, 34, 118, 186),
                         child: const Icon(
                           Icons.add,
                           size: 36,
@@ -729,9 +729,9 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                             context: context,
                             builder: (BuildContext context) =>
                                 QuestionSelectionDialog(
-                                  refreshQuestions: _fetchFormDetails,
-                                  formId: widget.form['id'],
-                                ),
+                              refreshQuestions: _fetchFormDetails,
+                              formId: widget.form['id'],
+                            ),
                           );
                         },
                         backgroundColor: Colors.white,
@@ -748,18 +748,18 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                           onPressed: isAnimating
                               ? null
                               : () {
-                            setState(() {
-                              isAnimating = true;
-                              showMenuButtons = !showMenuButtons;
-                            });
+                                  setState(() {
+                                    isAnimating = true;
+                                    showMenuButtons = !showMenuButtons;
+                                  });
 
-                            Future.delayed(
-                                const Duration(milliseconds: 300), () {
-                              setState(() {
-                                isAnimating = false;
-                              });
-                            });
-                          },
+                                  Future.delayed(
+                                      const Duration(milliseconds: 300), () {
+                                    setState(() {
+                                      isAnimating = false;
+                                    });
+                                  });
+                                },
                           backgroundColor: Colors.white,
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -786,7 +786,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                         ),
                       if (showMenuButtons ||
                           orientation == Orientation.landscape)
-                      // Animación para mostrar/ocultar botones adicionales
+                        // Animación para mostrar/ocultar botones adicionales
                         Column(
                           children: [
                             const SizedBox(height: 8),
@@ -804,7 +804,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                               heroTag: 'export_form',
                               onPressed: _showExportDialog,
                               backgroundColor:
-                              const Color.fromARGB(255, 74, 180, 246),
+                                  const Color.fromARGB(255, 74, 180, 246),
                               child: const Icon(
                                 Icons.ios_share_rounded,
                                 color: Colors.white,
@@ -822,7 +822,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                 bottom: 20,
                 left: 0,
                 right:
-                80, // Para dejar espacio para los botones flotantes de la derecha
+                    80, // Para dejar espacio para los botones flotantes de la derecha
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -832,7 +832,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                         backgroundColor: const Color.fromARGB(
                             255, 23, 99, 161), // Fondo azul
                         foregroundColor:
-                        Colors.white, // Color del texto y el ícono
+                            Colors.white, // Color del texto y el ícono
                         padding: const EdgeInsets.symmetric(
                             horizontal: 50, vertical: 20),
                         shape: RoundedRectangleBorder(

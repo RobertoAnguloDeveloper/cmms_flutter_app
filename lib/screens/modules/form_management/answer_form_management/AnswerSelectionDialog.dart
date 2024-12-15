@@ -60,7 +60,6 @@ class _AnswerSelectionDialogState extends State<AnswerSelectionDialog> {
 
   Future<void> _assignSelectedAnswers() async {
     try {
-      // Iterar sobre cada respuesta seleccionada
       for (int answerId in selectedAnswerIds) {
         await _answerApiService.assignAnswerToQuestion(
           context,
@@ -71,7 +70,6 @@ class _AnswerSelectionDialogState extends State<AnswerSelectionDialog> {
 
       if (!mounted) return;
 
-      // Mostrar mensaje de éxito
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Answers assigned successfully'),
@@ -79,10 +77,8 @@ class _AnswerSelectionDialogState extends State<AnswerSelectionDialog> {
         ),
       );
 
-      // Actualizar la lista de preguntas/respuestas
       widget.refreshAnswers();
 
-      // Cerrar el diálogo
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
@@ -102,78 +98,37 @@ class _AnswerSelectionDialogState extends State<AnswerSelectionDialog> {
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20.0),
+        borderRadius: BorderRadius.circular(16.0),
       ),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Select Answers for:\n${widget.questionText}',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 400, // Smaller width for a more compact dialog
+          maxHeight: 500, // Smaller height for better fit
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Select Answers for:\n${widget.questionText}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            if (isLoading)
-              const CircularProgressIndicator()
-            else if (availableAnswers.isEmpty)
-              Column(
-                children: [
-                  const Text('No answers available'),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await showDialog(
-                        context: context,
-                        builder: (context) => CreateAnswerDialog(
-                          refreshAnswers: _fetchAnswers,
-                        ),
-                      );
-
-                      if (result == true) {
-                        await _fetchAnswers();
-                      }
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Create New Answer'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 34, 118, 186),
-                    ),
-                  ),
-                ],
-              )
-            else
-              Flexible(
-                child: Column(
+              const SizedBox(height: 12),
+              if (isLoading)
+                const CircularProgressIndicator()
+              else if (availableAnswers.isEmpty)
+                Column(
                   children: [
-                    Expanded(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: availableAnswers.length,
-                        itemBuilder: (context, index) {
-                          final answer = availableAnswers[index];
-                          return CheckboxListTile(
-                            title: Text(answer['value'] ?? ''),
-                            value: selectedAnswerIds.contains(answer['id']),
-                            onChanged: (bool? selected) {
-                              setState(() {
-                                if (selected == true) {
-                                  selectedAnswerIds.add(answer['id']);
-                                } else {
-                                  selectedAnswerIds.remove(answer['id']);
-                                }
-                              });
-                            },
-                          );
-                        },
-                      ),
+                    const Text(
+                      'No answers available',
+                      style: TextStyle(fontSize: 14),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     ElevatedButton.icon(
                       onPressed: () async {
                         final result = await showDialog(
@@ -188,41 +143,99 @@ class _AnswerSelectionDialogState extends State<AnswerSelectionDialog> {
                         }
                       },
                       icon: const Icon(Icons.add),
-                      label: const Text('Add More Answers'),
+                      label: const Text('Create New Answer'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor:
                             const Color.fromARGB(255, 34, 118, 186),
-                        foregroundColor: Colors.white,
                       ),
                     ),
                   ],
-                ),
-              ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed:
-                      selectedAnswerIds.isEmpty ? null : _assignSelectedAnswers,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color.fromARGB(255, 34, 118, 186),
+                )
+              else
+                Flexible(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: availableAnswers.length,
+                          itemBuilder: (context, index) {
+                            final answer = availableAnswers[index];
+                            return CheckboxListTile(
+                              title: Text(
+                                answer['value'] ?? '',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                              value: selectedAnswerIds.contains(answer['id']),
+                              onChanged: (bool? selected) {
+                                setState(() {
+                                  if (selected == true) {
+                                    selectedAnswerIds.add(answer['id']);
+                                  } else {
+                                    selectedAnswerIds.remove(answer['id']);
+                                  }
+                                });
+                              },
+                              activeColor: const Color.fromARGB(255, 34, 118, 186),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final result = await showDialog(
+                            context: context,
+                            builder: (context) => CreateAnswerDialog(
+                              refreshAnswers: _fetchAnswers,
+                            ),
+                          );
+
+                          if (result == true) {
+                            await _fetchAnswers();
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.add,
+                          color: Colors.white, // Cambiado a blanco
+                        ),
+                        label: const Text('Add More Answers'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              const Color.fromARGB(255, 34, 118, 186),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'Assign',
-                    style: TextStyle(
-                      color: Colors.white, // Cambia el color del texto a blanco
+                ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: selectedAnswerIds.isEmpty
+                        ? null
+                        : _assignSelectedAnswers,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 34, 118, 186),
+                    ),
+                    child: const Text(
+                      'Assign',
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

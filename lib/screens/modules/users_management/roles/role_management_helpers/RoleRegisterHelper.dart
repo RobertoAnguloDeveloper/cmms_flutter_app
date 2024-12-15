@@ -127,8 +127,8 @@ class _RoleHelperState extends State<RoleRegisterHelper> {
                     labelText: 'Role Name',
                     labelStyle: const TextStyle(fontSize: 18),
                     border: OutlineInputBorder(),
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 15.0, horizontal: 18.0),
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 15.0, horizontal: 18.0),
                   ),
                   style: const TextStyle(fontSize: 16),
                   validator: (value) {
@@ -145,8 +145,8 @@ class _RoleHelperState extends State<RoleRegisterHelper> {
                     labelText: 'Description',
                     labelStyle: const TextStyle(fontSize: 18),
                     border: OutlineInputBorder(),
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 15.0, horizontal: 18.0),
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 15.0, horizontal: 18.0),
                   ),
                   maxLines: 3,
                   style: const TextStyle(fontSize: 16),
@@ -187,9 +187,13 @@ class _RoleHelperState extends State<RoleRegisterHelper> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.save, size: 24),
+                      Icon(
+                        Icons.save,
+                        size: 24,
+                        color: Colors.white,
+                      ),
                       SizedBox(width: 10),
-                      Text('Save Role'),
+                      Text('Save'),
                     ],
                   ),
                 ),

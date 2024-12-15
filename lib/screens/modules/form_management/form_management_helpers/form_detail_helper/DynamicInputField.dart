@@ -130,31 +130,38 @@ class DynamicInputField extends StatelessWidget {
       case 'user':
         return _buildUserSelectionField();
       case 'date':
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: InkWell(
-            onTap: () {}, // Preview only
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.white,
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.calendar_today,
-                      color: Color.fromARGB(255, 34, 118, 186)),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Select Date (DD/MM/YYYY)',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ],
+  return Container(
+    padding: const EdgeInsets.all(16),
+    child: InkWell(
+      onTap: () {}, // Preview only
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.white,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today,
+                color: Color.fromARGB(255, 34, 118, 186)),
+            const SizedBox(width: 8),
+            Expanded( // Hace que el texto se ajuste al espacio disponible
+              child: Text(
+                'Select Date (DD/MM/YYYY)',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  overflow: TextOverflow.ellipsis, // Ajusta el texto si es muy largo
+                ),
+                maxLines: 1, // Opcional: restringe a una línea
               ),
             ),
-          ),
-        );
+          ],
+        ),
+      ),
+    ),
+  );
+
 
       case 'datetime':
         return Container(

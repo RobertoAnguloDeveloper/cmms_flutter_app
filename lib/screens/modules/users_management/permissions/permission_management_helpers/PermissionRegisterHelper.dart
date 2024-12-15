@@ -175,9 +175,13 @@ class _RegisterPermissionState extends State<RegisterPermission> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.save, size: 24),
+                      Icon(
+                        Icons.save,
+                        size: 24,
+                        color: Colors.white,
+                      ),
                       SizedBox(width: 10),
-                      Text('Save Permission'),
+                      Text('Save'),
                     ],
                   ),
                 ),
