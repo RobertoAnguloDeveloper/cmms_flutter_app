@@ -60,7 +60,10 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login successful')),
+          const SnackBar(
+            content: Text('Login successful'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
@@ -68,6 +71,15 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Login failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -149,20 +161,44 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
                           controller: _usernameController,
                           decoration: const InputDecoration(
                             labelText: 'Username',
+                            border: OutlineInputBorder(),
+                            errorBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.red),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.red),
+                            ),
                           ),
+                          key: const Key('username_field'),
                         ),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _passwordController,
                           decoration: const InputDecoration(
                             labelText: 'Password',
+                            border: OutlineInputBorder(),
+                            errorBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.red),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.red),
+                            ),
                           ),
                           obscureText: true,
+                          key: const Key('password_field'),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
-                          onPressed: _login,
-                          child: const Text('Login'),
+                          onPressed: _isLoading ? null : _login,
+                          child: _isLoading
+                              ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                              : const Text('Login'),
                         ),
                       ],
                     ),

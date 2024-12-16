@@ -6,8 +6,8 @@ class ApiConfig {
   // Private constructor to prevent instantiation
   ApiConfig._();
 
-  /// Local development URL
-  static const String _localUrl = 'http://localhost:5000';
+  /// Local development URL for all environments
+  static const String _localUrl = 'http://127.0.0.1:5000';
 
   /// Remote server URL
   static const String _remoteUrl = 'http://3.129.92.139';
@@ -28,15 +28,11 @@ class ApiConfig {
     }
 
     if (kIsWeb) {
-      return _remoteUrl;
+      return _localUrl;
     }
 
     if (Platform.isAndroid) {
       return _androidEmulatorUrl;
-    }
-
-    if (Platform.isIOS) {
-      return _localUrl;
     }
 
     return _localUrl;
@@ -58,8 +54,8 @@ class ApiConfig {
   static bool get enableApiLogs => _isDevelopment;
 
   /// Checks if the current URL is local
-  static bool get isLocalEnvironment => baseUrl.contains('localhost') ||
-      baseUrl.contains('10.0.2.2');
+  static bool get isLocalEnvironment =>
+      baseUrl.contains('127.0.0.1') || baseUrl.contains('10.0.2.2');
 
   /// Get full URL for a given endpoint
   static String getEndpointUrl(String endpoint) {

@@ -60,22 +60,19 @@ class ApiClient {
       receiveTimeout: _defaultTimeout,
       connectTimeout: _defaultTimeout,
       sendTimeout: _defaultTimeout,
-      validateStatus: (status) {
-        return status != null && status < 500;
-      },
-      // Essential for web CORS
-      extra: {
-        'withCredentials': true,
-      },
+      validateStatus: (status) => true,
+      headers: _defaultHeaders,
     ));
-
     _initializeInterceptors();
   }
 
-  /// Initialize Dio interceptors for logging, auth, and error handling
+  Map<String, String> get _defaultHeaders => {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  };
+
   void _initializeInterceptors() {
-    // Add logging in debug mode
-    if (!kReleaseMode) {
+    if (kDebugMode) {
       _dio.interceptors.add(LogInterceptor(
         requestBody: true,
         responseBody: true,
@@ -88,124 +85,66 @@ class ApiClient {
       ));
     }
 
-    // Add auth and error handling interceptor
     _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: _handleRequest,
-      onResponse: _handleResponse,
-      onError: _handleError,
-    ));
-  }
+      onRequest: (options, handler) async {
+        try {
+          final token = await _storage.read(key: _tokenKey);
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+        } catch (e) {
+          print('Error reading token: $e');
+        }
+        return handler.next(options);
+      },
+      onResponse: (response, handler) async {
+        if (response.data is Map && response.data['access_token'] != null) {
+          await saveToken(response.data['access_token']);
+        }
+        return handler.next(response);
+      },
+      onError: (error, handler) async {
+        print('Error Type: ${error.type}');
+        print('Error Message: ${error.message}');
+        print('Error Response: ${error.response}');
 
-  Future<void> _handleRequest(
-      RequestOptions options,
-      RequestInterceptorHandler handler,
-      ) async {
-    // Set base headers
-    options.headers.addAll({
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    });
+        if (error.type == DioExceptionType.badResponse) {
+          final statusCode = error.response?.statusCode;
+          final responseData = error.response?.data;
 
-    // Web-specific configuration
-    if (kIsWeb) {
-      // Remove any existing CORS headers to prevent conflicts
-      options.headers.remove('Origin');
-
-      options.headers.addAll({
-        'X-Requested-With': 'XMLHttpRequest',
-      });
-
-      // Enable CORS credentials
-      options.extra['withCredentials'] = true;
-    }
-
-    try {
-      final token = await _storage.read(key: _tokenKey);
-      if (token != null) {
-        options.headers['Authorization'] = 'Bearer $token';
-      }
-    } catch (e) {
-      print('Error reading token: $e');
-    }
-
-    return handler.next(options);
-  }
-
-  /// Handle incoming responses
-  void _handleResponse(
-      Response response,
-      ResponseInterceptorHandler handler,
-      ) {
-    // Extract and save token if present
-    if (response.data is Map && response.data['access_token'] != null) {
-      saveToken(response.data['access_token']);
-    }
-
-    return handler.next(response);
-  }
-
-  /// Handle errors
-  Future<void> _handleError(
-      DioException e,
-      ErrorInterceptorHandler handler,
-      ) async {
-    print('Error Type: ${e.type}');
-    print('Error Message: ${e.message}');
-    print('Error Response: ${e.response}');
-
-    switch (e.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        throw TimeoutException('Connection timed out. Please check your internet connection.');
-
-      case DioExceptionType.badResponse:
-        final statusCode = e.response?.statusCode;
-        final responseData = e.response?.data;
-
-        switch (statusCode) {
-          case 400:
-            throw ApiException(
-              responseData?['error'] ?? 'Invalid request',
-              statusCode,
-            );
-          case 401:
-            await clearToken();
-            throw UnauthorizedException(
-              responseData?['error'] ?? 'Unauthorized access',
-            );
-          case 403:
-            throw ForbiddenException(
-              responseData?['error'] ?? 'Access forbidden',
-            );
-          case 404:
-            throw NotFoundException(
-              responseData?['error'] ?? 'Resource not found',
-            );
-          case 409:
-            throw ConflictException(
-              responseData?['error'] ?? 'Conflict occurred',
-            );
-          default:
-            throw ServerException(
-              responseData?['error'] ?? 'Server error occurred',
-              statusCode,
-            );
+          switch (statusCode) {
+            case 401:
+              await clearToken();
+              throw UnauthorizedException(
+                responseData?['error'] ?? 'Unauthorized access',
+              );
+            case 403:
+              throw ForbiddenException(
+                responseData?['error'] ?? 'Access forbidden',
+              );
+            case 404:
+              throw NotFoundException(
+                responseData?['error'] ?? 'Resource not found',
+              );
+            case 409:
+              throw ConflictException(
+                responseData?['error'] ?? 'Conflict occurred',
+              );
+            default:
+              throw ServerException(
+                responseData?['error'] ?? 'Server error occurred',
+                statusCode,
+              );
+          }
         }
 
-      case DioExceptionType.cancel:
-        throw ApiException('Request was cancelled');
+        if (error.type == DioExceptionType.connectionError) {
+          throw NetworkException('Unable to connect to server');
+        }
 
-      case DioExceptionType.connectionError:
-        throw NetworkException(
-          kIsWeb
-              ? 'Cross-Origin Request Blocked: Please ensure CORS is properly configured'
-              : 'Connection error occurred. Please check your internet connection.',
-        );
-
-      default:
-        throw ApiException('An unexpected error occurred');
-    }
+        return handler.next(error);
+      },
+    ));
   }
 
   /// Save auth token
@@ -237,6 +176,7 @@ class ApiClient {
       );
 
       if (response.statusCode == 200 && response.data['access_token'] != null) {
+        await saveToken(response.data['access_token']);
         return response.data;
       } else {
         throw ApiException(
@@ -245,12 +185,7 @@ class ApiClient {
         );
       }
     } catch (e) {
-      if (e is DioException) {
-        print('DioException details:');
-        print('Type: ${e.type}');
-        print('Message: ${e.message}');
-        print('Response: ${e.response}');
-      }
+      print('Login error: $e');
       rethrow;
     }
   }
