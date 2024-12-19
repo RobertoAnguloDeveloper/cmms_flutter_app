@@ -1,8 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../models/base_model.dart';
-import '../../../models/role_permission.dart';
+import '../../../services/api_services/answer_submitted_service.dart';
 import '../../../services/api_services/api_client.dart';
 import '../../../configs/api_config.dart';
 import '../../../services/api_services/auth_service.dart';
@@ -40,6 +45,53 @@ class ParamConfig {
     this.isPassword = false,
     this.options,
   });
+}
+
+class FileHelper {
+  static Future<String> saveFile(Uint8List bytes, String filename, BuildContext context) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final String filePath = '${appDir.path}/$filename';
+
+      // Write bytes to file
+      final File file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      // Show success snackbar
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('File downloaded successfully!'),
+                const SizedBox(height: 4),
+                Text(
+                  'Saved to: $filePath',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+
+      return filePath;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving file: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      throw Exception('Failed to save file: $e');
+    }
+  }
 }
 
 // Helper function to parse parameter values based on their type
@@ -113,6 +165,7 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
   late final QuestionTypeService _questionTypeService;
   late final FormQuestionService _formQuestionService;
   late final AnswerService _answerService;
+  late final AnswerSubmittedService _answerSubmittedService;
   late final FormAnswerService _formAnswerService;
   late final FormSubmissionService _formSubmissionService;
   late final AttachmentService _attachmentService;
@@ -974,35 +1027,340 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
         operations: [
           ServiceOperation(
             name: 'Export Form',
-            description: 'Export form to different formats',
+            description: 'Export form to PDF or DOCX format',
             params: {
-              'formId': ParamConfig(type: 'int', required: true),
+              'formId': ParamConfig(
+                type: 'int',
+                required: true,
+                description: 'ID of the form to export',
+              ),
               'format': ParamConfig(
                 type: 'string',
                 required: false,
                 defaultValue: 'PDF',
+                options: ['PDF', 'DOCX'],
+                description: 'Export format',
               ),
               'pageSize': ParamConfig(
                 type: 'string',
                 required: false,
                 defaultValue: 'A4',
+                options: ['A4', 'Letter', 'Legal'],
+                description: 'Page size for the exported document',
               ),
             },
-            operation: (params) => _exportService.exportForm(
-              params['formId'],
-              format: params['format'],
-              pageSize: params['pageSize'],
-            ),
+            operation: (params) async {
+              try {
+                final formId = params['formId'] as int;
+                final format = ExportFormat.values.firstWhere(
+                      (f) => f.value == (params['format'] ?? 'PDF'),
+                  orElse: () => ExportFormat.pdf,
+                );
+                final pageSize = PageSize.values.firstWhere(
+                      (p) => p.value == (params['pageSize'] ?? 'A4'),
+                  orElse: () => PageSize.a4,
+                );
+
+                final bytes = await _exportService.exportForm(
+                  formId,
+                  format: format,
+                  pageSize: pageSize,
+                );
+
+                final filename = 'form_${formId}_export.${format.value.toLowerCase()}';
+
+                // Note: You need to pass the BuildContext to saveFile
+                final filePath = await FileHelper.saveFile(
+                  bytes,
+                  filename,
+                  context, // Make sure 'context' is available here
+                );
+
+                return {
+                  'status': 'success',
+                  'message': 'File saved successfully',
+                  'filename': filename,
+                  'filePath': filePath,
+                  'size': bytes.length,
+                };
+              } catch (e) {
+                throw Exception('Export failed: $e');
+              }
+            },
           ),
           ServiceOperation(
             name: 'Get Export Formats',
-            description: 'Get available export formats',
-            operation: (params) => _exportService.getExportFormats(),
+            description: 'Get available export formats and default settings',
+            operation: (params) async {
+              final response = await _exportService.getExportFormats();
+              return {
+                'formats': response.formats,
+                'default': response.defaultFormat,
+              };
+            },
           ),
           ServiceOperation(
             name: 'Get Export Parameters',
             description: 'Get export configuration parameters',
-            operation: (params) => _exportService.getExportParameters(),
+            operation: (params) async {
+              final response = await _exportService.getExportParameters();
+              return response.parameters;
+            },
+          ),
+          ServiceOperation(
+            name: 'Preview Export Parameters',
+            description: 'Preview export parameters for a specific form',
+            params: {
+              'formId': ParamConfig(
+                type: 'int',
+                required: true,
+                description: 'ID of the form to preview parameters for',
+              ),
+            },
+            operation: (params) async {
+              return await _exportService.previewExportParameters(params['formId']);
+            },
+          ),
+        ],
+      ),
+      // Add these categories to the _serviceCategories list in _initializeServiceCategories()
+
+      ServiceCategory(
+        name: 'Form Answers',
+        description: 'Form answer management operations',
+        operations: [
+          ServiceOperation(
+            name: 'Get All Form Answers',
+            description: 'Retrieve all form answers',
+            operation: (params) => _formAnswerService.getAllFormAnswers(),
+          ),
+          ServiceOperation(
+            name: 'Create Form Answer',
+            description: 'Create new form answer',
+            params: {
+              'formQuestionId': ParamConfig(type: 'int', required: true),
+              'answerId': ParamConfig(type: 'int', required: true),
+              'remarks': ParamConfig(type: 'string', required: false),
+            },
+            operation: (params) => _formAnswerService.createFormAnswer(
+              formQuestionId: params['formQuestionId'],
+              answerId: params['answerId'],
+              remarks: params['remarks'],
+            ),
+          ),
+          ServiceOperation(
+            name: 'Get Form Answer',
+            description: 'Get specific form answer details',
+            params: {
+              'formAnswerId': ParamConfig(
+                type: 'int',
+                required: true,
+                hint: 'Enter form answer ID',
+              ),
+            },
+            operation: (params) =>
+                _formAnswerService.getFormAnswer(params['formAnswerId']),
+          ),
+          ServiceOperation(
+            name: 'Get Answers by Question',
+            description: 'Get form answers for specific question',
+            params: {
+              'formQuestionId': ParamConfig(
+                type: 'int',
+                required: true,
+                hint: 'Enter form question ID',
+              ),
+            },
+            operation: (params) => _formAnswerService
+                .getAnswersByQuestion(params['formQuestionId']),
+          ),
+          ServiceOperation(
+            name: 'Update Form Answer',
+            description: 'Update existing form answer',
+            params: {
+              'formAnswerId': ParamConfig(type: 'int', required: true),
+              'answerId': ParamConfig(type: 'int', required: false),
+              'formQuestionId': ParamConfig(type: 'int', required: false),
+            },
+            operation: (params) => _formAnswerService.updateFormAnswer(
+              params['formAnswerId'],
+              answerId: params['answerId'],
+              formQuestionId: params['formQuestionId'],
+            ),
+          ),
+          ServiceOperation(
+            name: 'Delete Form Answer',
+            description: 'Delete form answer',
+            params: {
+              'formAnswerId': ParamConfig(
+                type: 'int',
+                required: true,
+                hint: 'Enter form answer ID',
+              ),
+            },
+            operation: (params) =>
+                _formAnswerService.deleteFormAnswer(params['formAnswerId']),
+          ),
+        ],
+      ),
+
+      ServiceCategory(
+        name: 'Answer Submissions',
+        description: 'Answer submission operations',
+        operations: [
+          ServiceOperation(
+            name: 'Create Answer Submitted',
+            description: 'Create new answer submission',
+            params: {
+              'formSubmissionId': ParamConfig(type: 'int', required: true),
+              'questionText': ParamConfig(type: 'string', required: true),
+              'answerText': ParamConfig(type: 'string', required: true),
+              'questionType': ParamConfig(type: 'string', required: true),
+              'isSignature': ParamConfig(
+                type: 'boolean',
+                required: false,
+                defaultValue: false,
+              ),
+            },
+            operation: (params) =>
+                _answerSubmittedService.createAnswerSubmitted(
+              formSubmissionId: params['formSubmissionId'],
+              questionText: params['questionText'],
+              answerText: params['answerText'],
+              questionType: params['questionType'],
+              isSignature: params['isSignature'] ?? false,
+            ),
+          ),
+          ServiceOperation(
+            name: 'Get All Answers Submitted',
+            description: 'Retrieve all submitted answers',
+            params: {
+              'formSubmissionId': ParamConfig(type: 'int', required: false),
+              'startDate': ParamConfig(type: 'datetime', required: false),
+              'endDate': ParamConfig(type: 'datetime', required: false),
+            },
+            operation: (params) =>
+                _answerSubmittedService.getAllAnswersSubmitted(
+              formSubmissionId: params['formSubmissionId'],
+              startDate: params['startDate'],
+              endDate: params['endDate'],
+            ),
+          ),
+          ServiceOperation(
+            name: 'Get Answer Submitted',
+            description: 'Get specific submitted answer',
+            params: {
+              'answerSubmittedId': ParamConfig(
+                type: 'int',
+                required: true,
+                hint: 'Enter submitted answer ID',
+              ),
+            },
+            operation: (params) => _answerSubmittedService
+                .getAnswerSubmitted(params['answerSubmittedId']),
+          ),
+          ServiceOperation(
+            name: 'Get Answers by Submission',
+            description: 'Get all answers for a submission',
+            params: {
+              'submissionId': ParamConfig(
+                type: 'int',
+                required: true,
+                hint: 'Enter submission ID',
+              ),
+            },
+            operation: (params) => _answerSubmittedService
+                .getAnswersBySubmission(params['submissionId']),
+          ),
+          ServiceOperation(
+            name: 'Update Answer Submitted',
+            description: 'Update submitted answer',
+            params: {
+              'answerSubmittedId': ParamConfig(type: 'int', required: true),
+              'answerText': ParamConfig(type: 'string', required: true),
+            },
+            operation: (params) =>
+                _answerSubmittedService.updateAnswerSubmitted(
+              params['answerSubmittedId'],
+              answerText: params['answerText'],
+            ),
+          ),
+          ServiceOperation(
+            name: 'Delete Answer Submitted',
+            description: 'Delete submitted answer',
+            params: {
+              'answerSubmittedId': ParamConfig(
+                type: 'int',
+                required: true,
+                hint: 'Enter submitted answer ID',
+              ),
+            },
+            operation: (params) => _answerSubmittedService
+                .deleteAnswerSubmitted(params['answerSubmittedId']),
+          ),
+        ],
+      ),
+
+      ServiceCategory(
+        name: 'Attachments',
+        description: 'Attachment management operations',
+        operations: [
+          ServiceOperation(
+            name: 'Create Attachment',
+            description: 'Upload new attachment',
+            params: {
+              'formSubmissionId': ParamConfig(type: 'int', required: true),
+              'isSignature': ParamConfig(
+                type: 'boolean',
+                required: false,
+                defaultValue: false,
+              ),
+            },
+            operation: (params) => _attachmentService.createAttachment(
+              formSubmissionId: params['formSubmissionId'],
+              file: params['file'],
+              isSignature: params['isSignature'] ?? false,
+            ),
+          ),
+          ServiceOperation(
+            name: 'Get All Attachments',
+            description: 'Retrieve all attachments',
+            params: {
+              'formSubmissionId': ParamConfig(type: 'int', required: false),
+              'isSignature': ParamConfig(type: 'boolean', required: false),
+              'fileType': ParamConfig(type: 'string', required: false),
+            },
+            operation: (params) => _attachmentService.getAllAttachments(
+              formSubmissionId: params['formSubmissionId'],
+              isSignature: params['isSignature'],
+              fileType: params['fileType'],
+            ),
+          ),
+          ServiceOperation(
+            name: 'Get Submission Attachments',
+            description: 'Get attachments for specific submission',
+            params: {
+              'submissionId': ParamConfig(
+                type: 'int',
+                required: true,
+                hint: 'Enter submission ID',
+              ),
+            },
+            operation: (params) => _attachmentService
+                .getSubmissionAttachments(params['submissionId']),
+          ),
+          ServiceOperation(
+            name: 'Delete Attachment',
+            description: 'Delete attachment',
+            params: {
+              'attachmentId': ParamConfig(
+                type: 'int',
+                required: true,
+                hint: 'Enter attachment ID',
+              ),
+            },
+            operation: (params) =>
+                _attachmentService.deleteAttachment(params['attachmentId']),
           ),
         ],
       ),
