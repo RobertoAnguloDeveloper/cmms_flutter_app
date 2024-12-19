@@ -1,21 +1,31 @@
-// lib/services/api_services/role_service.dart
+import 'package:dio/dio.dart';
 import '../../models/role.dart';
 import '../../models/permission.dart';
 import 'api_client.dart';
 
 class RoleService {
   final ApiClient _apiClient;
+  static const String _basePath = '/api/roles';
 
-  RoleService(this._apiClient);
+  const RoleService(this._apiClient);
 
   Future<List<Role>> getAllRoles() async {
     try {
-      final response = await _apiClient.get('/api/roles');
+      final response = await _apiClient.get(_basePath);
       return (response.data as List)
-          .map((json) => Role.fromJson(json))
+          .map((json) => Role.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e) {
-      rethrow;
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<Role> getRole(int id) async {
+    try {
+      final response = await _apiClient.get('$_basePath/$id');
+      return Role.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 
@@ -25,15 +35,17 @@ class RoleService {
     bool isSuperUser = false,
   }) async {
     try {
-      final response = await _apiClient.post('/api/roles',
-          data: {
-            'name': name,
-            'description': description,
-            'is_super_user': isSuperUser,
-          });
-      return Role.fromJson(response.data['role']);
-    } catch (e) {
-      rethrow;
+      final response = await _apiClient.post(
+        _basePath,
+        data: {
+          'name': name,
+          if (description != null) 'description': description,
+          'is_super_user': isSuperUser,
+        },
+      );
+      return Role.fromJson(response.data['role'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 
@@ -45,58 +57,56 @@ class RoleService {
       }) async {
     try {
       final response = await _apiClient.put(
-        '/api/roles/$roleId',
+        '$_basePath/$roleId',
         data: {
           if (name != null) 'name': name,
           if (description != null) 'description': description,
           if (isSuperUser != null) 'is_super_user': isSuperUser,
         },
       );
-      return Role.fromJson(response.data['role']);
-    } catch (e) {
-      rethrow;
+      return Role.fromJson(response.data['role'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 
   Future<void> deleteRole(int roleId) async {
     try {
-      await _apiClient.delete('/api/roles/$roleId');
-    } catch (e) {
-      rethrow;
+      await _apiClient.delete('$_basePath/$roleId');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 
-  Future<void> assignPermissionToRole(int roleId, int permissionId) async {
+  Future<void> removePermissionFromRole(int roleId, int permissionId) async {
     try {
-      await _apiClient.post('/api/role-permissions',
-          data: {
-            'role_id': roleId,
-            'permission_id': permissionId,
-          });
-    } catch (e) {
-      rethrow;
+      await _apiClient.delete('$_basePath/$roleId/permissions/$permissionId');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 
-  Future<void> removePermissionFromRole(
-      int roleId,
-      int permissionId,
-      ) async {
-    try {
-      await _apiClient.delete('/api/roles/$roleId/permissions/$permissionId');
-    } catch (e) {
-      rethrow;
+  Exception _handleDioException(DioException e) {
+    if (e.response?.statusCode == 403) {
+      return UnauthorizedException('Unauthorized access to role operation');
     }
+    if (e.response?.data != null && e.response?.data['error'] != null) {
+      return ApiException(e.response?.data['error'] as String);
+    }
+    return ApiException('Failed to process role operation: ${e.message}');
   }
+}
 
-  Future<List<Permission>> getRolePermissions(int roleId) async {
-    try {
-      final response = await _apiClient.get('/api/roles/$roleId/permissions');
-      return (response.data['permissions'] as List)
-          .map((json) => Permission.fromJson(json))
-          .toList();
-    } catch (e) {
-      rethrow;
-    }
-  }
+class UnauthorizedException implements Exception {
+  final String message;
+  UnauthorizedException(this.message);
+  @override
+  String toString() => message;
+}
+
+class ApiException implements Exception {
+  final String message;
+  ApiException(this.message);
+  @override
+  String toString() => message;
 }

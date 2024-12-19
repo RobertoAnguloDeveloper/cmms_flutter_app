@@ -9,7 +9,7 @@ class Attachment extends BaseModel {
   final bool isSignature;
   final FormSubmission? formSubmission;
 
-  Attachment({
+  const Attachment({
     required this.id,
     required this.formSubmissionId,
     required this.fileType,
@@ -18,38 +18,63 @@ class Attachment extends BaseModel {
     this.formSubmission,
     super.createdAt,
     super.updatedAt,
-    super.isDeleted,
+    super.isDeleted = false,
     super.deletedAt,
   });
 
   factory Attachment.fromJson(Map<String, dynamic> json) {
     return Attachment(
-      id: json['id'],
-      formSubmissionId: json['form_submission_id'],
-      fileType: json['file_type'],
-      filePath: json['file_path'],
-      isSignature: json['is_signature'] ?? false,
+      id: json['id'] as int? ?? 0,
+      formSubmissionId: json['form_submission_id'] as int? ?? 0,
+      fileType: json['file_type'] as String? ?? '',
+      filePath: json['file_path'] as String? ?? '',
+      isSignature: json['is_signature'] as bool? ?? false,
       formSubmission: json['form_submission'] != null
-          ? FormSubmission.fromJson(json['form_submission'])
+          ? FormSubmission.fromJson(json['form_submission'] as Map<String, dynamic>)
           : null,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
-      isDeleted: json['is_deleted'] ?? false,
-      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
+      isDeleted: json['is_deleted'] as bool? ?? false,
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at'] as String) : null,
     );
   }
 
   @override
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = super.toJson();
-    data.addAll({
+    return {
+      ...super.toJson(),
       'id': id,
       'form_submission_id': formSubmissionId,
       'file_type': fileType,
       'file_path': filePath,
       'is_signature': isSignature,
-      'form_submission': formSubmission?.toJson(),
-    });
-    return data;
+      if (formSubmission != null) 'form_submission': formSubmission?.toJson(),
+    };
+  }
+
+  Attachment copyWith({
+    int? id,
+    int? formSubmissionId,
+    String? fileType,
+    String? filePath,
+    bool? isSignature,
+    FormSubmission? Function()? formSubmission,
+    DateTime? Function()? createdAt,
+    DateTime? Function()? updatedAt,
+    bool? isDeleted,
+    DateTime? Function()? deletedAt,
+  }) {
+    return Attachment(
+      id: id ?? this.id,
+      formSubmissionId: formSubmissionId ?? this.formSubmissionId,
+      fileType: fileType ?? this.fileType,
+      filePath: filePath ?? this.filePath,
+      isSignature: isSignature ?? this.isSignature,
+      formSubmission: formSubmission != null ? formSubmission() : this.formSubmission,
+      createdAt: createdAt != null ? createdAt() : this.createdAt,
+      updatedAt: updatedAt != null ? updatedAt() : this.updatedAt,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedAt: deletedAt != null ? deletedAt() : this.deletedAt,
+    );
   }
 }

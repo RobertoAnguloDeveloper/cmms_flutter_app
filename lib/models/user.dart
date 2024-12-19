@@ -12,7 +12,7 @@ class User extends BaseModel {
   final Role? role;
   final Environment? environment;
 
-  User({
+  const User({
     required this.id,
     required this.username,
     required this.firstName,
@@ -23,40 +23,69 @@ class User extends BaseModel {
     this.environment,
     super.createdAt,
     super.updatedAt,
-    super.isDeleted,
+    super.isDeleted = false,
     super.deletedAt,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'],
-      username: json['username'],
-      firstName: json['first_name'],
-      lastName: json['last_name'],
-      email: json['email'],
-      contactNumber: json['contact_number'],
-      role: json['role'] != null ? Role.fromJson(json['role']) : null,
-      environment: json['environment'] != null ? Environment.fromJson(json['environment']) : null,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
-      isDeleted: json['is_deleted'] ?? false,
-      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
+      id: json['id'] as int? ?? 0,
+      username: json['username'] as String? ?? '',
+      firstName: json['first_name'] as String? ?? '',
+      lastName: json['last_name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      contactNumber: json['contact_number'] as String?,
+      role: json['role'] != null ? Role.fromJson(json['role'] as Map<String, dynamic>) : null,
+      environment: json['environment'] != null ? Environment.fromJson(json['environment'] as Map<String, dynamic>) : null,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
+      isDeleted: json['is_deleted'] as bool? ?? false,
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at'] as String) : null,
     );
   }
 
   @override
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = super.toJson();
-    data.addAll({
+    return {
+      ...super.toJson(),
       'id': id,
       'username': username,
       'first_name': firstName,
       'last_name': lastName,
       'email': email,
-      'contact_number': contactNumber,
-      'role': role?.toJson(),
-      'environment': environment?.toJson(),
-    });
-    return data;
+      if (contactNumber != null) 'contact_number': contactNumber,
+      if (role != null) 'role': role!.toJson(),
+      if (environment != null) 'environment': environment!.toJson(),
+    };
+  }
+
+  User copyWith({
+    int? id,
+    String? username,
+    String? firstName,
+    String? lastName,
+    String? email,
+    String? contactNumber,
+    Role? role,
+    Environment? environment,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isDeleted,
+    DateTime? deletedAt,
+  }) {
+    return User(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      email: email ?? this.email,
+      contactNumber: contactNumber ?? this.contactNumber,
+      role: role ?? this.role,
+      environment: environment ?? this.environment,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedAt: deletedAt ?? this.deletedAt,
+    );
   }
 }

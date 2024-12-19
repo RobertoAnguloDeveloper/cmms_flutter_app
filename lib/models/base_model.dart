@@ -4,7 +4,7 @@ class BaseModel {
   final bool isDeleted;
   final DateTime? deletedAt;
 
-  BaseModel({
+  const BaseModel({
     this.createdAt,
     this.updatedAt,
     this.isDeleted = false,

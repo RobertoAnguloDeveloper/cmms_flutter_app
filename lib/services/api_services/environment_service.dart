@@ -1,4 +1,4 @@
-// lib/services/api_services/environment_service.dart
+import 'package:dio/dio.dart';
 import '../../models/environment.dart';
 import '../../models/user.dart';
 import '../../models/form.dart';
@@ -7,16 +7,39 @@ import 'api_client.dart';
 class EnvironmentService {
   final ApiClient _apiClient;
 
-  EnvironmentService(this._apiClient);
+  const EnvironmentService(this._apiClient);
 
-  Future<List<Environment>> getAllEnvironments() async {
+  Future<List<Environment>> getAllEnvironments({bool includeDeleted = false}) async {
     try {
-      final response = await _apiClient.get('/api/environments');
+      final response = await _apiClient.get(
+        '/api/environments',
+        queryParameters: {
+          'include_deleted': includeDeleted.toString(),
+        },
+      );
       return (response.data as List)
-          .map((json) => Environment.fromJson(json))
+          .map((json) => Environment.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e) {
-      rethrow;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  Future<Environment> getEnvironment(int environmentId) async {
+    try {
+      final response = await _apiClient.get('/api/environments/$environmentId');
+      return Environment.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  Future<Environment> getEnvironmentByName(String name) async {
+    try {
+      final response = await _apiClient.get('/api/environments/name/$name');
+      return Environment.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
     }
   }
 
@@ -25,14 +48,16 @@ class EnvironmentService {
     String? description,
   }) async {
     try {
-      final response = await _apiClient.post('/api/environments',
-          data: {
-            'name': name,
-            'description': description,
-          });
-      return Environment.fromJson(response.data['environment']);
-    } catch (e) {
-      rethrow;
+      final response = await _apiClient.post(
+        '/api/environments',
+        data: {
+          'name': name,
+          if (description != null) 'description': description,
+        },
+      );
+      return Environment.fromJson(response.data['environment'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
     }
   }
 
@@ -49,17 +74,17 @@ class EnvironmentService {
           if (description != null) 'description': description,
         },
       );
-      return Environment.fromJson(response.data['environment']);
-    } catch (e) {
-      rethrow;
+      return Environment.fromJson(response.data['environment'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
     }
   }
 
   Future<void> deleteEnvironment(int environmentId) async {
     try {
       await _apiClient.delete('/api/environments/$environmentId');
-    } catch (e) {
-      rethrow;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
     }
   }
 
@@ -67,10 +92,10 @@ class EnvironmentService {
     try {
       final response = await _apiClient.get('/api/environments/$environmentId/users');
       return (response.data as List)
-          .map((json) => User.fromJson(json))
+          .map((json) => User.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e) {
-      rethrow;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
     }
   }
 
@@ -78,10 +103,43 @@ class EnvironmentService {
     try {
       final response = await _apiClient.get('/api/environments/$environmentId/forms');
       return (response.data as List)
-          .map((json) => Form.fromJson(json))
+          .map((json) => Form.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e) {
-      rethrow;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
     }
   }
+
+  Exception _handleDioError(DioException e) {
+    if (e.response?.statusCode == 404) {
+      return NotFoundException('Environment not found');
+    }
+    if (e.response?.statusCode == 400) {
+      final message = e.response?.data['error'] as String? ?? 'Bad request';
+      return BadRequestException(message);
+    }
+    if (e.response?.statusCode == 403) {
+      return UnauthorizedException('Unauthorized access');
+    }
+    return ApiException('Failed to complete environment operation: ${e.message}');
+  }
+}
+
+class ApiException implements Exception {
+  final String message;
+  const ApiException(this.message);
+  @override
+  String toString() => message;
+}
+
+class NotFoundException extends ApiException {
+  const NotFoundException(super.message);
+}
+
+class BadRequestException extends ApiException {
+  const BadRequestException(super.message);
+}
+
+class UnauthorizedException extends ApiException {
+  const UnauthorizedException(super.message);
 }

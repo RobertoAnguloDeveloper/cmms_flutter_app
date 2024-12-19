@@ -7,13 +7,24 @@ class AuthService {
 
   AuthService(this._apiClient);
 
-  Future<String> login(String username, String password) async {
+  Future<Map<String, dynamic>> login(String username, String password) async {
     try {
-      final response = await _apiClient.post('/api/login', data: {
-        'username': username,
-        'password': password,
-      });
-      return response.data['access_token'];
+      final response = await _apiClient.post('/api/users/login',
+          data: {
+            'username': username,
+            'password': password,
+          }
+      );
+
+      // Handle raw response for login
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw ApiException(
+          response.data['error'] ?? 'Login failed',
+          response.statusCode,
+        );
+      }
     } catch (e) {
       rethrow;
     }

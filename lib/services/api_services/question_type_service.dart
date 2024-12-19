@@ -1,19 +1,30 @@
-import 'api_client.dart';
+import 'package:dio/dio.dart';
 import '../../models/question_type.dart';
+import 'api_client.dart';
 
 class QuestionTypeService {
   final ApiClient _apiClient;
+  static const String _basePath = '/api/question-types';
 
-  QuestionTypeService(this._apiClient);
+  const QuestionTypeService(this._apiClient);
 
   Future<List<QuestionType>> getAllQuestionTypes() async {
     try {
-      final response = await _apiClient.get('/api/question-types');
+      final response = await _apiClient.get(_basePath);
       return (response.data as List)
-          .map((json) => QuestionType.fromJson(json))
+          .map((json) => QuestionType.fromJson(json as Map<String, dynamic>))
           .toList();
-    } catch (e) {
-      rethrow;
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<QuestionType> getQuestionType(int id) async {
+    try {
+      final response = await _apiClient.get('$_basePath/$id');
+      return QuestionType.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 
@@ -21,11 +32,13 @@ class QuestionTypeService {
     required String type,
   }) async {
     try {
-      final response = await _apiClient.post('/api/question-types',
-          data: {'type': type});
-      return QuestionType.fromJson(response.data['question_type']);
-    } catch (e) {
-      rethrow;
+      final response = await _apiClient.post(
+        _basePath,
+        data: {'type': type.trim()},
+      );
+      return QuestionType.fromJson(response.data['question_type'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 
@@ -35,20 +48,44 @@ class QuestionTypeService {
       }) async {
     try {
       final response = await _apiClient.put(
-        '/api/question-types/$typeId',
-        data: {'type': type},
+        '$_basePath/$typeId',
+        data: {'type': type.trim()},
       );
-      return QuestionType.fromJson(response.data['question_type']);
-    } catch (e) {
-      rethrow;
+      return QuestionType.fromJson(response.data['question_type'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 
   Future<void> deleteQuestionType(int typeId) async {
     try {
-      await _apiClient.delete('/api/question-types/$typeId');
-    } catch (e) {
-      rethrow;
+      await _apiClient.delete('$_basePath/$typeId');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
+
+  Exception _handleDioException(DioException e) {
+    if (e.response?.statusCode == 403) {
+      return UnauthorizedException('Unauthorized access to question type operation');
+    }
+    if (e.response?.data != null && e.response?.data['error'] != null) {
+      return ApiException(e.response?.data['error'] as String);
+    }
+    return ApiException('Failed to process question type operation: ${e.message}');
+  }
+}
+
+class UnauthorizedException implements Exception {
+  final String message;
+  UnauthorizedException(this.message);
+  @override
+  String toString() => message;
+}
+
+class ApiException implements Exception {
+  final String message;
+  ApiException(this.message);
+  @override
+  String toString() => message;
 }
