@@ -23,11 +23,16 @@ class RolePermission extends BaseModel {
 
   factory RolePermission.fromJson(Map<String, dynamic> json) {
     return RolePermission(
-      id: json['id'] as int,
-      roleId: json['role_id'] as int,
-      permissionId: json['permission_id'] as int,
+      id: json['id'] as int? ?? 0,
+      // Extract roleId from either direct field or nested role object
+      roleId: json['role_id'] as int? ??
+          (json['role'] != null ? (json['role']['id'] as int? ?? 0) : 0),
+      // Extract permissionId from either direct field or nested permission object
+      permissionId: json['permission_id'] as int? ??
+          (json['permissions'] != null ? (json['permissions']['id'] as int? ?? 0) : 0),
+      // Handle nested objects
       role: json['role'] != null ? Role.fromJson(json['role'] as Map<String, dynamic>) : null,
-      permission: json['permission'] != null ? Permission.fromJson(json['permission'] as Map<String, dynamic>) : null,
+      permission: json['permissions'] != null ? Permission.fromJson(json['permissions'] as Map<String, dynamic>) : null,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
       isDeleted: json['is_deleted'] as bool? ?? false,
@@ -37,38 +42,37 @@ class RolePermission extends BaseModel {
 
   @override
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = super.toJson();
-    data.addAll({
+    return {
+      ...super.toJson(),
       'id': id,
       'role_id': roleId,
       'permission_id': permissionId,
-      if (role != null) 'role': role!.toJson(),
-      if (permission != null) 'permission': permission!.toJson(),
-    });
-    return data;
+      if (role != null) 'role': role?.toJson(),
+      if (permission != null) 'permission': permission?.toJson(),
+    };
   }
 
   RolePermission copyWith({
     int? id,
     int? roleId,
     int? permissionId,
-    Role? role,
-    Permission? permission,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    Role? Function()? role,
+    Permission? Function()? permission,
+    DateTime? Function()? createdAt,
+    DateTime? Function()? updatedAt,
     bool? isDeleted,
-    DateTime? deletedAt,
+    DateTime? Function()? deletedAt,
   }) {
     return RolePermission(
       id: id ?? this.id,
       roleId: roleId ?? this.roleId,
       permissionId: permissionId ?? this.permissionId,
-      role: role ?? this.role,
-      permission: permission ?? this.permission,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+      role: role != null ? role() : this.role,
+      permission: permission != null ? permission() : this.permission,
+      createdAt: createdAt != null ? createdAt() : this.createdAt,
+      updatedAt: updatedAt != null ? updatedAt() : this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,
-      deletedAt: deletedAt ?? this.deletedAt,
+      deletedAt: deletedAt != null ? deletedAt() : this.deletedAt,
     );
   }
 }
