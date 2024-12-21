@@ -202,6 +202,7 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
     _authService = AuthService(_apiClient);
     _userService = UserService(_apiClient);
     _roleService = RoleService(_apiClient);
+    _permissionService = PermissionService(_apiClient);
     _rolePermissionService = RolePermissionService(_apiClient);
     _environmentService = EnvironmentService(_apiClient);
     _formService = FormService(_apiClient);
