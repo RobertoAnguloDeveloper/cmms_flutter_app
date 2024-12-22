@@ -1,12 +1,12 @@
-// 📂 lib/gui/screens/home/home_screen.dart
+// 📂 lib/gui/screens/home_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../services/api_services/auth_provider.dart';
 import '../components/app_drawer.dart';
 import '../components/screen_scaffold.dart';
 import 'auth/login_screen.dart';
+import 'env_theme_config_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,8 +21,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<DrawerItem> _buildDrawerItems(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final currentUser = authProvider.currentUser;
+    final isAdmin = currentUser?.id == 1;
 
-    return [
+    final List<DrawerItem> items = [
       DrawerItem(
         title: 'Dashboard',
         icon: Icons.dashboard,
@@ -47,18 +48,48 @@ class _HomeScreenState extends State<HomeScreen> {
         selected: _selectedIndex == 3,
         onTap: () => _onItemSelected(3),
       ),
-      DrawerItem(
-        title: 'Settings',
-        icon: Icons.settings,
-        selected: _selectedIndex == 4,
-        onTap: () => _onItemSelected(4),
-      ),
+    ];
+
+    // Add Environment Theme Configuration only for admin user
+    if (isAdmin) {
+      items.add(
+        DrawerItem(
+          title: 'Environment Theme',
+          icon: Icons.palette,
+          selected: _selectedIndex == 4,
+          onTap: () => _onItemSelected(4),
+        ),
+      );
+
+      items.add(
+        DrawerItem(
+          title: 'Settings',
+          icon: Icons.settings,
+          selected: _selectedIndex == 5,
+          onTap: () => _onItemSelected(5),
+        ),
+      );
+    } else {
+      items.add(
+        DrawerItem(
+          title: 'Settings',
+          icon: Icons.settings,
+          selected: _selectedIndex == 4,
+          onTap: () => _onItemSelected(4),
+        ),
+      );
+    }
+
+    // Add Logout as the last item
+    items.add(
       DrawerItem(
         title: 'Logout',
         icon: Icons.logout,
         onTap: () => _handleLogout(context),
       ),
-    ];
+    );
+
+    return items;
   }
 
   void _onItemSelected(int index) {
@@ -81,20 +112,81 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildDashboardContent() {
+    return const Center(
+      child: Text(
+        'Dashboard Content',
+        style: TextStyle(fontSize: 24),
+      ),
+    );
+  }
+
+  Widget _buildFormsContent() {
+    return const Center(
+      child: Text(
+        'Forms Content',
+        style: TextStyle(fontSize: 24),
+      ),
+    );
+  }
+
+  Widget _buildSubmissionsContent() {
+    return const Center(
+      child: Text(
+        'Submissions Content',
+        style: TextStyle(fontSize: 24),
+      ),
+    );
+  }
+
+  Widget _buildUsersContent() {
+    return const Center(
+      child: Text(
+        'Users Content',
+        style: TextStyle(fontSize: 24),
+      ),
+    );
+  }
+
+  Widget _buildSettingsContent() {
+    return const Center(
+      child: Text(
+        'Settings Content',
+        style: TextStyle(fontSize: 24),
+      ),
+    );
+  }
+
   Widget _buildContent() {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final isAdmin = authProvider.currentUser?.id == 1;
+
     switch (_selectedIndex) {
       case 0:
-        return const Center(child: Text('Dashboard Content'));
+        return _buildDashboardContent();
       case 1:
-        return const Center(child: Text('Forms Content'));
+        return _buildFormsContent();
       case 2:
-        return const Center(child: Text('Submissions Content'));
+        return _buildSubmissionsContent();
       case 3:
-        return const Center(child: Text('Users Content'));
+        return _buildUsersContent();
       case 4:
-        return const Center(child: Text('Settings Content'));
+      // For admin users, index 4 is Environment Theme
+      // For regular users, index 4 is Settings
+        if (isAdmin) {
+          return const EnvThemeConfigScreen();
+        } else {
+          return _buildSettingsContent();
+        }
+      case 5:
+      // Only admin users will have index 5 (Settings)
+        if (isAdmin) {
+          return _buildSettingsContent();
+        }
+        // Fall through to default if not admin
+        return _buildDashboardContent();
       default:
-        return const Center(child: Text('Dashboard Content'));
+        return _buildDashboardContent();
     }
   }
 
