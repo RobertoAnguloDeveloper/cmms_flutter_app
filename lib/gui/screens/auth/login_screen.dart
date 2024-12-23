@@ -11,6 +11,7 @@ import '../../components/logo_widget.dart';
 import '../../../services/api_services/api_client.dart';
 import '../../../configs/api_config.dart';
 import '../../../constants/gui_constants/app_spacing.dart';
+import '../../theme/env_theme_provider.dart';
 import '../home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -59,23 +60,38 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.login(
+      final themeProvider = Provider.of<EnvThemeProvider>(context, listen: false);
+
+      // First perform login
+      final success = await authProvider.login(
         _usernameController.text,
         _passwordController.text,
       );
 
-      if (mounted) {
-        // Navigate to HomeScreen after successful login
+      if (!mounted) return;
+
+      if (success) {
+        // Load theme before navigation
+        await themeProvider.loadThemeForCurrentUser();
+
+        if (!mounted) return;
+
+        // Navigate to HomeScreen after successful login and theme load
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(
+            builder: (_) => const HomeScreen(),
+            settings: const RouteSettings(name: '/home'),
+          ),
         );
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = e is ApiException
-            ? e.message
-            : 'An unexpected error occurred. Please try again.';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e is ApiException
+              ? e.message
+              : 'An unexpected error occurred. Please try again.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -108,8 +124,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: AnimatedLogoWidget(
                       variant: LogoVariant.full,
                       theme: LogoTheme.colored,
-                      width: 200,
-                      height: 100,
+                      width: 400,
+                      height: 200,
                       animationDuration: const Duration(milliseconds: 1500),
                     ),
                   ),

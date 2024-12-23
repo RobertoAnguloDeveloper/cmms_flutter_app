@@ -2,15 +2,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../services/api_services/api_client.dart';
-import '../../services/api_services/cmms_config_provider.dart';
-import '../../services/api_services/environment_service.dart';
 import '../../services/api_services/auth_provider.dart';
+import '../../services/api_services/api_client.dart';
+import '../../services/api_services/environment_service.dart';
+import '../../services/config/environment_theme_config_manager.dart';
 import '../../models/environment.dart';
 import '../components/custom_button.dart';
 import '../components/color_picker_dialog.dart';
 import '../components/screen_scaffold.dart';
 import '../components/info_card.dart';
+import '../components/theme_preview.dart';
 import '../../constants/gui_constants/app_spacing.dart';
 import '../../constants/gui_constants/app_typography.dart';
 import '../../constants/gui_constants/theme_constants.dart';
@@ -24,10 +25,12 @@ class EnvThemeConfigScreen extends StatefulWidget {
 }
 
 class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
-  final _environmentService = EnvironmentService(ApiClient(baseUrl: ApiConfig.baseUrl));
-  List<Environment> _environments = [];
-  Environment? _selectedEnvironment;
+  late final ApiClient _apiClient;
+  late final EnvironmentService _environmentService;
+  late final EnvironmentThemeConfigManager _configManager;
+
   bool _isLoading = false;
+  String? _error;
 
   // Theme configuration state
   Color _primaryColor = Colors.blue;
@@ -36,74 +39,76 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
   Color _textColor = Colors.black;
   String _fontFamily = ThemeConstants.defaultFontFamily;
   double _fontSizeScale = 1.0;
+  Environment? _selectedEnvironment;
+  List<Environment> _environments = [];
 
   @override
   void initState() {
     super.initState();
+    _apiClient = ApiClient(baseUrl: ApiConfig.baseUrl);
+    _environmentService = EnvironmentService(_apiClient);
+    _configManager = EnvironmentThemeConfigManager(apiClient: _apiClient);
     _loadEnvironments();
   }
 
   Future<void> _loadEnvironments() async {
     try {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
       _environments = await _environmentService.getAllEnvironments();
 
       if (_environments.isNotEmpty) {
-        setState(() {
-          _selectedEnvironment = _environments.first;
-        });
-        await _loadConfigForEnvironment(_environments.first);
+        await _selectEnvironment(_environments.first);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading environments: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _loadConfigForEnvironment(Environment environment) async {
-    try {
-      setState(() => _isLoading = true);
-
-      final configProvider = Provider.of<CmmsConfigProvider>(context, listen: false);
-      await configProvider.loadConfig('env_theme_${environment.id}.json');
-
-      final config = configProvider.currentConfig;
-      if (config != null && config.content.containsKey('parameters')) {
-        final parameters = config.content['parameters'] as Map<String, dynamic>;
-        if (parameters.containsKey('theme_settings')) {
-          final themeSettings = parameters['theme_settings'] as Map<String, dynamic>;
-
-          setState(() {
-            _primaryColor = _colorFromHex(themeSettings['primary_color'] as String);
-            _secondaryColor = _colorFromHex(themeSettings['secondary_color'] as String);
-            _backgroundColor = _colorFromHex(themeSettings['background_color'] as String);
-            _textColor = _colorFromHex(themeSettings['text_color'] as String);
-            _fontFamily = themeSettings['font_family'] as String;
-            _fontSizeScale = themeSettings['font_size_scale'] as double;
-          });
-        }
-      }
-    } catch (e) {
-      print('Loading config error (using defaults): $e');
-      // If config doesn't exist or there's an error, use defaults
-      setState(() {
-        _primaryColor = Colors.blue;
-        _secondaryColor = Colors.green;
-        _backgroundColor = Colors.white;
-        _textColor = Colors.black;
-        _fontFamily = ThemeConstants.defaultFontFamily;
-        _fontSizeScale = 1.0;
-      });
+      setState(() => _error = e.toString());
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _selectEnvironment(Environment environment) async {
+    setState(() {
+      _selectedEnvironment = environment;
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final themeSettings = await _configManager.getEnvironmentTheme(environment.id);
+
+      if (themeSettings != null) {
+        setState(() {
+          _primaryColor = _colorFromHex(themeSettings['primary_color']);
+          _secondaryColor = _colorFromHex(themeSettings['secondary_color']);
+          _backgroundColor = _colorFromHex(themeSettings['background_color']);
+          _textColor = _colorFromHex(themeSettings['text_color']);
+          _fontFamily = themeSettings['font_family'];
+          _fontSizeScale = themeSettings['font_size_scale'];
+        });
+      } else {
+        // Set defaults if no existing configuration
+        _resetToDefaults();
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _resetToDefaults() {
+    setState(() {
+      _primaryColor = Colors.blue;
+      _secondaryColor = Colors.green;
+      _backgroundColor = Colors.white;
+      _textColor = Colors.black;
+      _fontFamily = ThemeConstants.defaultFontFamily;
+      _fontSizeScale = 1.0;
+    });
   }
 
   Color _colorFromHex(String hexString) {
@@ -115,53 +120,231 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
     return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
   }
 
-  Future<void> _saveConfig() async {
-    if (_selectedEnvironment == null) return;
-
-    final configProvider = Provider.of<CmmsConfigProvider>(context, listen: false);
-    final filename = 'env_theme_${_selectedEnvironment!.id}.json';
+  Future<void> _handleSaveConfiguration() async {
+    if (_selectedEnvironment == null) {
+      setState(() {
+        _error = 'Please select an environment first';
+      });
+      return;
+    }
 
     try {
-      // First try to delete any existing config
-      try {
-        await configProvider.deleteConfig();
-      } catch (e) {
-        print('Cleanup error (can be ignored): $e');
-      }
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
 
-      // Create new config
-      await configProvider.saveConfig(
-        filename: filename,
-        content: {
-          'name': 'Environment Theme Configuration',
-          'description': 'Theme configuration for environment',
-          'parameters': {
-            'environment_id': _selectedEnvironment!.id,
-            'environment_name': _selectedEnvironment!.name,
-            'theme_settings': {
-              'primary_color': _colorToHex(_primaryColor),
-              'secondary_color': _colorToHex(_secondaryColor),
-              'background_color': _colorToHex(_backgroundColor),
-              'text_color': _colorToHex(_textColor),
-              'font_family': _fontFamily,
-              'font_size_scale': _fontSizeScale,
-            }
-          }
-        },
+      final themeSettings = {
+        'primary_color': _colorToHex(_primaryColor),
+        'secondary_color': _colorToHex(_secondaryColor),
+        'background_color': _colorToHex(_backgroundColor),
+        'text_color': _colorToHex(_textColor),
+        'font_family': _fontFamily,
+        'font_size_scale': _fontSizeScale,
+      };
+
+      await _configManager.saveEnvironmentConfig(
+        environment: _selectedEnvironment!,
+        themeSettings: themeSettings,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Theme configuration saved successfully')),
+          const SnackBar(
+            content: Text('Theme configuration saved successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
+      setState(() {
+        _error = 'Failed to save configuration: ${e.toString()}';
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving configuration: $e')),
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final authProvider = Provider.of<AuthProvider>(context);
+    final currentUser = authProvider.currentUser;
+
+    // Only show this screen to admin users
+    if (currentUser?.id != 1) {
+      return const Scaffold(
+        body: Center(
+          child: Text('You do not have permission to access this section.'),
+        ),
+      );
+    }
+
+    return ScreenScaffold(
+      title: 'Environment Theme Configuration',
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_error != null) ...[
+              InfoCard(
+                title: 'Error',
+                content: Text(_error!, style: const TextStyle(color: Colors.red)),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+
+            // Environment Selection
+            InfoCard(
+              title: 'Select Environment',
+              content: DropdownButtonFormField<Environment>(
+                value: _selectedEnvironment,
+                decoration: const InputDecoration(
+                  labelText: 'Environment',
+                  border: OutlineInputBorder(),
+                ),
+                items: _environments.map((env) {
+                  return DropdownMenuItem(
+                    value: env,
+                    child: Text('${env.name} - ${env.description}'),
+                  );
+                }).toList(),
+                onChanged: (env) {
+                  if (env != null) _selectEnvironment(env);
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // Colors Section
+            InfoCard(
+              title: 'Colors',
+              content: Column(
+                children: [
+                  _buildColorPicker(
+                    'Primary Color',
+                    _primaryColor,
+                        (color) => setState(() => _primaryColor = color),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildColorPicker(
+                    'Secondary Color',
+                    _secondaryColor,
+                        (color) => setState(() => _secondaryColor = color),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildColorPicker(
+                    'Background Color',
+                    _backgroundColor,
+                        (color) => setState(() => _backgroundColor = color),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildColorPicker(
+                    'Text Color',
+                    _textColor,
+                        (color) => setState(() => _textColor = color),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // Typography Section
+            InfoCard(
+              title: 'Typography',
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Font Family',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: _fontFamily,
+                    items: ThemeConstants.availableFontFamilies.map((font) {
+                      return DropdownMenuItem(
+                        value: font,
+                        child: Text(font, style: TextStyle(fontFamily: font)),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _fontFamily = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text('Font Size Scale', style: theme.textTheme.titleSmall),
+                  Slider(
+                    value: _fontSizeScale,
+                    min: 0.8,
+                    max: 1.4,
+                    divisions: 12,
+                    label: _fontSizeScale.toStringAsFixed(2),
+                    onChanged: (value) {
+                      setState(() => _fontSizeScale = value);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // Theme Preview
+            InfoCard(
+              title: 'Live Preview',
+              content: SizedBox(
+                height: 400,
+                child: ThemePreview(
+                  primaryColor: _primaryColor,
+                  secondaryColor: _secondaryColor,
+                  backgroundColor: _backgroundColor,
+                  textColor: _textColor,
+                  fontFamily: _fontFamily,
+                  fontScale: _fontSizeScale,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+
+            // Action Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CustomButton(
+                  text: 'Reset to Defaults',
+                  onPressed: _resetToDefaults,
+                  variant: ButtonVariant.outline,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                CustomButton(
+                  text: 'Save Configuration',
+                  onPressed: _handleSaveConfiguration,
+                  variant: ButtonVariant.primary,
+                  isLoading: _isLoading,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildColorPicker(
@@ -196,141 +379,6 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final currentUser = authProvider.currentUser;
-
-    // Only show this screen to user with ID 1
-    if (currentUser?.id != 1) {
-      return const Scaffold(
-        body: Center(
-          child: Text('You do not have permission to access this section.'),
-        ),
-      );
-    }
-
-    return ScreenScaffold(
-      title: 'Environment Theme Configuration',
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Environment Selection
-            InfoCard(
-              title: 'Select Environment',
-              content: DropdownButtonFormField<Environment>(
-                value: _selectedEnvironment,
-                items: _environments.map((env) {
-                  return DropdownMenuItem(
-                    value: env,
-                    child: Text(env.name),
-                  );
-                }).toList(),
-                onChanged: (env) {
-                  if (env != null) {
-                    setState(() => _selectedEnvironment = env);
-                    _loadConfigForEnvironment(env);
-                  }
-                },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            // Color Configuration
-            InfoCard(
-              title: 'Color Configuration',
-              content: Column(
-                children: [
-                  _buildColorPicker(
-                    'Primary Color',
-                    _primaryColor,
-                        (color) => setState(() => _primaryColor = color),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildColorPicker(
-                    'Secondary Color',
-                    _secondaryColor,
-                        (color) => setState(() => _secondaryColor = color),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildColorPicker(
-                    'Background Color',
-                    _backgroundColor,
-                        (color) => setState(() => _backgroundColor = color),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildColorPicker(
-                    'Text Color',
-                    _textColor,
-                        (color) => setState(() => _textColor = color),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            // Typography Configuration
-            InfoCard(
-              title: 'Typography Configuration',
-              content: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Font Family',
-                    ),
-                    value: _fontFamily,
-                    items: ThemeConstants.availableFontFamilies.map((font) {
-                      return DropdownMenuItem(
-                        value: font,
-                        child: Text(
-                          font,
-                          style: TextStyle(fontFamily: font),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _fontFamily = value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text('Font Size Scale', style: AppTypography.body),
-                  Slider(
-                    value: _fontSizeScale,
-                    min: 0.8,
-                    max: 1.4,
-                    divisions: 12,
-                    label: _fontSizeScale.toStringAsFixed(2),
-                    onChanged: (value) {
-                      setState(() => _fontSizeScale = value);
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-
-            // Save Button
-            Center(
-              child: CustomButton(
-                text: 'Save Configuration',
-                onPressed: _saveConfig,
-                variant: ButtonVariant.primary,
-                size: ButtonSize.large,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

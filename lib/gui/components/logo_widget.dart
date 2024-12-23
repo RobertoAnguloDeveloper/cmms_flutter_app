@@ -39,19 +39,14 @@ class LogoWidget extends StatelessWidget {
   });
 
   String _getAssetPath() {
-    final variantPath = variant == LogoVariant.full
-        ? 'full'
-        : variant == LogoVariant.icon
-        ? 'icon'
-        : 'text';
-
-    final themePath = theme == LogoTheme.light
-        ? 'light'
-        : theme == LogoTheme.dark
-        ? 'dark'
-        : 'colored';
-
-    return 'assets/logo_${variantPath}_$themePath.png';
+    switch (variant) {
+      case LogoVariant.full:
+        return 'assets/logo_item.png';
+      case LogoVariant.icon:
+        return 'assets/logo.png';
+      case LogoVariant.text:
+        return 'assets/logo_3.png';
+      }
   }
 
   @override

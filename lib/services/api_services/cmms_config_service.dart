@@ -1,50 +1,77 @@
 // 📂 lib/services/api_services/cmms_config_service.dart
 
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../models/cmms_config.dart';
 import 'api_client.dart';
 
+/// Custom exceptions for CMMS config operations
+class CmmsConfigException implements Exception {
+  final String message;
+  const CmmsConfigException(this.message);
+  @override
+  String toString() => message;
+}
+
+class BadRequestException extends CmmsConfigException {
+  const BadRequestException(super.message);
+}
+
+class NotFoundException extends CmmsConfigException {
+  const NotFoundException(super.message);
+}
+
+class UnauthorizedException extends CmmsConfigException {
+  const UnauthorizedException(super.message);
+}
+
+class ApiException extends CmmsConfigException {
+  const ApiException(super.message);
+}
+
+/// Service class for handling CMMS configuration operations
 class CmmsConfigService {
   final ApiClient _apiClient;
   static const String _basePath = '/api/cmms-configs';
 
   const CmmsConfigService(this._apiClient);
 
+  /// Create a new CMMS configuration file
+  ///
+  /// Throws:
+  /// - [BadRequestException] if the request is malformed
+  /// - [UnauthorizedException] if not authorized
+  /// - [ApiException] for other API errors
   Future<CmmsConfig> createConfig({
     required String filename,
     required Map<String, dynamic> content,
   }) async {
     try {
-      // Create request body as JSON
-      final requestData = {
-        'filename': filename,
-        'content': content,
-      };
-
       final response = await _apiClient.post(
         _basePath,
-        data: requestData,
-        options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-        ),
+        data: {
+          'filename': filename,
+          'content': content,
+        },
       );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return CmmsConfig.fromJson(response.data['config'] as Map<String, dynamic>);
-      } else {
+      if (response.statusCode != 201) {
         throw ApiException(
-          response.data['error'] ?? 'Failed to create configuration',
+          response.data?['error'] ?? 'Failed to create configuration',
         );
       }
+
+      return CmmsConfig.fromJson(response.data['config']);
     } on DioException catch (e) {
       throw _handleDioError(e);
     }
   }
 
+  /// Upload a configuration file
+  ///
+  /// Throws:
+  /// - [BadRequestException] if file upload fails
+  /// - [UnauthorizedException] if not authorized
+  /// - [ApiException] for other API errors
   Future<CmmsConfig> uploadConfig(MultipartFile file) async {
     try {
       final formData = FormData.fromMap({
@@ -55,56 +82,80 @@ class CmmsConfigService {
         '$_basePath/upload',
         data: formData,
       );
-      return CmmsConfig.fromJson(response.data['config'] as Map<String, dynamic>);
+
+      if (response.statusCode != 201) {
+        throw ApiException(
+          response.data?['error'] ?? 'Failed to upload configuration',
+        );
+      }
+
+      return CmmsConfig.fromJson(response.data['config']);
     } on DioException catch (e) {
       throw _handleDioError(e);
     }
   }
 
+  /// Load an existing configuration file
+  ///
+  /// Throws:
+  /// - [NotFoundException] if config not found
+  /// - [UnauthorizedException] if not authorized
+  /// - [ApiException] for other API errors
   Future<CmmsConfig> loadConfig(String filename) async {
     try {
       final response = await _apiClient.get('$_basePath/$filename');
 
-      if (response.statusCode == 200) {
-        return CmmsConfig.fromJson(response.data as Map<String, dynamic>);
-      } else if (response.statusCode == 404) {
-        throw NotFoundException('Configuration file not found');
-      } else if (response.statusCode == 500) {
-        throw ApiException('Server error loading configuration');
+      if (response.statusCode != 200) {
+        throw ApiException(
+          response.data?['error'] ?? 'Failed to load configuration',
+        );
       }
 
-      throw ApiException(
-        response.data['error'] ?? 'Failed to load configuration',
-      );
+      return CmmsConfig.fromJson(response.data);
     } on DioException catch (e) {
       throw _handleDioError(e);
     }
   }
 
-  Future<CmmsConfig> renameConfig(String filename, String newFilename) async {
+  /// Rename a configuration file
+  ///
+  /// Throws:
+  /// - [NotFoundException] if original config not found
+  /// - [BadRequestException] if new name is invalid
+  /// - [UnauthorizedException] if not authorized
+  /// - [ApiException] for other API errors
+  Future<CmmsConfig> renameConfig(String oldFilename, String newFilename) async {
     try {
       final response = await _apiClient.put(
-        '$_basePath/$filename/rename',
+        '$_basePath/$oldFilename/rename',
         data: {'new_filename': newFilename},
-        options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-        ),
       );
-      return CmmsConfig.fromJson(response.data['config'] as Map<String, dynamic>);
+
+      if (response.statusCode != 200) {
+        throw ApiException(
+          response.data?['error'] ?? 'Failed to rename configuration',
+        );
+      }
+
+      return CmmsConfig.fromJson(response.data['config']);
     } on DioException catch (e) {
       throw _handleDioError(e);
     }
   }
 
+  /// Delete a configuration file
+  ///
+  /// Throws:
+  /// - [NotFoundException] if config not found
+  /// - [UnauthorizedException] if not authorized
+  /// - [ApiException] for other API errors
   Future<void> deleteConfig(String filename) async {
     try {
       final response = await _apiClient.delete('$_basePath/$filename');
-      if (response.statusCode != 200 && response.statusCode != 204) {
+
+      if (response.statusCode != 200) {
         throw ApiException(
-          response.data['error'] ?? 'Failed to delete configuration',
+          response.data?['error'] ?? 'Failed to delete configuration',
         );
       }
     } on DioException catch (e) {
@@ -112,40 +163,49 @@ class CmmsConfigService {
     }
   }
 
-  Exception _handleDioError(DioException e) {
-    print('DioError response: ${e.response?.data}');
-    if (e.response?.statusCode == 404) {
-      return NotFoundException('Configuration not found');
+  /// Check if configuration file exists
+  ///
+  /// Returns a map containing:
+  /// - exists: boolean indicating if config exists
+  /// - metadata: map of config metadata if exists
+  ///
+  /// Throws:
+  /// - [UnauthorizedException] if not authorized
+  /// - [ApiException] for other API errors
+  Future<Map<String, dynamic>> checkConfig() async {
+    try {
+      final response = await _apiClient.get('$_basePath/check');
+
+      if (response.statusCode != 200) {
+        throw ApiException(
+          response.data?['error'] ?? 'Failed to check configuration',
+        );
+      }
+
+      return {
+        'exists': response.data['exists'] as bool,
+        'metadata': response.data['metadata'] as Map<String, dynamic>,
+      };
+    } on DioException catch (e) {
+      throw _handleDioError(e);
     }
-    if (e.response?.statusCode == 400) {
-      final message = e.response?.data['error'] as String? ?? 'Bad request';
-      return BadRequestException(message);
-    }
-    if (e.response?.statusCode == 403) {
-      return UnauthorizedException('Unauthorized access');
-    }
-    if (e.response?.statusCode == 500) {
-      return ApiException('Internal server error');
-    }
-    return ApiException('Failed to complete configuration operation: ${e.message}');
   }
-}
 
-class ApiException implements Exception {
-  final String message;
-  const ApiException(this.message);
-  @override
-  String toString() => message;
-}
+  /// Handle DioException and convert to appropriate CmmsConfigException
+  Exception _handleDioError(DioException e) {
+    final response = e.response;
+    final errorMsg = response?.data?['error'] as String? ?? e.message ?? 'Unknown error';
 
-class NotFoundException extends ApiException {
-  const NotFoundException(super.message);
-}
-
-class BadRequestException extends ApiException {
-  const BadRequestException(super.message);
-}
-
-class UnauthorizedException extends ApiException {
-  const UnauthorizedException(super.message);
+    switch (response?.statusCode) {
+      case 400:
+        return BadRequestException(errorMsg);
+      case 401:
+      case 403:
+        return UnauthorizedException(errorMsg);
+      case 404:
+        return NotFoundException(errorMsg);
+      default:
+        return ApiException('Failed to complete config operation: $errorMsg');
+    }
+  }
 }

@@ -191,9 +191,9 @@ class _ApiTestScreenState extends State<ApiTestScreen> {
   }
 
   Future<void> _checkAuthStatus() async {
-    final token = await _apiClient.getToken();
+    final isValid = await _apiClient.isAuthenticated();
     setState(() {
-      _isAuthenticated = token != null;
+      _isAuthenticated = isValid;
     });
   }
 
