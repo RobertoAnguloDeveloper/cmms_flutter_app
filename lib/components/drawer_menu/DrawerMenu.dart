@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../models/Permission_set.dart';
 import '../../models/submission_management/QuestionsAnswerScreen.dart';
+import '../../screens/DraftsScreen.dart';
 import '../../screens/login_screen/LoginPage.dart';
 import '../../screens/modules/assign_permissions/PermissionsByRolesScreen.dart';
 import '../../screens/modules/form_management/FormListScreen.dart';
@@ -205,7 +206,18 @@ class _DrawerMenuState extends State<DrawerMenu> {
     ),
     );
     },
-    ),// Logout Option
+    ),
+            PermissionMenuItem(
+              title: 'Drafts',
+              icon: FontAwesomeIcons.save,
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const DraftsScreen()),
+                );
+              },
+            ),
+            // Logout Option
             PermissionMenuItem(
               title: 'Log Out',
               icon: Icons.logout,
