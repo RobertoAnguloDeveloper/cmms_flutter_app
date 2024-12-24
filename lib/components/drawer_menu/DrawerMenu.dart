@@ -184,24 +184,28 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
-            PermissionMenuItem(
-              title: 'Form Submission',
-              icon: FontAwesomeIcons.clipboardList,
-              condition: () => _isSuperUser,
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => QuestionsAnswerScreen(
-                      formTitle: 'Form Title',
-                      formDescription: 'Description of the form',
-                      permissionSet: widget.permissionSet!,
-                      sessionData: widget.sessionData!, formId: 0,
-                    ),
-                  ),
-                );
-              },
-            ),// Logout Option
+    PermissionMenuItem(
+    title: 'Form Submission',
+    icon: FontAwesomeIcons.clipboardList,
+    // Eliminamos condition: () => _isSuperUser,
+    hasPermission: () =>
+    (widget.permissionSet?.hasPermission('view_submissions') ?? false) &&
+    (widget.permissionSet?.hasPermission('create_submissions') ?? false),
+    onTap: () {
+    Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+    builder: (context) => QuestionsAnswerScreen(
+    formTitle: 'Form Title',
+    formDescription: 'Description of the form',
+    permissionSet: widget.permissionSet!,
+    sessionData: widget.sessionData!,
+    formId: 0,
+    ),
+    ),
+    );
+    },
+    ),// Logout Option
             PermissionMenuItem(
               title: 'Log Out',
               icon: Icons.logout,
