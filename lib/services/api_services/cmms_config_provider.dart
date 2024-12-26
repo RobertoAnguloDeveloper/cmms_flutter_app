@@ -229,25 +229,73 @@ class CmmsConfigProvider with ChangeNotifier {
     }
   }
 
-  Future<void> downloadConfig(String filename) async {
+  Future<Uint8List> downloadConfig(String filename) async {
     try {
       _setLoading(true);
-      final response = await _apiClient.get(
-        '/api/cmms-configs/file/$filename',
-        options: Options(responseType: ResponseType.bytes),
+
+      final options = Options(
+        responseType: ResponseType.bytes,
+        headers: {
+          'Accept': '*/*',  // Accept any content type for image files
+          'Content-Type': 'application/octet-stream',  // For binary data
+          'Authorization': 'Bearer ${_apiClient.getToken()}',  // Ensure token is sent
+        },
+        // Setting longer timeouts for large files
+        receiveTimeout: const Duration(minutes: 5),
+        sendTimeout: const Duration(minutes: 5),
+        // Validate any successful status code
+        validateStatus: (status) => status != null && status < 500,
+        // Enable response streaming
+        listFormat: ListFormat.multiCompatible,
+        // Ensure buffer is large enough
+        extra: {'bufferSize': 1024 * 1024}, // 1MB buffer
       );
 
-      if (response.statusCode == 200) {
-        // Handle file download - response.data will be bytes
-        _error = null;
-      } else {
-        throw ConfigException(
-          response.data?['error'] ?? 'Failed to download configuration',
-        );
+      // Retry logic
+      int maxRetries = 3;
+      int currentTry = 0;
+      DioException? lastError;
+
+      while (currentTry < maxRetries) {
+        try {
+          final response = await _apiClient.get(
+            '/api/cmms-configs/file/$filename',
+            options: options,
+          );
+
+          if (response.statusCode == 200 && response.data != null) {
+            if (response.data is! Uint8List) {
+              throw ConfigException('Invalid response type: ${response.data.runtimeType}');
+            }
+            _error = null;
+            return response.data as Uint8List;
+          } else {
+            throw ConfigException(
+              'Failed to download file: ${response.statusCode}',
+            );
+          }
+        } on DioException catch (e) {
+          lastError = e;
+          currentTry++;
+          if (currentTry < maxRetries) {
+            // Wait before retrying
+            await Future.delayed(Duration(seconds: currentTry * 2));
+            continue;
+          }
+          break;
+        }
       }
-    } on DioException catch (e) {
-      _handleDioError(e);
+
+      throw lastError ?? ConfigException('Failed to download file after retries');
     } catch (e) {
+      print('Error downloading config: $e');
+      if (e is DioException) {
+        print('Dio error type: ${e.type}');
+        print('Dio error message: ${e.message}');
+        if (e.response != null) {
+          print('Response status: ${e.response?.statusCode}');
+        }
+      }
       _setError(e.toString());
       rethrow;
     } finally {

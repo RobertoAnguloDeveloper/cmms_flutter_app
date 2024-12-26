@@ -2,7 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../configs/api_config.dart';
+import '../../services/api_services/api_client.dart';
 import '../../services/api_services/auth_provider.dart';
+import '../../services/config/environment_theme_config_manager.dart';
 import '../components/app_drawer.dart';
 import '../components/screen_scaffold.dart';
 import 'auth/login_screen.dart';
@@ -101,15 +104,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleLogout(BuildContext context) async {
+    final navigator = Navigator.of(context);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
     await authProvider.logout();
 
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => false,
-      );
-    }
+    if (!mounted) return;
+
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
   }
 
   Widget _buildDashboardContent() {
@@ -171,15 +176,15 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return _buildUsersContent();
       case 4:
-      // For admin users, index 4 is Environment Theme
-      // For regular users, index 4 is Settings
+        // For admin users, index 4 is Environment Theme
+        // For regular users, index 4 is Settings
         if (isAdmin) {
           return const EnvThemeConfigScreen();
         } else {
           return _buildSettingsContent();
         }
       case 5:
-      // Only admin users will have index 5 (Settings)
+        // Only admin users will have index 5 (Settings)
         if (isAdmin) {
           return _buildSettingsContent();
         }
@@ -190,29 +195,55 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // In home_screen.dart
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final currentUser = authProvider.currentUser;
 
+    // Get EnvironmentThemeConfigManager
+    final configManager = EnvironmentThemeConfigManager(
+        apiClient: ApiClient(baseUrl: ApiConfig.baseUrl));
+
+    final String userInitials = currentUser?.firstName.isNotEmpty == true
+        ? '${currentUser!.firstName[0]}${currentUser.lastName[0]}'
+        : 'U';
+
+    final String userName = [
+      currentUser?.firstName,
+      currentUser?.lastName,
+      "\n",
+      currentUser?.username,
+    ].where((part) => part != null && part.isNotEmpty).join(' ');
+
+    // Get environment ID from current user
+    final environmentId = currentUser?.environment?.id;
+
+    // Build the drawer
     return ScreenScaffold(
       title: 'CMMS App',
-      drawer: AppDrawer(
-        headerWidget: UserAccountsDrawerHeader(
-          accountName: Text(
-            '${currentUser?.firstName ?? ''} ${currentUser?.lastName ?? ''}',
-          ),
-          accountEmail: Text(currentUser?.email ?? ''),
-          currentAccountPicture: CircleAvatar(
-            child: Text(
-              (currentUser?.firstName.isNotEmpty == true
-                  ? currentUser!.firstName[0]
-                  : 'U').toUpperCase(),
+      drawer: environmentId != null
+          ? FutureBuilder<Map<String, dynamic>?>(
+              future: configManager.getEnvironmentTheme(environmentId),
+              builder: (context, snapshot) {
+                final logoFile = snapshot.data?['logo_file'] as String?;
+
+                return AppDrawer(
+                  userName: userName,
+                  userEmail: currentUser?.email ?? '',
+                  userInitials: userInitials,
+                  logoFile: logoFile,
+                  items: _buildDrawerItems(context),
+                );
+              },
+            )
+          : AppDrawer(
+              userName: userName,
+              userEmail: currentUser?.email ?? '',
+              userInitials: userInitials,
+              items: _buildDrawerItems(context),
             ),
-          ),
-        ),
-        items: _buildDrawerItems(context),
-      ),
       body: _buildContent(),
     );
   }

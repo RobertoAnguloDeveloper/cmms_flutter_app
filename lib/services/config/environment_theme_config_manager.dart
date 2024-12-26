@@ -1,15 +1,48 @@
 // File: lib/services/config/environment_theme_config_manager.dart
 
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import '../../models/environment.dart';
 import '../api_services/api_client.dart';
 import '../api_services/cmms_config_provider.dart';
 
+
 class EnvironmentThemeConfigManager {
   final CmmsConfigProvider _configProvider;
+  final ApiClient _apiClient;
   static const String configFilename = 'config.json';
 
   EnvironmentThemeConfigManager({required ApiClient apiClient})
-      : _configProvider = CmmsConfigProvider(apiClient: apiClient);
+      : _configProvider = CmmsConfigProvider(apiClient: apiClient),
+      _apiClient = apiClient;
+
+  // Add new methods for file handling
+  Future<void> uploadConfig(MultipartFile file) async {
+    try {
+      await _configProvider.uploadConfig(file);
+    } catch (e) {
+      print('Error uploading config: $e');
+      rethrow;
+    }
+  }
+
+  Future<Uint8List> downloadConfig(String filename) async {
+    try {
+      final response = await _apiClient.get(  // Use _apiClient instead
+        '/api/cmms-configs/file/$filename',
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      if (response.data is! Uint8List) {
+        throw Exception('Invalid response type');
+      }
+
+      return response.data as Uint8List;
+    } catch (e) {
+      print('Error downloading config: $e');
+      rethrow;
+    }
+  }
 
   /// Check if config file exists
   Future<bool> checkConfigExists() async {
@@ -21,6 +54,7 @@ class EnvironmentThemeConfigManager {
       return false;
     }
   }
+
 
   /// Create initial configuration file
   Future<void> createInitialConfig() async {
@@ -84,12 +118,13 @@ class EnvironmentThemeConfigManager {
       }
 
       // Get existing environments
-      List<Map<String, dynamic>> environments =
-      List<Map<String, dynamic>>.from(currentConfig.content['environments'] as List);
+      List<Map<String, dynamic>> environments = List<Map<String, dynamic>>.from(
+        currentConfig.content['environments'] as List,
+      );
 
       // Find existing environment config or prepare new one
       final envIndex = environments.indexWhere(
-              (env) => env['parameters']?['environment_id'] == environment.id
+            (env) => env['parameters']?['environment_id'] == environment.id,
       );
 
       final newEnvConfig = {
@@ -120,7 +155,6 @@ class EnvironmentThemeConfigManager {
         },
         useUpdate: true,
       );
-
     } catch (e) {
       print('Error saving environment config: $e');
       rethrow;

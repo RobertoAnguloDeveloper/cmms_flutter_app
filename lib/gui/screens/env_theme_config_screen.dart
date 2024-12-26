@@ -1,7 +1,11 @@
 // 📂 lib/gui/screens/env_theme_config_screen.dart
 
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'dart:io';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import '../../services/api_services/auth_provider.dart';
 import '../../services/api_services/api_client.dart';
 import '../../services/api_services/environment_service.dart';
@@ -17,6 +21,8 @@ import '../../constants/gui_constants/app_typography.dart';
 import '../../constants/gui_constants/theme_constants.dart';
 import '../../configs/api_config.dart';
 
+
+
 class EnvThemeConfigScreen extends StatefulWidget {
   const EnvThemeConfigScreen({super.key});
 
@@ -28,6 +34,7 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
   late final ApiClient _apiClient;
   late final EnvironmentService _environmentService;
   late final EnvironmentThemeConfigManager _configManager;
+
 
   bool _isLoading = false;
   String? _error;
@@ -41,6 +48,10 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
   double _fontSizeScale = 1.0;
   Environment? _selectedEnvironment;
   List<Environment> _environments = [];
+
+  // Logo state
+  String? _selectedLogoPath;
+  Uint8List? _logoPreview;
 
   @override
   void initState() {
@@ -88,13 +99,77 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
           _textColor = _colorFromHex(themeSettings['text_color']);
           _fontFamily = themeSettings['font_family'];
           _fontSizeScale = themeSettings['font_size_scale'];
+          _selectedLogoPath = themeSettings['logo_file'];
+
+          // Load logo preview if path exists
+          if (_selectedLogoPath != null) {
+            _loadLogoPreview();
+          } else {
+            _logoPreview = null;
+          }
         });
       } else {
-        // Set defaults if no existing configuration
         _resetToDefaults();
       }
     } catch (e) {
       setState(() => _error = e.toString());
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadLogoPreview() async {
+    try {
+      if (_selectedLogoPath == null) return;
+
+      final bytes = await _configManager.downloadConfig(_selectedLogoPath!);
+      setState(() => _logoPreview = bytes);
+    } catch (e) {
+      print('Error loading logo preview: $e');
+      setState(() => _logoPreview = null);
+    }
+  }
+
+  Future<void> _pickAndUploadLogo() async {
+    try {
+      final params = OpenFileDialogParams(
+        dialogType: OpenFileDialogType.image,
+        sourceType: SourceType.photoLibrary,
+      );
+      final filePath = await FlutterFileDialog.pickFile(params: params);
+
+      if (filePath == null) return;
+
+      setState(() => _isLoading = true);
+
+      // Read file bytes using dart:io
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+
+      final fileName = filePath.split('/').last;
+      final multipartFile = MultipartFile.fromBytes(
+        bytes,
+        filename: fileName,
+      );
+
+      await _configManager.uploadConfig(multipartFile);
+
+      setState(() {
+        _logoPreview = bytes;
+        _selectedLogoPath = fileName;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logo uploaded successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading logo: $e')),
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -108,6 +183,8 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
       _textColor = Colors.black;
       _fontFamily = ThemeConstants.defaultFontFamily;
       _fontSizeScale = 1.0;
+      _logoPreview = null;
+      _selectedLogoPath = null;
     });
   }
 
@@ -117,7 +194,17 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
   }
 
   String _colorToHex(Color color) {
-    return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
+    // Convert components to 8-bit values (0-255)
+    final int r = (color.r * 255).round();
+    final int g = (color.g * 255).round();
+    final int b = (color.b * 255).round();
+    final int a = (color.a * 255).round();
+
+    // Pack into ARGB format
+    final int colorInt = (a << 24) | (r << 16) | (g << 8) | b;
+
+    // Convert to hex string, strip alpha channel, ensure uppercase
+    return '#${colorInt.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
   }
 
   Future<void> _handleSaveConfiguration() async {
@@ -141,6 +228,7 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
         'text_color': _colorToHex(_textColor),
         'font_family': _fontFamily,
         'font_size_scale': _fontSizeScale,
+        'logo_file': _selectedLogoPath,
       };
 
       await _configManager.saveEnvironmentConfig(
@@ -160,15 +248,6 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
       setState(() {
         _error = 'Failed to save configuration: ${e.toString()}';
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } finally {
       if (mounted) {
         setState(() {
@@ -176,6 +255,57 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
         });
       }
     }
+  }
+
+  Widget _buildLogoSection() {
+    return InfoCard(
+      title: 'Environment Logo',
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.md),
+          // Logo preview
+          Container(
+            width: 200,
+            height: 100,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: _logoPreview != null
+                ? Image.memory(
+              _logoPreview!,
+              fit: BoxFit.contain,
+            )
+                : const Center(
+              child: Text('No logo selected'),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          // Upload button
+          CustomButton(
+            text: 'Upload Logo',
+            onPressed: _pickAndUploadLogo,
+            icon: const Icon(Icons.upload),
+            variant: ButtonVariant.outline,
+          ),
+          if (_selectedLogoPath != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text('Selected: $_selectedLogoPath'),
+            const SizedBox(height: AppSpacing.sm),
+            CustomButton(
+              text: 'Remove Logo',
+              onPressed: () => setState(() {
+                _logoPreview = null;
+                _selectedLogoPath = null;
+              }),
+              variant: ButtonVariant.outline,
+              icon: const Icon(Icons.delete_outline),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -194,156 +324,160 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
     }
 
     return ScreenScaffold(
-      title: 'Environment Theme Configuration',
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_error != null) ...[
-              InfoCard(
-                title: 'Error',
-                content: Text(_error!, style: const TextStyle(color: Colors.red)),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-            ],
-
-            // Environment Selection
-            InfoCard(
-              title: 'Select Environment',
-              content: DropdownButtonFormField<Environment>(
-                value: _selectedEnvironment,
-                decoration: const InputDecoration(
-                  labelText: 'Environment',
-                  border: OutlineInputBorder(),
-                ),
-                items: _environments.map((env) {
-                  return DropdownMenuItem(
-                    value: env,
-                    child: Text('${env.name} - ${env.description}'),
-                  );
-                }).toList(),
-                onChanged: (env) {
-                  if (env != null) _selectEnvironment(env);
-                },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            // Colors Section
-            InfoCard(
-              title: 'Colors',
-              content: Column(
-                children: [
-                  _buildColorPicker(
-                    'Primary Color',
-                    _primaryColor,
-                        (color) => setState(() => _primaryColor = color),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildColorPicker(
-                    'Secondary Color',
-                    _secondaryColor,
-                        (color) => setState(() => _secondaryColor = color),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildColorPicker(
-                    'Background Color',
-                    _backgroundColor,
-                        (color) => setState(() => _backgroundColor = color),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildColorPicker(
-                    'Text Color',
-                    _textColor,
-                        (color) => setState(() => _textColor = color),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            // Typography Section
-            InfoCard(
-              title: 'Typography',
-              content: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Font Family',
-                      border: OutlineInputBorder(),
-                    ),
-                    value: _fontFamily,
-                    items: ThemeConstants.availableFontFamilies.map((font) {
-                      return DropdownMenuItem(
-                        value: font,
-                        child: Text(font, style: TextStyle(fontFamily: font)),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _fontFamily = value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text('Font Size Scale', style: theme.textTheme.titleSmall),
-                  Slider(
-                    value: _fontSizeScale,
-                    min: 0.8,
-                    max: 1.4,
-                    divisions: 12,
-                    label: _fontSizeScale.toStringAsFixed(2),
-                    onChanged: (value) {
-                      setState(() => _fontSizeScale = value);
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            // Theme Preview
-            InfoCard(
-              title: 'Live Preview',
-              content: SizedBox(
-                height: 400,
-                child: ThemePreview(
-                  primaryColor: _primaryColor,
-                  secondaryColor: _secondaryColor,
-                  backgroundColor: _backgroundColor,
-                  textColor: _textColor,
-                  fontFamily: _fontFamily,
-                  fontScale: _fontSizeScale,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-
-            // Action Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+        title: 'Environment Theme Configuration',
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CustomButton(
-                  text: 'Reset to Defaults',
-                  onPressed: _resetToDefaults,
-                  variant: ButtonVariant.outline,
-                ),
-                const SizedBox(width: AppSpacing.md),
-                CustomButton(
-                  text: 'Save Configuration',
-                  onPressed: _handleSaveConfiguration,
-                  variant: ButtonVariant.primary,
-                  isLoading: _isLoading,
-                ),
-              ],
-            ),
-          ],
+              if (_error != null) ...[
+          InfoCard(
+          title: 'Error',
+          content: Text(_error!, style: const TextStyle(color: Colors.red)),
         ),
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        ],
+
+    // Environment Selection
+    InfoCard(
+    title: 'Select Environment',
+    content: DropdownButtonFormField<Environment>(
+    value: _selectedEnvironment,
+        decoration: const InputDecoration(
+        labelText: 'Environment',
+        border: OutlineInputBorder(),
+    ),
+    items: _environments.map((env) {
+    return DropdownMenuItem(
+    value: env,
+    child: Text('${env.name} - ${env.description}'),
+    );
+    }).toList(),
+    onChanged: (env) {
+    if (env != null) _selectEnvironment(env);
+    },
+    ),
+    ),
+    const SizedBox(height: AppSpacing.lg),
+
+    // Colors Section
+    InfoCard(
+    title: 'Colors',
+    content: Column(
+    children: [
+    _buildColorPicker(
+    'Primary Color',
+    _primaryColor,
+    (color) => setState(() => _primaryColor = color),
+    ),
+    const SizedBox(height: AppSpacing.md),
+    _buildColorPicker(
+    'Secondary Color',
+    _secondaryColor,
+    (color) => setState(() => _secondaryColor = color),
+    ),
+    const SizedBox(height: AppSpacing.md),
+    _buildColorPicker(
+    'Background Color',
+    _backgroundColor,
+    (color) => setState(() => _backgroundColor = color),
+    ),
+    const SizedBox(height: AppSpacing.md),
+    _buildColorPicker(
+    'Text Color',
+    _textColor,
+    (color) => setState(() => _textColor = color),
+    ),
+    ],
+    ),
+    ),
+    const SizedBox(height: AppSpacing.lg),
+
+    // Typography Section
+    InfoCard(
+    title: 'Typography',
+    content: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+    DropdownButtonFormField<String>(
+    decoration: const InputDecoration(
+    labelText: 'Font Family',
+    border: OutlineInputBorder(),
+    ),
+    value: _fontFamily,
+    items: ThemeConstants.availableFontFamilies.map((font) {
+    return DropdownMenuItem(
+    value: font,
+    child: Text(font, style: TextStyle(fontFamily: font)),
+    );
+    }).toList(),
+    onChanged: (value) {
+    if (value != null) {
+    setState(() => _fontFamily = value);
+    }
+    },
+    ),
+    const SizedBox(height: AppSpacing.md),
+    Text('Font Size Scale', style: theme.textTheme.titleSmall),
+    Slider(
+    value: _fontSizeScale,
+    min: 0.8,
+    max: 1.4,
+    divisions: 12,
+    label: _fontSizeScale.toStringAsFixed(2),
+    onChanged: (value) {
+    setState(() => _fontSizeScale = value);
+    },
+    ),
+    ],
+    ),
+    ),
+    const SizedBox(height: AppSpacing.lg),
+
+    // Logo Section
+    _buildLogoSection(),
+    const SizedBox(height: AppSpacing.lg),
+
+    // Theme Preview
+    InfoCard(
+    title: 'Live Preview',
+    content: SizedBox(
+    height: 400,
+    child: ThemePreview(
+    primaryColor: _primaryColor,
+    secondaryColor: _secondaryColor,
+    backgroundColor: _backgroundColor,
+    textColor: _textColor,
+    fontFamily: _fontFamily,
+    fontScale: _fontSizeScale,
+    ),
+    ),
+    ),
+    const SizedBox(height: AppSpacing.xl),
+
+    // Action Buttons
+    Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+    CustomButton(
+    text: 'Reset to Defaults',
+    onPressed: _resetToDefaults,
+    variant: ButtonVariant.outline,
+    ),
+    const SizedBox(width: AppSpacing.md),
+    CustomButton(
+      text: 'Save Configuration',
+      onPressed: _handleSaveConfiguration,
+      variant: ButtonVariant.primary,
+      isLoading: _isLoading,
+    ),
+    ],
+    ),
+              ],
+          ),
+        ),
     );
   }
 
