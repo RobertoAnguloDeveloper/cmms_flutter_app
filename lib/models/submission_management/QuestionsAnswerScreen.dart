@@ -4,6 +4,9 @@ import '../../../components/drawer_menu/DrawerMenu.dart';
 import '../../../models/Permission_set.dart';
 import '../../../services/api_model_services/api_form_services/AnswerApiService.dart';
 import '../../../services/api_model_services/api_form_services/FormApiService.dart';
+import '../../screens/modules/form_submission/Components/DynamicQuestionInput.dart';
+
+
 
 class QuestionsAnswerScreen extends StatefulWidget {
   final int formId;
@@ -213,113 +216,20 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   }
 
   Widget _buildAnswerField(Map<String, dynamic> question) {
-    final questionType = question['type']?.toString().toLowerCase() ?? '';
-
-    switch (questionType) {
-      case 'checkbox':
-        return _buildCheckboxAnswer(question);
-      case 'radio':
-      case 'multiple_choice':
-        return _buildRadioAnswer(question);
-      case 'date':
-        return _buildDateAnswer(question);
-      default:
-        return _buildTextAnswer(question);
-    }
-  }
-
-  Widget _buildCheckboxAnswer(Map<String, dynamic> question) {
-    final options = question['possible_answers'] as List? ?? [];
-    return Column(
-      children: options.map((option) {
-        final isSelected = answers[question['id']] == option['id'];
-        return CheckboxListTile(
-          title: Text(option['value']),
-          value: isSelected,
-          onChanged: (bool? value) {
-            setState(() {
-              if (value == true) {
-                answers[question['id']] = option['id'];
-              } else {
-                answers.remove(question['id']);
-              }
-            });
-          },
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildRadioAnswer(Map<String, dynamic> question) {
-    final options = question['possible_answers'] as List? ?? [];
-    return Column(
-      children: options.map((option) {
-        return RadioListTile(
-          title: Text(option['value']),
-          value: option['id'],
-          groupValue: answers[question['id']],
-          onChanged: (value) {
-            setState(() {
-              answers[question['id']] = value;
-            });
-          },
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildDateAnswer(Map<String, dynamic> question) {
-    return InkWell(
-      onTap: () async {
-        final date = await showDatePicker(
-          context: context,
-          initialDate: DateTime.now(),
-          firstDate: DateTime(1900),
-          lastDate: DateTime(2100),
-        );
-        if (date != null) {
-          setState(() {
-            answers[question['id']] = DateFormat('yyyy-MM-dd').format(date);
-          });
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.calendar_today, color: Colors.blue),
-            const SizedBox(width: 8),
-            Text(
-              answers[question['id']] ?? 'Select date',
-              style: TextStyle(
-                color: answers[question['id']] != null ? Colors.black : Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextAnswer(Map<String, dynamic> question) {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: 'Enter your answer',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-      onChanged: (value) {
+    return DynamicQuestionInput(
+      question: question,
+      currentValue: answers[question['id']],
+      onAnswerChanged: (value) {
         setState(() {
-          answers[question['id']] = value.trim();
+          answers[question['id']] = value;
         });
       },
     );
   }
+
+
+
+
 
   Future<void> _submitAnswers() async {
     try {

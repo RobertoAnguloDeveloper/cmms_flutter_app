@@ -1,20 +1,43 @@
+// 📂 lib/screens/DraftsScreen.dart
+
 import 'package:flutter/material.dart';
+import '../screens/modules/home/HomePage.dart';
+import '../models/Permission_set.dart';
 
 class DraftsScreen extends StatelessWidget {
-  const DraftsScreen({Key? key}) : super(key: key);
+  final PermissionSet permissionSet;
+  final Map<String, dynamic> sessionData;
+
+  const DraftsScreen({
+    Key? key,
+    required this.permissionSet,
+    required this.sessionData,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomePage(
+                  sessionData: sessionData,
+                  permissionSet: permissionSet,
+                ),
+              ),
+            );
+          },
+        ),
         title: const Text("Drafts"),
       ),
       body: Container(
-        // Fondo claro, similar a tu pantalla principal
         color: const Color.fromARGB(255, 211, 234, 248),
         padding: const EdgeInsets.all(16.0),
         child: Card(
-          // Tarjeta con un color suave de fondo
           color: const Color.fromARGB(255, 237, 231, 253),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8.0),

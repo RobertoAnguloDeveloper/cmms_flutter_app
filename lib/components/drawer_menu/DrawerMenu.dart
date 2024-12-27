@@ -213,7 +213,12 @@ class _DrawerMenuState extends State<DrawerMenu> {
               onTap: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const DraftsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => DraftsScreen(
+                      permissionSet: widget.permissionSet!,
+                      sessionData: widget.sessionData!,
+                    ),
+                  ),
                 );
               },
             ),
