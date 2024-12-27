@@ -4,6 +4,8 @@ import '../../../components/drawer_menu/DrawerMenu.dart';
 import '../../../models/Permission_set.dart';
 import '../../../services/api_model_services/api_form_services/AnswerApiService.dart';
 import '../../../services/api_model_services/api_form_services/FormApiService.dart';
+import '../../screens/modules/form_management/form_management_helpers/form_detail_helper/DynamicInputField.dart';
+import '../../screens/modules/form_submission/Components/CustomSignaturePad.dart';
 import '../../screens/modules/form_submission/Components/DynamicQuestionInput.dart';
 
 
@@ -216,6 +218,25 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   }
 
   Widget _buildAnswerField(Map<String, dynamic> question) {
+    final questionType = question['type']?.toString().toLowerCase() ?? '';
+
+    if (questionType == 'signature') {
+      return Column(
+        children: [
+          const CustomSignaturePad(),
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            onPressed: () {
+              final padState = context.findAncestorStateOfType<CustomSignaturePadState>();
+              padState?.clear();
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('Clear'),
+          ),
+        ],
+      );
+    }
+
     return DynamicQuestionInput(
       question: question,
       currentValue: answers[question['id']],
@@ -226,9 +247,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       },
     );
   }
-
-
-
 
 
   Future<void> _submitAnswers() async {
