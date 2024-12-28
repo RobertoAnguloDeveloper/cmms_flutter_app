@@ -48,6 +48,7 @@ dev_dependencies:
   open_file: ^3.5.10
   flutter_file_dialog: ^3.0.2
   provider: ^6.1.2
+  dio_smart_retry: ^7.0.1
 
 
 

@@ -82,22 +82,22 @@ class _AppDrawerState extends State<AppDrawer> {
       return;
     }
 
-    if (_isLoading) return; // Prevent multiple simultaneous loads
+    if (_isLoading) return;
 
     try {
       setState(() => _isLoading = true);
       print('Loading logo: ${widget.logoFile}');
 
-      final configProvider =
-          Provider.of<CmmsConfigProvider>(context, listen: false);
+      final configProvider = Provider.of<CmmsConfigProvider>(context, listen: false);
       final bytes = await configProvider.downloadConfig(widget.logoFile!);
-      print('Received bytes length: ${bytes.length}');
 
       if (mounted) {
         setState(() {
           _logoBytes = bytes;
           _isLoading = false;
-          print('Logo bytes set in state. Length: ${_logoBytes?.length}');
+          if (bytes != null) {
+            print('Logo loaded successfully: ${bytes.length} bytes');
+          }
         });
       }
     } catch (e) {
@@ -111,11 +111,44 @@ class _AppDrawerState extends State<AppDrawer> {
     }
   }
 
+  Widget _buildDefaultAvatar(ColorScheme colorScheme) {
+    return Center(
+      child: Text(
+        widget.userInitials?.toUpperCase() ?? 'U',
+        style: TextStyle(
+          color: colorScheme.inversePrimary,
+          fontWeight: FontWeight.bold,
+          fontSize: 30,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogoContent(ColorScheme colorScheme, double containerSize) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_logoBytes != null) {
+      return Image.memory(
+        _logoBytes!,
+        fit: BoxFit.contain,
+        width: containerSize,
+        height: containerSize,
+        errorBuilder: (context, error, stack) {
+          print('Error displaying logo: $error');
+          return _buildDefaultAvatar(colorScheme);
+        },
+      );
+    }
+
+    return _buildDefaultAvatar(colorScheme);
+  }
+
   Widget _buildDefaultHeader(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    // Increase size significantly for the logo container
-    final double containerSize = 75; // Increased from 120 to 160
+    final double containerSize = 75;
 
     return UserAccountsDrawerHeader(
       decoration: BoxDecoration(
@@ -134,7 +167,6 @@ class _AppDrawerState extends State<AppDrawer> {
         ),
       ),
       margin: EdgeInsets.zero,
-      // Increase the header height to accommodate larger logo
       currentAccountPictureSize: Size(containerSize, containerSize),
       accountName: Padding(
         padding: const EdgeInsets.only(top: 9.0),
@@ -192,25 +224,7 @@ class _AppDrawerState extends State<AppDrawer> {
           ),
         ),
         child: ClipOval(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _logoBytes != null
-                  ? Image.memory(
-                      _logoBytes!,
-                      fit: BoxFit.contain,
-                      width: containerSize,
-                      height: containerSize,
-                    )
-                  : Center(
-                      child: Text(
-                        widget.userInitials?.toUpperCase() ?? 'U',
-                        style: TextStyle(
-                          color: colorScheme.inversePrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 30, // Increased font size for initials
-                        ),
-                      ),
-                    ),
+          child: _buildLogoContent(colorScheme, containerSize),
         ),
       ),
       otherAccountsPictures: null,
@@ -238,8 +252,7 @@ class _AppDrawerState extends State<AppDrawer> {
       ),
       leading: Icon(
         item.icon,
-        color:
-            item.selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+        color: item.selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
         size: 40,
       ),
       title: Text(

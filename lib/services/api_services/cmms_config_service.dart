@@ -1,7 +1,10 @@
 // 📂 lib/services/api_services/cmms_config_service.dart
 
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import '../../models/cmms_config.dart';
+import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 
 /// Custom exceptions for CMMS config operations
@@ -10,6 +13,10 @@ class CmmsConfigException implements Exception {
   const CmmsConfigException(this.message);
   @override
   String toString() => message;
+}
+
+class FileNotFoundException extends CmmsConfigException {
+  const FileNotFoundException(String message) : super(message);
 }
 
 class BadRequestException extends CmmsConfigException {
@@ -188,6 +195,55 @@ class CmmsConfigService {
       };
     } on DioException catch (e) {
       throw _handleDioError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>?> verifyFileMetadata(String filename) async {
+    try {
+      final response = await _apiClient.get('/api/cmms-configs/files');
+      final files = response.data['files'] as List;
+      return files.firstWhere(
+            (f) => f['filename'] == filename,
+        orElse: () => null,
+      );
+    } catch (e) {
+      print('Error verifying file metadata: $e');
+      return null;
+    }
+  }
+
+  Future<Uint8List> downloadFile(String filename) async {
+    try {
+      // First check if file exists and get metadata
+      final fileInfo = await verifyFileMetadata(filename);
+      if (fileInfo == null) {
+        throw FileNotFoundException('File $filename not found');
+      }
+
+      // Set download options
+      final options = Options(
+        responseType: ResponseType.bytes,
+        headers: {
+          'Accept': '*/*',
+          'Authorization': 'Bearer ${await _apiClient.getToken()}',
+        },
+        validateStatus: (status) => status! < 500,
+        receiveTimeout: const Duration(minutes: 2),
+      );
+
+      final response = await _apiClient.get(
+        '/api/cmms-configs/file/$filename',
+        options: options,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data as Uint8List;
+      }
+
+      throw ApiException('Failed to download file: ${response.statusCode}');
+    } catch (e) {
+      print('Error downloading file: $e');
+      rethrow;
     }
   }
 

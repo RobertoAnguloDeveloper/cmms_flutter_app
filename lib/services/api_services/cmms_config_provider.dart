@@ -1,8 +1,14 @@
 // 📂 lib/services/api_services/cmms_config_provider.dart
 
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
+import 'package:dio_smart_retry/dio_smart_retry.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../models/cmms_config.dart';
+import '../../models/environment.dart';
+import '../cache/local_file_cache.dart';
 import 'api_client.dart';
 
 /// Custom exceptions for config operations
@@ -15,6 +21,9 @@ class ConfigException implements Exception {
 
 class CmmsConfigProvider with ChangeNotifier {
   final ApiClient _apiClient;
+  final LocalFileCache _fileCache = LocalFileCache();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  static const String _tokenKey = 'auth_token';
   CmmsConfig? _currentConfig;
   bool _isLoading = false;
   String? _error;
@@ -58,7 +67,6 @@ class CmmsConfigProvider with ChangeNotifier {
       Response response;
 
       if (useUpdate) {
-        // Use PUT endpoint for updates
         response = await _apiClient.put(
           '/api/cmms-configs/configs/$filename',
           data: {
@@ -69,7 +77,6 @@ class CmmsConfigProvider with ChangeNotifier {
         if (response.statusCode == 200) {
           if (response.data != null && response.data is Map<String, dynamic>) {
             final configData = response.data['config'] as Map<String, dynamic>;
-            // Set content from our passed content since the response might not include it
             configData['content'] = content;
             _currentConfig = CmmsConfig.fromJson(configData);
             _error = null;
@@ -82,7 +89,6 @@ class CmmsConfigProvider with ChangeNotifier {
           );
         }
       } else {
-        // Use POST endpoint for new files
         response = await _apiClient.post(
           '/api/cmms-configs',
           data: {
@@ -94,7 +100,6 @@ class CmmsConfigProvider with ChangeNotifier {
         if (response.statusCode == 201) {
           if (response.data != null && response.data is Map<String, dynamic>) {
             final configData = response.data['config'] as Map<String, dynamic>;
-            // Set content from our passed content since the response might not include it
             configData['content'] = content;
             _currentConfig = CmmsConfig.fromJson(configData);
             _error = null;
@@ -117,13 +122,135 @@ class CmmsConfigProvider with ChangeNotifier {
     }
   }
 
+  Future<void> uploadConfig(MultipartFile file) async {
+    try {
+      _setLoading(true);
+      final formData = FormData();
+      formData.files.add(MapEntry('file', file));
+
+      final response = await _apiClient.post(
+        '/api/cmms-configs/upload',
+        data: formData,
+      );
+
+      if (response.statusCode == 201) {
+        if (response.data != null && response.data['config'] != null) {
+          _currentConfig = CmmsConfig.fromJson(response.data['config']);
+          _error = null;
+        } else {
+          throw ConfigException('Invalid response format');
+        }
+      } else {
+        throw ConfigException(
+          response.data?['error'] ?? 'Failed to upload configuration',
+        );
+      }
+    } on DioException catch (e) {
+      _handleDioError(e);
+    } catch (e) {
+      _setError(e.toString());
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<Uint8List?> downloadConfig(String filename) async {
+    try {
+      // Check cache first
+      final cachedFile = await _fileCache.getCachedFile(filename);
+      if (cachedFile != null) {
+        print('Found cached file: $filename');
+        return await cachedFile.readAsBytes();
+      }
+
+      // Create a dedicated Dio instance for file downloads
+      final downloadDio = Dio(BaseOptions(
+        baseUrl: _apiClient.baseUrl,
+        connectTimeout: const Duration(minutes: 5),
+        receiveTimeout: const Duration(minutes: 10),
+        sendTimeout: const Duration(minutes: 5),
+        validateStatus: (status) => status == 200,
+        // Set specific headers for file download
+        headers: {
+          'Accept': '*/*',
+          'Accept-Encoding': 'identity', // Disable compression
+          'Authorization': 'Bearer ${await _apiClient.getToken()}',
+        },
+      ));
+
+      // Add retry interceptor
+      downloadDio.interceptors.add(
+        RetryInterceptor(
+          dio: downloadDio,
+          logPrint: print,
+          retries: 3,
+          retryDelays: const [
+            Duration(seconds: 1),
+            Duration(seconds: 2),
+            Duration(seconds: 3),
+          ],
+          retryableExtraStatuses: {200}, // Add 200 to retry status codes
+        ),
+      );
+
+      final response = await downloadDio.get(
+        '/api/cmms-configs/file/$filename',
+        options: Options(
+          responseType: ResponseType.bytes,
+          followRedirects: true,
+          validateStatus: (status) => status == 200,
+          receiveTimeout: const Duration(minutes: 5),
+          sendTimeout: const Duration(minutes: 5),
+          listFormat: ListFormat.multiCompatible,
+          headers: {
+            'Accept': '*/*',
+            'Accept-Encoding': 'identity',
+          },
+        ),
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            final percentage = (received / total * 100).toStringAsFixed(0);
+            print('Download progress: $percentage% ($received/$total bytes)');
+          }
+        },
+      );
+
+      if (response.data != null) {
+        final bytes = Uint8List.fromList(response.data as List<int>);
+        print('Download completed: ${bytes.length} bytes');
+
+        // Cache the file
+        await _fileCache.cacheFile(
+          filename,
+          bytes,
+          FileMetadata(
+            filename: filename,
+            modifiedAt: DateTime.now().toIso8601String(),
+            size: bytes.length,
+            mimeType: 'image/*',
+          ),
+        );
+
+        return bytes;
+      }
+
+      print('Download failed: Empty response data');
+      return null;
+
+    } catch (e, stackTrace) {
+      print('Error downloading file: $e');
+      print('Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
   Future<void> deleteConfig(String filename) async {
     try {
       _setLoading(true);
       final response = await _apiClient.delete('/api/cmms-configs/$filename');
 
       if (response.statusCode == 200) {
-        // Clear current config if we just deleted it
         if (_currentConfig?.filename == filename) {
           _currentConfig = null;
         }
@@ -176,7 +303,6 @@ class CmmsConfigProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        // Update current config if we just renamed it
         if (_currentConfig?.filename == oldFilename) {
           _currentConfig = CmmsConfig.fromJson(response.data['config']);
         }
@@ -196,110 +322,32 @@ class CmmsConfigProvider with ChangeNotifier {
     }
   }
 
-  Future<void> uploadConfig(MultipartFile file) async {
+  Future<String?> getToken() async {
     try {
-      _setLoading(true);
-      final formData = FormData();
-      formData.files.add(MapEntry('file', file));
-
-      final response = await _apiClient.post(
-        '/api/cmms-configs/upload',
-        data: formData,
-      );
-
-      if (response.statusCode == 201) {
-        if (response.data != null && response.data['config'] != null) {
-          _currentConfig = CmmsConfig.fromJson(response.data['config']);
-          _error = null;
-        } else {
-          throw ConfigException('Invalid response format');
-        }
-      } else {
-        throw ConfigException(
-          response.data?['error'] ?? 'Failed to upload configuration',
-        );
+      final tokenData = await _secureStorage.read(key: _tokenKey);
+      if (tokenData != null) {
+        final data = jsonDecode(tokenData);
+        return data['token'] as String?;
       }
-    } on DioException catch (e) {
-      _handleDioError(e);
     } catch (e) {
-      _setError(e.toString());
-      rethrow;
-    } finally {
-      _setLoading(false);
+      print('Error getting token: $e');
     }
+    return null;
   }
 
-  Future<Uint8List> downloadConfig(String filename) async {
+  Future<bool> verifyFileExists(String filename) async {
     try {
-      _setLoading(true);
-
-      final options = Options(
-        responseType: ResponseType.bytes,
-        headers: {
-          'Accept': '*/*',  // Accept any content type for image files
-          'Content-Type': 'application/octet-stream',  // For binary data
-          'Authorization': 'Bearer ${_apiClient.getToken()}',  // Ensure token is sent
-        },
-        // Setting longer timeouts for large files
-        receiveTimeout: const Duration(minutes: 5),
-        sendTimeout: const Duration(minutes: 5),
-        // Validate any successful status code
-        validateStatus: (status) => status != null && status < 500,
-        // Enable response streaming
-        listFormat: ListFormat.multiCompatible,
-        // Ensure buffer is large enough
-        extra: {'bufferSize': 1024 * 1024}, // 1MB buffer
-      );
-
-      // Retry logic
-      int maxRetries = 3;
-      int currentTry = 0;
-      DioException? lastError;
-
-      while (currentTry < maxRetries) {
-        try {
-          final response = await _apiClient.get(
-            '/api/cmms-configs/file/$filename',
-            options: options,
-          );
-
-          if (response.statusCode == 200 && response.data != null) {
-            if (response.data is! Uint8List) {
-              throw ConfigException('Invalid response type: ${response.data.runtimeType}');
-            }
-            _error = null;
-            return response.data as Uint8List;
-          } else {
-            throw ConfigException(
-              'Failed to download file: ${response.statusCode}',
-            );
-          }
-        } on DioException catch (e) {
-          lastError = e;
-          currentTry++;
-          if (currentTry < maxRetries) {
-            // Wait before retrying
-            await Future.delayed(Duration(seconds: currentTry * 2));
-            continue;
-          }
-          break;
-        }
+      final response = await _apiClient.get('/api/cmms-configs/files');
+      if (response.statusCode == 200) {
+        final files = (response.data['files'] as List)
+            .map((f) => f['filename'] as String)
+            .toList();
+        return files.contains(filename);
       }
-
-      throw lastError ?? ConfigException('Failed to download file after retries');
+      return false;
     } catch (e) {
-      print('Error downloading config: $e');
-      if (e is DioException) {
-        print('Dio error type: ${e.type}');
-        print('Dio error message: ${e.message}');
-        if (e.response != null) {
-          print('Response status: ${e.response?.statusCode}');
-        }
-      }
-      _setError(e.toString());
-      rethrow;
-    } finally {
-      _setLoading(false);
+      print('Error verifying file existence: $e');
+      return false;
     }
   }
 
