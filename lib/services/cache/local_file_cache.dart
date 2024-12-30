@@ -84,41 +84,54 @@ class LocalFileCache {
       if (await file.exists()) {
         final fileStats = await file.stat();
         if (fileStats.size > 0) {
-          print('Found valid cached file: ${file.path}');
-          return file;
-        } else {
-          print('Cached file exists but is empty, will download fresh copy');
+          // Verify file integrity
+          try {
+            final bytes = await file.readAsBytes();
+            if (bytes.isNotEmpty) {
+              return file;
+            }
+          } catch (e) {
+            print('Error reading cached file: $e');
+          }
+        }
+
+        // If we get here, file is invalid
+        try {
           await file.delete();
-          return null;
+        } catch (e) {
+          print('Error deleting invalid cache file: $e');
         }
       }
 
-      print('No cached file found for: $filename');
       return null;
     } catch (e) {
-      print('Error checking cached file: $e');
+      print('Error accessing cached file: $e');
       return null;
     }
   }
 
-  Future<void> cacheFile(String filename, Uint8List bytes, FileMetadata metadata) async {
+  Future<void> cacheFile(String filename, Uint8List bytes, FileMetadata metadataInfo) async {
     try {
       final cacheDir = await _cacheDir;
       final file = File('$cacheDir/$filename');
 
       // Ensure directory exists
-      if (!await file.parent.exists()) {
-        await file.parent.create(recursive: true);
+      final directory = file.parent;
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
       }
 
-      // Write file
-      await file.writeAsBytes(bytes, flush: true);
+      // Write file atomically
+      final tempFile = File('${file.path}.tmp');
+      await tempFile.writeAsBytes(bytes, flush: true);
+      await tempFile.rename(file.path);
 
       // Save metadata
-      await _saveMetadata({
+      final updatedMetadata = {
         ...await _loadMetadata(),
-        filename: metadata,
-      });
+        filename: metadataInfo,
+      };
+      await _saveMetadata(updatedMetadata);
 
       print('File cached successfully: ${file.path}');
     } catch (e) {

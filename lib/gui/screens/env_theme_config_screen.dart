@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import '../../services/api_services/auth_provider.dart';
 import '../../services/api_services/api_client.dart';
+import '../../services/api_services/cmms_config_provider.dart';
 import '../../services/api_services/environment_service.dart';
 import '../../services/config/environment_theme_config_manager.dart';
 import '../../models/environment.dart';
@@ -20,8 +21,7 @@ import '../../constants/gui_constants/app_spacing.dart';
 import '../../constants/gui_constants/app_typography.dart';
 import '../../constants/gui_constants/theme_constants.dart';
 import '../../configs/api_config.dart';
-
-
+import 'logo_crop_screen.dart';
 
 class EnvThemeConfigScreen extends StatefulWidget {
   const EnvThemeConfigScreen({super.key});
@@ -34,7 +34,7 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
   late final ApiClient _apiClient;
   late final EnvironmentService _environmentService;
   late final EnvironmentThemeConfigManager _configManager;
-
+  LogoTransformData? _logoTransform;
 
   bool _isLoading = false;
   String? _error;
@@ -60,6 +60,64 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
     _environmentService = EnvironmentService(_apiClient);
     _configManager = EnvironmentThemeConfigManager(apiClient: _apiClient);
     _loadEnvironments();
+  }
+
+  void _showLogoCropScreen() {
+    if (_logoPreview == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => LogoCropScreen(
+          filename: _selectedLogoPath!,
+          logoBytes: _logoPreview!,
+          initialTransform: _logoTransform,
+          onSave: (transformData) {
+            setState(() {
+              _logoTransform = transformData;
+            });
+            // Save the transform data to your configuration
+            if (_selectedEnvironment != null) {
+              _saveLogoTransform(transformData);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveLogoTransform(LogoTransformData transform) async {
+    try {
+      // Get current theme settings
+      final themeSettings =
+          await _configManager.getEnvironmentTheme(_selectedEnvironment!.id);
+      if (themeSettings != null) {
+        // Update with transform data
+        themeSettings['logo_transform'] = transform.toJson();
+
+        // Save updated settings
+        await _configManager.saveEnvironmentConfig(
+          environment: _selectedEnvironment!,
+          themeSettings: {
+            // Direct object, no extra nesting
+            'primary_color': _colorToHex(_primaryColor),
+            'secondary_color': _colorToHex(_secondaryColor),
+            'background_color': _colorToHex(_backgroundColor),
+            'text_color': _colorToHex(_textColor),
+            'font_family': _fontFamily,
+            'font_size_scale': _fontSizeScale,
+            'logo_file': _selectedLogoPath,
+            'logo_transform': _logoTransform?.toJson(),
+          },
+        );
+      }
+    } catch (e) {
+      print('Error saving logo transform: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving logo adjustments: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _loadEnvironments() async {
@@ -89,7 +147,8 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
     });
 
     try {
-      final themeSettings = await _configManager.getEnvironmentTheme(environment.id);
+      final themeSettings =
+          await _configManager.getEnvironmentTheme(environment.id);
 
       if (themeSettings != null) {
         setState(() {
@@ -101,6 +160,12 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
           _fontSizeScale = themeSettings['font_size_scale'];
           _selectedLogoPath = themeSettings['logo_file'];
 
+          if (themeSettings['logo_transform'] != null) {
+            _logoTransform = LogoTransformData.fromJson(
+                themeSettings['logo_transform'] as Map<String, dynamic>);
+          } else {
+            _logoTransform = null;
+          }
           // Load logo preview if path exists
           if (_selectedLogoPath != null) {
             _loadLogoPreview();
@@ -122,11 +187,31 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
     try {
       if (_selectedLogoPath == null) return;
 
-      final bytes = await _configManager.downloadConfig(_selectedLogoPath!);
-      setState(() => _logoPreview = bytes);
+      setState(() => _isLoading = true);
+
+      final configProvider =
+          Provider.of<CmmsConfigProvider>(context, listen: false);
+      final bytes = await configProvider.downloadConfig(_selectedLogoPath!);
+
+      if (mounted) {
+        setState(() {
+          _logoPreview = bytes;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print('Error loading logo preview: $e');
-      setState(() => _logoPreview = null);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading logo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -208,12 +293,7 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
   }
 
   Future<void> _handleSaveConfiguration() async {
-    if (_selectedEnvironment == null) {
-      setState(() {
-        _error = 'Please select an environment first';
-      });
-      return;
-    }
+    if (_selectedEnvironment == null) return;
 
     try {
       setState(() {
@@ -229,6 +309,7 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
         'font_family': _fontFamily,
         'font_size_scale': _fontSizeScale,
         'logo_file': _selectedLogoPath,
+        'logo_transform': _logoTransform?.toJson(),
       };
 
       await _configManager.saveEnvironmentConfig(
@@ -245,19 +326,19 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
         );
       }
     } catch (e) {
-      setState(() {
-        _error = 'Failed to save configuration: ${e.toString()}';
-      });
+      setState(() => _error = 'Failed to save configuration: $e');
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
 
   Widget _buildLogoSection() {
+    final double containerSize = 75;
+    final double cropScreenSize = 200.0; // Size used in logo_crop_screen.dart
+    final double scaleRatio = containerSize / cropScreenSize;
+
     return InfoCard(
       title: 'Environment Logo',
       content: Column(
@@ -265,29 +346,117 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
         children: [
           const SizedBox(height: AppSpacing.md),
           // Logo preview
-          Container(
-            width: 200,
-            height: 100,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: _logoPreview != null
-                ? Image.memory(
-              _logoPreview!,
-              fit: BoxFit.contain,
-            )
-                : const Center(
-              child: Text('No logo selected'),
+          Center(
+            child: GestureDetector(
+              onTap: _logoPreview != null ? _showLogoCropScreen : null,
+              child: Container(
+                width: containerSize,
+                height: containerSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2.0,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _logoTransform?.backgroundColor ?? Colors.white,
+                  ),
+                  child: _logoPreview != null
+                      ? Stack(
+                          children: [
+                            SizedBox.expand(
+                              child: OverflowBox(
+                                maxWidth: cropScreenSize,
+                                maxHeight: cropScreenSize,
+                                child: Transform.scale(
+                                  scale: scaleRatio *
+                                      (_logoTransform?.scale ?? 1.0),
+                                  child: Transform.translate(
+                                    offset:
+                                        _logoTransform?.position ?? Offset.zero,
+                                    child: Image.memory(
+                                      _logoPreview!,
+                                      width: cropScreenSize,
+                                      height: cropScreenSize,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stack) {
+                                        print('Error displaying logo: $error');
+                                        return const Center(
+                                          child: Text(
+                                            'Error loading image',
+                                            style: TextStyle(fontSize: 10),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_isLoading)
+                              Container(
+                                color: Colors.black26,
+                                child: const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                color: Colors.black54,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 2),
+                                child: const Text(
+                                  'Click to adjust',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : const Center(
+                          child: Text(
+                            'No logo selected',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
           // Upload button
-          CustomButton(
-            text: 'Upload Logo',
-            onPressed: _pickAndUploadLogo,
-            icon: const Icon(Icons.upload),
-            variant: ButtonVariant.outline,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: CustomButton(
+                  text: 'Upload Logo',
+                  onPressed: _isLoading ? null : _pickAndUploadLogo,
+                  icon: const Icon(Icons.upload),
+                  variant: ButtonVariant.outline,
+                ),
+              ),
+              if (_selectedLogoPath != null) ...[
+                const SizedBox(width: AppSpacing.md),
+                CustomButton(
+                  text: 'Reload',
+                  onPressed: _isLoading ? null : () => _loadLogoPreview(),
+                  icon: const Icon(Icons.refresh),
+                  variant: ButtonVariant.outline,
+                ),
+              ],
+            ],
           ),
           if (_selectedLogoPath != null) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -295,10 +464,13 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
             const SizedBox(height: AppSpacing.sm),
             CustomButton(
               text: 'Remove Logo',
-              onPressed: () => setState(() {
-                _logoPreview = null;
-                _selectedLogoPath = null;
-              }),
+              onPressed: _isLoading
+                  ? null
+                  : () => setState(() {
+                        _logoPreview = null;
+                        _selectedLogoPath = null;
+                        _logoTransform = null;
+                      }),
               variant: ButtonVariant.outline,
               icon: const Icon(Icons.delete_outline),
             ),
@@ -324,168 +496,172 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
     }
 
     return ScreenScaffold(
-        title: 'Environment Theme Configuration',
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-              if (_error != null) ...[
-          InfoCard(
-          title: 'Error',
-          content: Text(_error!, style: const TextStyle(color: Colors.red)),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        ],
+      title: 'Environment Theme Configuration',
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_error != null) ...[
+                    InfoCard(
+                      title: 'Error',
+                      content: Text(_error!,
+                          style: const TextStyle(color: Colors.red)),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
 
-    // Environment Selection
-    InfoCard(
-    title: 'Select Environment',
-    content: DropdownButtonFormField<Environment>(
-    value: _selectedEnvironment,
-        decoration: const InputDecoration(
-        labelText: 'Environment',
-        border: OutlineInputBorder(),
-    ),
-    items: _environments.map((env) {
-    return DropdownMenuItem(
-    value: env,
-    child: Text('${env.name} - ${env.description}'),
-    );
-    }).toList(),
-    onChanged: (env) {
-    if (env != null) _selectEnvironment(env);
-    },
-    ),
-    ),
-    const SizedBox(height: AppSpacing.lg),
+                  // Environment Selection
+                  InfoCard(
+                    title: 'Select Environment',
+                    content: DropdownButtonFormField<Environment>(
+                      value: _selectedEnvironment,
+                      decoration: const InputDecoration(
+                        labelText: 'Environment',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _environments.map((env) {
+                        return DropdownMenuItem(
+                          value: env,
+                          child: Text('${env.name} - ${env.description}'),
+                        );
+                      }).toList(),
+                      onChanged: (env) {
+                        if (env != null) _selectEnvironment(env);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
 
-    // Colors Section
-    InfoCard(
-    title: 'Colors',
-    content: Column(
-    children: [
-    _buildColorPicker(
-    'Primary Color',
-    _primaryColor,
-    (color) => setState(() => _primaryColor = color),
-    ),
-    const SizedBox(height: AppSpacing.md),
-    _buildColorPicker(
-    'Secondary Color',
-    _secondaryColor,
-    (color) => setState(() => _secondaryColor = color),
-    ),
-    const SizedBox(height: AppSpacing.md),
-    _buildColorPicker(
-    'Background Color',
-    _backgroundColor,
-    (color) => setState(() => _backgroundColor = color),
-    ),
-    const SizedBox(height: AppSpacing.md),
-    _buildColorPicker(
-    'Text Color',
-    _textColor,
-    (color) => setState(() => _textColor = color),
-    ),
-    ],
-    ),
-    ),
-    const SizedBox(height: AppSpacing.lg),
+                  // Colors Section
+                  InfoCard(
+                    title: 'Colors',
+                    content: Column(
+                      children: [
+                        _buildColorPicker(
+                          'Primary Color',
+                          _primaryColor,
+                          (color) => setState(() => _primaryColor = color),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildColorPicker(
+                          'Secondary Color',
+                          _secondaryColor,
+                          (color) => setState(() => _secondaryColor = color),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildColorPicker(
+                          'Background Color',
+                          _backgroundColor,
+                          (color) => setState(() => _backgroundColor = color),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildColorPicker(
+                          'Text Color',
+                          _textColor,
+                          (color) => setState(() => _textColor = color),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
 
-    // Typography Section
-    InfoCard(
-    title: 'Typography',
-    content: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-    DropdownButtonFormField<String>(
-    decoration: const InputDecoration(
-    labelText: 'Font Family',
-    border: OutlineInputBorder(),
-    ),
-    value: _fontFamily,
-    items: ThemeConstants.availableFontFamilies.map((font) {
-    return DropdownMenuItem(
-    value: font,
-    child: Text(font, style: TextStyle(fontFamily: font)),
-    );
-    }).toList(),
-    onChanged: (value) {
-    if (value != null) {
-    setState(() => _fontFamily = value);
-    }
-    },
-    ),
-    const SizedBox(height: AppSpacing.md),
-    Text('Font Size Scale', style: theme.textTheme.titleSmall),
-    Slider(
-    value: _fontSizeScale,
-    min: 0.8,
-    max: 1.4,
-    divisions: 12,
-    label: _fontSizeScale.toStringAsFixed(2),
-    onChanged: (value) {
-    setState(() => _fontSizeScale = value);
-    },
-    ),
-    ],
-    ),
-    ),
-    const SizedBox(height: AppSpacing.lg),
+                  // Typography Section
+                  InfoCard(
+                    title: 'Typography',
+                    content: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'Font Family',
+                            border: OutlineInputBorder(),
+                          ),
+                          value: _fontFamily,
+                          items:
+                              ThemeConstants.availableFontFamilies.map((font) {
+                            return DropdownMenuItem(
+                              value: font,
+                              child: Text(font,
+                                  style: TextStyle(fontFamily: font)),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _fontFamily = value);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text('Font Size Scale',
+                            style: theme.textTheme.titleSmall),
+                        Slider(
+                          value: _fontSizeScale,
+                          min: 0.8,
+                          max: 1.4,
+                          divisions: 12,
+                          label: _fontSizeScale.toStringAsFixed(2),
+                          onChanged: (value) {
+                            setState(() => _fontSizeScale = value);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
 
-    // Logo Section
-    _buildLogoSection(),
-    const SizedBox(height: AppSpacing.lg),
+                  // Logo Section
+                  _buildLogoSection(),
+                  const SizedBox(height: AppSpacing.lg),
 
-    // Theme Preview
-    InfoCard(
-    title: 'Live Preview',
-    content: SizedBox(
-    height: 400,
-    child: ThemePreview(
-    primaryColor: _primaryColor,
-    secondaryColor: _secondaryColor,
-    backgroundColor: _backgroundColor,
-    textColor: _textColor,
-    fontFamily: _fontFamily,
-    fontScale: _fontSizeScale,
-    ),
-    ),
-    ),
-    const SizedBox(height: AppSpacing.xl),
+                  // Theme Preview
+                  InfoCard(
+                    title: 'Live Preview',
+                    content: SizedBox(
+                      height: 400,
+                      child: ThemePreview(
+                        primaryColor: _primaryColor,
+                        secondaryColor: _secondaryColor,
+                        backgroundColor: _backgroundColor,
+                        textColor: _textColor,
+                        fontFamily: _fontFamily,
+                        fontScale: _fontSizeScale,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
 
-    // Action Buttons
-    Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-    CustomButton(
-    text: 'Reset to Defaults',
-    onPressed: _resetToDefaults,
-    variant: ButtonVariant.outline,
-    ),
-    const SizedBox(width: AppSpacing.md),
-    CustomButton(
-      text: 'Save Configuration',
-      onPressed: _handleSaveConfiguration,
-      variant: ButtonVariant.primary,
-      isLoading: _isLoading,
-    ),
-    ],
-    ),
-              ],
-          ),
-        ),
+                  // Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CustomButton(
+                        text: 'Reset to Defaults',
+                        onPressed: _resetToDefaults,
+                        variant: ButtonVariant.outline,
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      CustomButton(
+                        text: 'Save Configuration',
+                        onPressed: _handleSaveConfiguration,
+                        variant: ButtonVariant.primary,
+                        isLoading: _isLoading,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
   Widget _buildColorPicker(
-      String label,
-      Color color,
-      ValueChanged<Color> onColorChanged,
-      ) {
+    String label,
+    Color color,
+    ValueChanged<Color> onColorChanged,
+  ) {
     return Row(
       children: [
         Expanded(

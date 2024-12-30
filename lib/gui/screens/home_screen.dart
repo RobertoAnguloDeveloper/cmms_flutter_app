@@ -20,6 +20,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  late final EnvironmentThemeConfigManager _configManager;
+
+  @override
+  void initState() {
+    super.initState();
+    final apiClient = ApiClient(baseUrl: ApiConfig.baseUrl);
+    _configManager = EnvironmentThemeConfigManager(apiClient: apiClient);
+  }
 
   List<DrawerItem> _buildDrawerItems(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -202,10 +210,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
     final currentUser = authProvider.currentUser;
 
-    // Get EnvironmentThemeConfigManager
-    final configManager = EnvironmentThemeConfigManager(
-        apiClient: ApiClient(baseUrl: ApiConfig.baseUrl));
-
     final String userInitials = currentUser?.firstName.isNotEmpty == true
         ? '${currentUser!.firstName[0]}${currentUser.lastName[0]}'
         : 'U';
@@ -217,33 +221,47 @@ class _HomeScreenState extends State<HomeScreen> {
       currentUser?.username,
     ].where((part) => part != null && part.isNotEmpty).join(' ');
 
-    // Get environment ID from current user
     final environmentId = currentUser?.environment?.id;
 
-    // Build the drawer
     return ScreenScaffold(
       title: 'CMMS App',
       drawer: environmentId != null
           ? FutureBuilder<Map<String, dynamic>?>(
-              future: configManager.getEnvironmentTheme(environmentId),
-              builder: (context, snapshot) {
-                final logoFile = snapshot.data?['logo_file'] as String?;
+        future: _configManager.getEnvironmentTheme(environmentId),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data != null) {
+            final themeSettings = snapshot.data!;  // This is already theme_settings
+            final logoFile = themeSettings['logo_file'] as String?;
+            final logoTransform = themeSettings['logo_transform'] as Map<String, dynamic>?;
 
-                return AppDrawer(
-                  userName: userName,
-                  userEmail: currentUser?.email ?? '',
-                  userInitials: userInitials,
-                  logoFile: logoFile,
-                  items: _buildDrawerItems(context),
-                );
-              },
-            )
-          : AppDrawer(
+            print('Logo file: $logoFile');  // Debug print
+            print('Logo transform: $logoTransform');  // Debug print
+
+            return AppDrawer(
               userName: userName,
               userEmail: currentUser?.email ?? '',
               userInitials: userInitials,
+              logoFile: logoFile,
+              logoTransform: logoTransform,
               items: _buildDrawerItems(context),
-            ),
+            );
+          }
+
+          // Return default drawer while loading or if no theme settings
+          return AppDrawer(
+            userName: userName,
+            userEmail: currentUser?.email ?? '',
+            userInitials: userInitials,
+            items: _buildDrawerItems(context),
+          );
+        },
+      )
+          : AppDrawer(
+        userName: userName,
+        userEmail: currentUser?.email ?? '',
+        userInitials: userInitials,
+        items: _buildDrawerItems(context),
+      ),
       body: _buildContent(),
     );
   }

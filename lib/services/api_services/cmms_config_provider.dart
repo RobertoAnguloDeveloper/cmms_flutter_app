@@ -157,7 +157,7 @@ class CmmsConfigProvider with ChangeNotifier {
 
   Future<Uint8List?> downloadConfig(String filename) async {
     try {
-      // Check cache first
+      // First check cache
       final cachedFile = await _fileCache.getCachedFile(filename);
       if (cachedFile != null) {
         print('Found cached file: $filename');

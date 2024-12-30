@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_services/cmms_config_provider.dart';
 import '../../constants/gui_constants/app_spacing.dart';
+import '../screens/logo_crop_screen.dart';
 
 class DrawerItem {
   final String title;
@@ -32,6 +33,7 @@ class AppDrawer extends StatefulWidget {
   final String? userEmail;
   final String? userInitials;
   final String? logoFile;
+  final Map<String, dynamic>? logoTransform;
 
   const AppDrawer({
     super.key,
@@ -44,6 +46,7 @@ class AppDrawer extends StatefulWidget {
     this.userEmail,
     this.userInitials,
     this.logoFile,
+    this.logoTransform,
   });
 
   @override
@@ -53,12 +56,13 @@ class AppDrawer extends StatefulWidget {
 class _AppDrawerState extends State<AppDrawer> {
   Uint8List? _logoBytes;
   bool _isLoading = false;
+  bool _hasError = false;
 
   @override
   void initState() {
     super.initState();
     if (widget.logoFile != null) {
-      Future.microtask(() => _loadLogo());
+      _loadLogo();
     }
   }
 
@@ -66,28 +70,27 @@ class _AppDrawerState extends State<AppDrawer> {
   void didUpdateWidget(AppDrawer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.logoFile != widget.logoFile) {
-      Future.microtask(() {
-        if (widget.logoFile != null) {
-          _loadLogo();
-        } else {
-          setState(() => _logoBytes = null);
-        }
-      });
+      if (widget.logoFile != null) {
+        _loadLogo();
+      } else {
+        setState(() {
+          _logoBytes = null;
+          _hasError = false;
+        });
+      }
     }
   }
 
   Future<void> _loadLogo() async {
-    if (widget.logoFile == null) {
-      setState(() => _logoBytes = null);
-      return;
-    }
-
-    if (_isLoading) return;
+    if (widget.logoFile == null || _isLoading) return;
 
     try {
-      setState(() => _isLoading = true);
-      print('Loading logo: ${widget.logoFile}');
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+      });
 
+      // Try to load from cache first
       final configProvider = Provider.of<CmmsConfigProvider>(context, listen: false);
       final bytes = await configProvider.downloadConfig(widget.logoFile!);
 
@@ -95,9 +98,7 @@ class _AppDrawerState extends State<AppDrawer> {
         setState(() {
           _logoBytes = bytes;
           _isLoading = false;
-          if (bytes != null) {
-            print('Logo loaded successfully: ${bytes.length} bytes');
-          }
+          _hasError = bytes == null;
         });
       }
     } catch (e) {
@@ -106,6 +107,7 @@ class _AppDrawerState extends State<AppDrawer> {
         setState(() {
           _logoBytes = null;
           _isLoading = false;
+          _hasError = true;
         });
       }
     }
@@ -126,19 +128,60 @@ class _AppDrawerState extends State<AppDrawer> {
 
   Widget _buildLogoContent(ColorScheme colorScheme, double containerSize) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
     }
 
     if (_logoBytes != null) {
-      return Image.memory(
-        _logoBytes!,
-        fit: BoxFit.contain,
+      final cropScreenSize = 200.0;
+      final scaleRatio = containerSize / cropScreenSize;
+
+      final transform = widget.logoTransform != null ?
+      LogoTransformData.fromJson(widget.logoTransform!) : null;
+
+      return Container(
         width: containerSize,
         height: containerSize,
-        errorBuilder: (context, error, stack) {
-          print('Error displaying logo: $error');
-          return _buildDefaultAvatar(colorScheme);
-        },
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: transform?.backgroundColor,
+        ),
+        child: SizedBox.expand(
+          child: OverflowBox(
+            maxWidth: cropScreenSize-cropScreenSize*0.1,
+            maxHeight: cropScreenSize-cropScreenSize*0.1,
+            child: Transform.scale(
+              scale: scaleRatio * (transform?.scale ?? 1.0),
+              child: Transform.translate(
+                offset: transform?.position ?? Offset.zero,
+                child: Image.memory(
+                  _logoBytes!,
+                  width: cropScreenSize,
+                  height: cropScreenSize,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('Error displaying logo: $error');
+                    return _buildDefaultAvatar(colorScheme);
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_hasError) {
+      return IconButton(
+        icon: const Icon(Icons.refresh),
+        onPressed: _loadLogo,
+        tooltip: 'Retry loading logo',
       );
     }
 

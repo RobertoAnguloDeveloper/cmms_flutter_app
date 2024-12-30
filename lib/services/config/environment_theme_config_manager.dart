@@ -76,6 +76,7 @@ class EnvironmentThemeConfigManager {
   /// Save configuration for a specific environment
   Future<void> saveEnvironmentConfig({
     required Environment environment,
+
     required Map<String, dynamic> themeSettings,
   }) async {
     try {
