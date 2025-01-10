@@ -6,6 +6,7 @@ import '../../configs/api_config.dart';
 import '../../services/api_services/api_client.dart';
 import '../../services/api_services/auth_provider.dart';
 import '../../services/config/environment_theme_config_manager.dart';
+import '../../services/platform/logo_loader_service.dart';
 import '../components/app_drawer.dart';
 import '../components/screen_scaffold.dart';
 import 'auth/login_screen.dart';
@@ -20,13 +21,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final ApiClient _apiClient = ApiClient(baseUrl: ApiConfig.baseUrl);
   late final EnvironmentThemeConfigManager _configManager;
+  late final LogoLoaderService _logoLoader;
 
   @override
   void initState() {
     super.initState();
-    final apiClient = ApiClient(baseUrl: ApiConfig.baseUrl);
-    _configManager = EnvironmentThemeConfigManager(apiClient: apiClient);
+    _configManager = EnvironmentThemeConfigManager(apiClient: _apiClient);
+    _logoLoader = LogoLoaderService(_apiClient);
   }
 
   List<DrawerItem> _buildDrawerItems(BuildContext context) {
@@ -230,12 +233,9 @@ class _HomeScreenState extends State<HomeScreen> {
         future: _configManager.getEnvironmentTheme(environmentId),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data != null) {
-            final themeSettings = snapshot.data!;  // This is already theme_settings
+            final themeSettings = snapshot.data!;
             final logoFile = themeSettings['logo_file'] as String?;
             final logoTransform = themeSettings['logo_transform'] as Map<String, dynamic>?;
-
-            print('Logo file: $logoFile');  // Debug print
-            print('Logo transform: $logoTransform');  // Debug print
 
             return AppDrawer(
               userName: userName,
@@ -243,15 +243,16 @@ class _HomeScreenState extends State<HomeScreen> {
               userInitials: userInitials,
               logoFile: logoFile,
               logoTransform: logoTransform,
+              logoLoader: _logoLoader,  // Pass the logo loader
               items: _buildDrawerItems(context),
             );
           }
 
-          // Return default drawer while loading or if no theme settings
           return AppDrawer(
             userName: userName,
             userEmail: currentUser?.email ?? '',
             userInitials: userInitials,
+            logoLoader: _logoLoader,  // Pass the logo loader
             items: _buildDrawerItems(context),
           );
         },
@@ -260,6 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
         userName: userName,
         userEmail: currentUser?.email ?? '',
         userInitials: userInitials,
+        logoLoader: _logoLoader,  // Pass the logo loader
         items: _buildDrawerItems(context),
       ),
       body: _buildContent(),

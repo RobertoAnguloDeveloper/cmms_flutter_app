@@ -12,6 +12,7 @@ import '../../services/api_services/cmms_config_provider.dart';
 import '../../services/api_services/environment_service.dart';
 import '../../services/config/environment_theme_config_manager.dart';
 import '../../models/environment.dart';
+import '../../services/platform/logo_loader_service.dart';
 import '../components/custom_button.dart';
 import '../components/color_picker_dialog.dart';
 import '../components/screen_scaffold.dart';
@@ -22,6 +23,7 @@ import '../../constants/gui_constants/app_typography.dart';
 import '../../constants/gui_constants/theme_constants.dart';
 import '../../configs/api_config.dart';
 import 'logo_crop_screen.dart';
+import '../../models/logo_transform.dart';
 
 class EnvThemeConfigScreen extends StatefulWidget {
   const EnvThemeConfigScreen({super.key});
@@ -34,6 +36,7 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
   late final ApiClient _apiClient;
   late final EnvironmentService _environmentService;
   late final EnvironmentThemeConfigManager _configManager;
+  late final LogoLoaderService _logoLoader;
   LogoTransformData? _logoTransform;
 
   bool _isLoading = false;
@@ -59,6 +62,7 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
     _apiClient = ApiClient(baseUrl: ApiConfig.baseUrl);
     _environmentService = EnvironmentService(_apiClient);
     _configManager = EnvironmentThemeConfigManager(apiClient: _apiClient);
+    _logoLoader = LogoLoaderService(_apiClient);
     _loadEnvironments();
   }
 
@@ -189,9 +193,8 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
 
       setState(() => _isLoading = true);
 
-      final configProvider =
-          Provider.of<CmmsConfigProvider>(context, listen: false);
-      final bytes = await configProvider.downloadConfig(_selectedLogoPath!);
+      // Use LogoLoaderService instead of CmmsConfigProvider
+      final bytes = await _logoLoader.loadLogo(_selectedLogoPath!);
 
       if (mounted) {
         setState(() {
@@ -335,8 +338,8 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
   }
 
   Widget _buildLogoSection() {
-    final double containerSize = 75;
-    final double cropScreenSize = 200.0; // Size used in logo_crop_screen.dart
+    final double containerSize = 175;
+    final double cropScreenSize = 200.0;
     final double scaleRatio = containerSize / cropScreenSize;
 
     return InfoCard(
@@ -345,7 +348,6 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: AppSpacing.md),
-          // Logo preview
           Center(
             child: GestureDetector(
               onTap: _logoPreview != null ? _showLogoCropScreen : null,
@@ -383,15 +385,6 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
                                       width: cropScreenSize,
                                       height: cropScreenSize,
                                       fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stack) {
-                                        print('Error displaying logo: $error');
-                                        return const Center(
-                                          child: Text(
-                                            'Error loading image',
-                                            style: TextStyle(fontSize: 10),
-                                          ),
-                                        );
-                                      },
                                     ),
                                   ),
                                 ),
@@ -404,24 +397,6 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
                                   child: CircularProgressIndicator(),
                                 ),
                               ),
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              child: Container(
-                                color: Colors.black54,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 2),
-                                child: const Text(
-                                  'Click to adjust',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 8,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
                           ],
                         )
                       : const Center(
@@ -438,22 +413,33 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
           // Upload button
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(
+              // Upload button - sized to content
+              SizedBox(
+                height: 45, // Smaller fixed height
                 child: CustomButton(
-                  text: 'Upload Logo',
+                  text: "Upload",
                   onPressed: _isLoading ? null : _pickAndUploadLogo,
-                  icon: const Icon(Icons.upload),
-                  variant: ButtonVariant.outline,
+                  icon: const Icon(Icons.cloud_upload,
+                      size: 38, color: Colors.white), // Smaller icon
+                  variant: ButtonVariant.upload,
+                  size: ButtonSize.small,
                 ),
               ),
               if (_selectedLogoPath != null) ...[
-                const SizedBox(width: AppSpacing.md),
-                CustomButton(
-                  text: 'Reload',
-                  onPressed: _isLoading ? null : () => _loadLogoPreview(),
-                  icon: const Icon(Icons.refresh),
-                  variant: ButtonVariant.outline,
+                const SizedBox(width: AppSpacing.sm),
+                // Reload button - sized to content
+                SizedBox(
+                  height: 45, // Smaller fixed height
+                  child: CustomButton(
+                    text: "Reload",
+                    onPressed: _isLoading ? null : () => _loadLogoPreview(),
+                    icon: const Icon(Icons.refresh,
+                        size: 38, color: Colors.white), // Smaller icon
+                    variant: ButtonVariant.reload,
+                    size: ButtonSize.small,
+                  ),
                 ),
               ],
             ],
@@ -471,8 +457,8 @@ class _EnvThemeConfigScreenState extends State<EnvThemeConfigScreen> {
                         _selectedLogoPath = null;
                         _logoTransform = null;
                       }),
-              variant: ButtonVariant.outline,
-              icon: const Icon(Icons.delete_outline),
+              variant: ButtonVariant.danger,
+              icon: const Icon(Icons.delete_outline, color: Colors.white),
             ),
           ],
         ],

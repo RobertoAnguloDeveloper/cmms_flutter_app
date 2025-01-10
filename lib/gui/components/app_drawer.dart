@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_services/cmms_config_provider.dart';
 import '../../constants/gui_constants/app_spacing.dart';
+import '../../services/platform/logo_loader_service.dart';
 import '../screens/logo_crop_screen.dart';
+import '../../models/logo_transform.dart';
 
 class DrawerItem {
   final String title;
@@ -34,6 +36,7 @@ class AppDrawer extends StatefulWidget {
   final String? userInitials;
   final String? logoFile;
   final Map<String, dynamic>? logoTransform;
+  final LogoLoaderService? logoLoader;
 
   const AppDrawer({
     super.key,
@@ -47,6 +50,7 @@ class AppDrawer extends StatefulWidget {
     this.userInitials,
     this.logoFile,
     this.logoTransform,
+    this.logoLoader,
   });
 
   @override
@@ -90,9 +94,22 @@ class _AppDrawerState extends State<AppDrawer> {
         _hasError = false;
       });
 
-      // Try to load from cache first
-      final configProvider = Provider.of<CmmsConfigProvider>(context, listen: false);
-      final bytes = await configProvider.downloadConfig(widget.logoFile!);
+      Uint8List? bytes;
+
+      // Try loading with LogoLoaderService first if available
+      if (widget.logoLoader != null) {
+        bytes = await widget.logoLoader!.loadLogo(widget.logoFile!);
+      }
+
+      // Fall back to CmmsConfigProvider if needed
+      if (bytes == null) {
+        final configProvider = Provider.of<CmmsConfigProvider>(context, listen: false);
+        try {
+          bytes = await configProvider.downloadConfig(widget.logoFile!);
+        } catch (e) {
+          print('Error loading from config provider: $e');
+        }
+      }
 
       if (mounted) {
         setState(() {
@@ -139,7 +156,7 @@ class _AppDrawerState extends State<AppDrawer> {
 
     if (_logoBytes != null) {
       final cropScreenSize = 200.0;
-      final scaleRatio = containerSize / cropScreenSize;
+      final scaleRatio = (containerSize / cropScreenSize)-0.095;
 
       final transform = widget.logoTransform != null ?
       LogoTransformData.fromJson(widget.logoTransform!) : null;
@@ -154,8 +171,8 @@ class _AppDrawerState extends State<AppDrawer> {
         ),
         child: SizedBox.expand(
           child: OverflowBox(
-            maxWidth: cropScreenSize-cropScreenSize*0.1,
-            maxHeight: cropScreenSize-cropScreenSize*0.1,
+            maxWidth: cropScreenSize,
+            maxHeight: cropScreenSize,
             child: Transform.scale(
               scale: scaleRatio * (transform?.scale ?? 1.0),
               child: Transform.translate(

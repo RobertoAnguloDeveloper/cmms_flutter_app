@@ -6,44 +6,7 @@ import '../components/screen_scaffold.dart';
 import '../components/custom_button.dart';
 import '../components/color_picker_dialog.dart';
 import '../../constants/gui_constants/app_spacing.dart';
-
-class LogoTransformData {
-  final double scale;
-  final Offset position;
-  final Color? backgroundColor;
-
-  LogoTransformData({
-    required this.scale,
-    required this.position,
-    this.backgroundColor,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'scale': scale,
-    'position': {
-      'x': position.dx,
-      'y': position.dy,
-    },
-    if (backgroundColor != null)
-      'background_color': '#${backgroundColor!.value.toRadixString(16).padLeft(8, '0').substring(2)}',
-  };
-
-  factory LogoTransformData.fromJson(Map<String, dynamic> json) {
-    final position = json['position'] as Map<String, dynamic>;
-    String? bgColor = json['background_color'] as String?;
-
-    return LogoTransformData(
-      scale: json['scale'] as double,
-      position: Offset(
-        position['x'] as double,
-        position['y'] as double,
-      ),
-      backgroundColor: bgColor != null ?
-      Color(int.parse('FF${bgColor.replaceFirst('#', '')}', radix: 16)) :
-      null,
-    );
-  }
-}
+import '../../models/logo_transform.dart';
 
 class LogoCropScreen extends StatefulWidget {
   final String filename;

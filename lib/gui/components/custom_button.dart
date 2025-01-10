@@ -7,10 +7,14 @@ enum ButtonVariant {
   primary,
   secondary,
   outline,
-  text
+  text,
+  danger,
+  upload,
+  reload
 }
 
 enum ButtonSize {
+  smallest,
   small,
   medium,
   large
@@ -28,8 +32,8 @@ class CustomButton extends StatelessWidget {
 
   const CustomButton({
     super.key,
-    required this.text,
-    required this.onPressed,
+    this.text = "",
+    this.onPressed,
     this.variant = ButtonVariant.primary,
     this.size = ButtonSize.medium,
     this.isLoading = false,
@@ -45,6 +49,11 @@ class CustomButton extends StatelessWidget {
     // Define size-based padding
     EdgeInsets getPadding() {
       switch (size) {
+        case ButtonSize.smallest:
+          return const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.xxs,
+          );
         case ButtonSize.small:
           return const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
@@ -74,6 +83,19 @@ class CustomButton extends StatelessWidget {
         case ButtonVariant.outline:
           return OutlinedButton.styleFrom(
             foregroundColor: theme.colorScheme.primary,
+          );
+        case ButtonVariant.danger:
+          return ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+          );
+        case ButtonVariant.upload:
+          return ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+          );
+        case ButtonVariant.reload:
+          return ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
           );
         case ButtonVariant.text:
           return TextButton.styleFrom(

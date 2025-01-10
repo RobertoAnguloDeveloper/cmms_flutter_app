@@ -113,6 +113,9 @@ class EnvThemeProvider with ChangeNotifier {
   }
 
   ThemeData _createThemeData(Map<String, dynamic> themeSettings) {
+    final double fontSizeScale = themeSettings['font_size_scale'] is int ?
+    (themeSettings['font_size_scale'] as int).toDouble() :
+    (themeSettings['font_size_scale'] as double?) ?? 1.0;
     return ThemeData(
       primaryColor: _colorFromHex(themeSettings['primary_color']),
       colorScheme: ColorScheme(
@@ -135,7 +138,7 @@ class EnvThemeProvider with ChangeNotifier {
         fontFamily: themeSettings['font_family'],
         bodyColor: _colorFromHex(themeSettings['text_color']),
         displayColor: _colorFromHex(themeSettings['text_color']),
-        fontSizeFactor: themeSettings['font_size_scale'],
+        fontSizeFactor: fontSizeScale,
       ),
       fontFamily: themeSettings['font_family'],
       useMaterial3: true,

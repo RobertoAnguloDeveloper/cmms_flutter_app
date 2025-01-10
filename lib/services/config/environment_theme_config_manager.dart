@@ -176,7 +176,6 @@ class EnvironmentThemeConfigManager {
         config.content['environments'] as List,
       );
 
-      // Find the matching environment
       final envConfig = environments.firstWhere(
             (env) => env['parameters']?['environment_id'] == environmentId,
         orElse: () => {},
@@ -184,7 +183,14 @@ class EnvironmentThemeConfigManager {
 
       if (envConfig.isEmpty) return null;
 
-      return envConfig['parameters']?['theme_settings'] as Map<String, dynamic>;
+      final themeSettings = envConfig['parameters']?['theme_settings'] as Map<String, dynamic>;
+
+      // Convert integer font_size_scale to double
+      if (themeSettings['font_size_scale'] is int) {
+        themeSettings['font_size_scale'] = (themeSettings['font_size_scale'] as int).toDouble();
+      }
+
+      return themeSettings;
     } catch (e) {
       print('Error getting environment theme: $e');
       return null;
