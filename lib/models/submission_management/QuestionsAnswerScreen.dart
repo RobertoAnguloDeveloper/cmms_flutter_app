@@ -450,6 +450,7 @@ import '../../../services/api_model_services/api_form_services/FormApiService.da
 import '../../screens/modules/form_management/form_management_helpers/form_detail_helper/DynamicInputField.dart';
 import '../../screens/modules/form_submission/Components/CustomSignaturePad.dart';
 import '../../screens/modules/form_submission/Components/DynamicQuestionInput.dart';
+import '../../services/api_model_services/api_form_services/form_submission_service.dart';
 
 class QuestionsAnswerScreen extends StatefulWidget {
   final int formId;
@@ -474,6 +475,16 @@ class QuestionsAnswerScreen extends StatefulWidget {
 class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   final FormApiService _formApiService = FormApiService();
   final AnswerApiService _answerApiService = AnswerApiService();
+  final FormSubmissionService _formSubmissionService = FormSubmissionService();
+
+  /*
+  bool isLoading = true;
+  List<dynamic> forms = [];
+  List<dynamic> questions = [];
+  Map<int, dynamic> answers = {};
+  bool showQuestions = false;
+  Map<String, dynamic>? selectedForm;
+  */
 
   bool isLoading = true;
   List<dynamic> forms = [];
@@ -481,9 +492,10 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   Map<int, dynamic> answers = {};
   bool showQuestions = false;
   Map<String, dynamic>? selectedForm;
+  List<String> _attachedFiles = [];
 
   // NUEVO: Lista para almacenar las rutas de los archivos seleccionados
-  List<String> _attachedFiles = [];
+
 
   @override
   void initState() {
@@ -559,7 +571,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   }
 
   // Función para seleccionar archivos
-  Future<void> _pickFiles() async {
+  /*Future<void> _pickFiles() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
@@ -577,7 +589,40 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         SnackBar(content: Text('Error picking files: $e')),
       );
     }
+  }*/
+
+  Future<void> _pickFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        // Add allowed extensions if needed
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
+        type: FileType.custom,
+      );
+
+      if (result != null) {
+        // Validate file sizes
+        for (var file in result.files) {
+          if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            throw Exception('File ${file.name} exceeds 10MB size limit');
+          }
+        }
+
+        setState(() {
+          _attachedFiles = result.paths.whereType<String>().toList();
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking files: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
+
+
 
   Widget _buildFormCard(Map<String, dynamic> form) {
     return Padding(
@@ -715,7 +760,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     );
   }
 
-  Future<void> _submitAnswers() async {
+  /*Future<void> _submitAnswers() async {
     try {
       for (var question in questions) {
         if (question['is_required'] == true &&
@@ -739,7 +784,130 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     } catch (e) {
       _showErrorSnackBar('Error submitting answers: $e');
     }
+  }*/
+
+
+  /*Future<void> _submitAnswers() async {
+    try {
+      // Validate required answers
+      for (var question in questions) {
+        if (question['is_required'] == true && !answers.containsKey(question['id'])) {
+          _showErrorSnackBar('Please answer: ${question['text']}');
+          return;
+        }
+      }
+
+      // Show loading indicator
+      setState(() {
+        isLoading = true;
+      });
+
+      // Submit form with answers and attachments
+      final result = await _formSubmissionService.submitFormWithAnswers(
+        context: context,
+        formId: selectedForm!['id'],
+        answers: answers,
+        attachmentPaths: _attachedFiles,
+        questions: questions,
+      );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Form submitted successfully'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Clear form and return to form list
+        setState(() {
+          showQuestions = false;
+          selectedForm = null;
+          answers.clear();
+          _attachedFiles.clear();
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        _showErrorSnackBar('Error submitting form: $e');
+      }
+    }
+  }*/
+
+  Future<void> _submitAnswers() async {
+    try {
+      // Validate required answers
+      for (var question in questions) {
+        if (question['is_required'] == true && !answers.containsKey(question['id'])) {
+          _showErrorSnackBar('Please answer: ${question['text']}');
+          return;
+        }
+      }
+
+      setState(() {
+        isLoading = true;
+      });
+
+      // Extract userId from session data
+      final userId = widget.sessionData['id'];
+      if (userId == null) {
+        throw Exception('User ID not found in session data');
+      }
+
+      print('Submitting answers:');
+      print('Form ID: ${selectedForm!['id']}');
+      print('User ID: $userId');
+      print('Answers: $answers');
+
+      final result = await _formSubmissionService.submitFormWithAnswers(
+        context: context,
+        formId: selectedForm!['id'],
+        answers: answers,
+        attachmentPaths: _attachedFiles,
+        questions: questions,
+        userId: userId, // Add this line
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Form submitted successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      setState(() {
+        showQuestions = false;
+        selectedForm = null;
+        answers.clear();
+        _attachedFiles.clear();
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
+
 
   // NUEVO: Botón para adjuntar archivos
   Widget _buildAttachmentButton() {
