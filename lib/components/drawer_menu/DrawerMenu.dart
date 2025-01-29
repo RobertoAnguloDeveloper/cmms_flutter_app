@@ -6,6 +6,7 @@ import '../../screens/DraftsScreen.dart';
 import '../../screens/login_screen/LoginPage.dart';
 import '../../screens/modules/assign_permissions/PermissionsByRolesScreen.dart';
 import '../../screens/modules/form_management/FormListScreen.dart';
+import '../../screens/modules/form_management/form_submissions_view_screen.dart';
 import '../../screens/modules/users_management/users/UserManagementScreen.dart';
 import '../../screens/modules/view_users/UserList.dart';
 import '../../services/api_session_client_services/SessionManager.dart';
@@ -233,6 +234,27 @@ class _DrawerMenuState extends State<DrawerMenu> {
                   context,
                   MaterialPageRoute(builder: (context) => const LoginPage()),
                 );
+              },
+            ),
+            PermissionMenuItem(
+              title: 'Form Submissions',
+              icon: FontAwesomeIcons.clipboardList,
+              hasPermission: () =>
+              (widget.permissionSet?.hasPermission('view_submissions') ?? false),
+              onTap: () {
+                if (widget.sessionData != null && widget.permissionSet != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FormSubmissionsViewScreen(
+                        formId: widget.sessionData!['current_form_id'] ?? 0,
+                        formTitle: widget.sessionData!['current_form_title'] ?? 'Form Submissions',
+                        permissionSet: widget.permissionSet!,
+                        sessionData: widget.sessionData!,
+                      ),
+                    ),
+                  );
+                }
               },
             ),
           ],

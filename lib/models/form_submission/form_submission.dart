@@ -1,3 +1,6 @@
+import 'answer_submitted.dart';
+import 'attachment.dart';
+
 class FormSubmission {
   final int? id;
   final int formId;
