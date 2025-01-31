@@ -798,6 +798,10 @@ class _FormSubmissionsViewScreenState
 }
 */
 
+
+
+
+/*
 // lib/screens/form_management/form_submissions_view_screen.dart
 
 import 'package:flutter/material.dart';
@@ -1214,4 +1218,844 @@ class _CustomExpansionCardState extends State<_CustomExpansionCard> {
     );
   }
 }
+
+ */
+
+/*
+// lib/screens/form_management/form_submissions_view_screen.dart
+
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../../components/drawer_menu/DrawerMenu.dart';
+import '../../../models/Permission_set.dart';
+import '../../../models/form_submission/answer_view.dart';
+import '../../../models/form_submission/form_submission_view.dart';
+import '../../../services/api_model_services/api_form_services/form_submission_view_service.dart';
+
+/// Screen that shows a detailed view of a single submission
+/// after the user taps the card (excluding the arrow).
+class SubmissionDetailScreen extends StatelessWidget {
+  final FormSubmissionView submission;
+
+  const SubmissionDetailScreen({Key? key, required this.submission})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // Displays all answers in a single scrollable "form" style
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          submission.formTitle.isNotEmpty
+              ? submission.formTitle
+              : "Submission Detail",
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Container(
+        color: const Color(0xFFE3F2FD),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Top card with submission info
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: ListTile(
+                title: Text(
+                  'Submitted by: ${submission.submittedBy}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(submission.submittedAt)}',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Each question/answer in a pastel container
+            ...submission.answers.map(
+                  (answer) => Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE7E8), // Light pink pastel
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      answer.question,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      answer.answer,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Main screen that lists all submissions for a particular form.
+/// We have a custom expansion card that toggles Q&A by arrow,
+/// and a tap on the card navigates to SubmissionDetailScreen.
+/// The expansion region itself is made more "compact" like QuestionsAnswerScreen.
+class FormSubmissionsViewScreen extends StatefulWidget {
+  final int formId;
+  final String formTitle;
+  final PermissionSet permissionSet;
+  final Map<String, dynamic> sessionData;
+
+  const FormSubmissionsViewScreen({
+    Key? key,
+    required this.formId,
+    required this.formTitle,
+    required this.permissionSet,
+    required this.sessionData,
+  }) : super(key: key);
+
+  @override
+  _FormSubmissionsViewScreenState createState() =>
+      _FormSubmissionsViewScreenState();
+}
+
+class _FormSubmissionsViewScreenState
+    extends State<FormSubmissionsViewScreen> {
+  final FormSubmissionViewService _submissionService =
+  FormSubmissionViewService();
+
+  List<FormSubmissionView> submissions = [];
+  List<FormSubmissionView> filteredSubmissions = [];
+  bool isLoading = true;
+
+  // Example user filter in a dropdown
+  String? _selectedUser;
+  List<String> _users = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubmissions();
+  }
+
+  Future<void> _loadSubmissions() async {
+    try {
+      setState(() => isLoading = true);
+
+      // Load from service
+      final data = await _submissionService.getFormSubmissions(widget.formId);
+
+      submissions = data;
+      filteredSubmissions = data;
+
+      // Build user list for the dropdown
+      _users = submissions.map((s) => s.submittedBy).toSet().toList()
+        ..sort();
+
+      setState(() => isLoading = false);
+    } catch (e) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading submissions: $e')),
+      );
+    }
+  }
+
+  void _filterByUser(String? user) {
+    if (user == null || user.isEmpty || user == 'All') {
+      setState(() {
+        _selectedUser = 'All';
+        filteredSubmissions = submissions;
+      });
+    } else {
+      setState(() {
+        _selectedUser = user;
+        filteredSubmissions =
+            submissions.where((s) => s.submittedBy == user).toList();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Build dropdown items
+    final dropdownItems = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(
+        value: 'All',
+        child: Text('All'),
+      ),
+      ..._users.map(
+            (user) => DropdownMenuItem(
+          value: user,
+          child: Text(user),
+        ),
+      ),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          'Submissions - ${widget.formTitle}',
+          style: const TextStyle(color: Colors.black),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      drawer: DrawerMenu(
+        onItemTapped: (index) => Navigator.pop(context),
+        parentContext: context,
+        permissionSet: widget.permissionSet,
+        sessionData: widget.sessionData,
+      ),
+      body: Container(
+        color: const Color(0xFFE3F2FD),
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : filteredSubmissions.isEmpty
+            ? const Center(
+          child: Text(
+            'No submissions found',
+            style: TextStyle(fontSize: 18),
+          ),
+        )
+            : Column(
+          children: [
+            // Filter row
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    'Filter by user:',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedUser ?? 'All',
+                      items: dropdownItems,
+                      onChanged: _filterByUser,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Submissions list
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: filteredSubmissions.length,
+                itemBuilder: (context, index) {
+                  final submission = filteredSubmissions[index];
+                  return _CustomExpansionCard(
+                    submission: submission,
+                    onCardTap: () {
+                      // Navigate to detail screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SubmissionDetailScreen(
+                            submission: submission,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A custom widget that mimics an "ExpansionTile" but in the expanded region,
+/// we display a "compact form" style for all Q&A (like QuestionsAnswerScreen).
+class _CustomExpansionCard extends StatefulWidget {
+  final FormSubmissionView submission;
+  final VoidCallback onCardTap;
+
+  const _CustomExpansionCard({
+    Key? key,
+    required this.submission,
+    required this.onCardTap,
+  }) : super(key: key);
+
+  @override
+  State<_CustomExpansionCard> createState() => _CustomExpansionCardState();
+}
+
+class _CustomExpansionCardState extends State<_CustomExpansionCard> {
+  bool _expanded = false;
+
+  void _toggleExpand() {
+    setState(() {
+      _expanded = !_expanded;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final submission = widget.submission;
+
+    return Card(
+      color: const Color(0xFFFFE0F0), // pastel pink
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          // The top portion of the card
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: widget.onCardTap, // Tapping card => navigate to detail
+            child: Padding(
+              padding:
+              const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(
+                children: [
+                  // Left side: main info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Show formTitle or submissionId
+                        Text(
+                          submission.formTitle.isNotEmpty
+                              ? submission.formTitle
+                              : 'Submission #${submission.submissionId}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Submitted by: ${submission.submittedBy}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today,
+                                size: 16, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(
+                              DateFormat('dd/MM/yyyy HH:mm')
+                                  .format(submission.submittedAt),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Right side: arrow icon
+                  IconButton(
+                    icon: Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      color: Colors.blue,
+                    ),
+                    onPressed: _toggleExpand, // Toggle expand
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // If expanded, show a "compact form" layout for all Q&A
+          if (_expanded)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: submission.answers.map((answer) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDE7E8), // Light pastel
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          answer.question,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          answer.answer,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+*/
+
+// lib/screens/form_management/form_submissions_view_screen.dart
+
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../../components/drawer_menu/DrawerMenu.dart';
+import '../../../models/Permission_set.dart';
+import '../../../models/form_submission/answer_view.dart';
+import '../../../models/form_submission/form_submission_view.dart';
+import '../../../services/api_model_services/api_form_services/form_submission_view_service.dart';
+
+/// If the user taps the card, we show a detail screen with all answers
+class SubmissionDetailScreen extends StatelessWidget {
+  final FormSubmissionView submission;
+
+  const SubmissionDetailScreen({Key? key, required this.submission})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // Display a single scrollable form of Q&A
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          submission.formTitle.isNotEmpty
+              ? submission.formTitle
+              : "Submission Detail",
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Container(
+        color: const Color(0xFFE3F2FD),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Basic info about the submission
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                title: Text(
+                  'Submitted by: ${submission.submittedBy}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(submission.submittedAt)}',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Show each Q&A in a pastel container
+            ...submission.answers.map((answer) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE7E8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      answer.question,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      answer.answer,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Main screen: lists the submissions for a form, one pastel card per submission.
+class FormSubmissionsViewScreen extends StatefulWidget {
+  final int formId;
+  final String formTitle;
+  final PermissionSet permissionSet;
+  final Map<String, dynamic> sessionData;
+
+  const FormSubmissionsViewScreen({
+    Key? key,
+    required this.formId,
+    required this.formTitle,
+    required this.permissionSet,
+    required this.sessionData,
+  }) : super(key: key);
+
+  @override
+  _FormSubmissionsViewScreenState createState() =>
+      _FormSubmissionsViewScreenState();
+}
+
+class _FormSubmissionsViewScreenState
+    extends State<FormSubmissionsViewScreen> {
+  final FormSubmissionViewService _submissionService =
+  FormSubmissionViewService();
+
+  List<FormSubmissionView> submissions = [];
+  List<FormSubmissionView> filteredSubmissions = [];
+  bool isLoading = true;
+
+  // Example filter by user in a Dropdown
+  String? _selectedUser;
+  List<String> _users = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubmissions();
+  }
+
+  Future<void> _loadSubmissions() async {
+    try {
+      setState(() => isLoading = true);
+
+      // This call now returns one FormSubmissionView per submission
+      final data = await _submissionService.getFormSubmissions(widget.formId);
+
+      submissions = data;
+      filteredSubmissions = data;
+
+      // Build list of unique "submittedBy" for filtering
+      _users = submissions.map((s) => s.submittedBy).toSet().toList()..sort();
+
+      setState(() => isLoading = false);
+    } catch (e) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading submissions: $e')),
+      );
+    }
+  }
+
+  void _filterByUser(String? user) {
+    if (user == null || user == 'All') {
+      setState(() {
+        _selectedUser = 'All';
+        filteredSubmissions = submissions;
+      });
+    } else {
+      setState(() {
+        _selectedUser = user;
+        filteredSubmissions =
+            submissions.where((s) => s.submittedBy == user).toList();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dropdownItems = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(
+        value: 'All',
+        child: Text('All'),
+      ),
+      ..._users.map((user) => DropdownMenuItem(
+        value: user,
+        child: Text(user),
+      ))
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          'Submissions - ${widget.formTitle}',
+          style: const TextStyle(color: Colors.black),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      drawer: DrawerMenu(
+        onItemTapped: (index) => Navigator.pop(context),
+        parentContext: context,
+        permissionSet: widget.permissionSet,
+        sessionData: widget.sessionData,
+      ),
+      body: Container(
+        color: const Color(0xFFE3F2FD),
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : filteredSubmissions.isEmpty
+            ? const Center(
+          child: Text(
+            'No submissions found',
+            style: TextStyle(fontSize: 18),
+          ),
+        )
+            : Column(
+          children: [
+            // Example filter by user
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    'Filter by user:',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedUser ?? 'All',
+                      items: dropdownItems,
+                      onChanged: _filterByUser,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: filteredSubmissions.length,
+                itemBuilder: (context, index) {
+                  final submission = filteredSubmissions[index];
+                  return _CustomExpansionCard(
+                    submission: submission,
+                    onCardTap: () {
+                      // Tapping the card => Go to detail screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SubmissionDetailScreen(
+                            submission: submission,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// An "ExpansionTile"-like card. One card per submission.
+/// Tapping the arrow expands a "compact form"; tapping the card navigates.
+class _CustomExpansionCard extends StatefulWidget {
+  final FormSubmissionView submission;
+  final VoidCallback onCardTap;
+
+  const _CustomExpansionCard({
+    Key? key,
+    required this.submission,
+    required this.onCardTap,
+  }) : super(key: key);
+
+  @override
+  State<_CustomExpansionCard> createState() => _CustomExpansionCardState();
+}
+
+class _CustomExpansionCardState extends State<_CustomExpansionCard> {
+  bool _expanded = false;
+
+  void _toggleExpand() {
+    setState(() {
+      _expanded = !_expanded;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.submission;
+
+    return Card(
+      color: const Color(0xFFFFE0F0), // pastel pink
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: widget.onCardTap, // navigate on card tap
+            child: Padding(
+              padding:
+              const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(
+                children: [
+                  // Left side: Title, user, date
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.formTitle.isNotEmpty
+                              ? s.formTitle
+                              : 'Submission #${s.submissionId}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Submitted by: ${s.submittedBy}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today,
+                                size: 16, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Text(
+                              DateFormat('dd/MM/yyyy HH:mm').format(s.submittedAt),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Expand arrow
+                  IconButton(
+                    icon: Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      color: Colors.blue,
+                    ),
+                    onPressed: _toggleExpand,
+                  )
+                ],
+              ),
+            ),
+          ),
+          // If expanded, show Q&A in pastel containers (compact form)
+          if (_expanded)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: s.answers.map((answer) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDE7E8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          answer.question,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          answer.answer,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+
 
