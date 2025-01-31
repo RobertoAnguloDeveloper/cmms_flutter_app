@@ -223,21 +223,8 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
-            // Logout Option
             PermissionMenuItem(
-              title: 'Log Out',
-              icon: Icons.logout,
-              onTap: () async {
-                await SessionManager.clearSession();
-                if (!mounted) return;
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                );
-              },
-            ),
-            PermissionMenuItem(
-              title: 'Form Submissions',
+              title: 'View Form',
               icon: FontAwesomeIcons.clipboardList,
               hasPermission: () =>
               (widget.permissionSet?.hasPermission('view_submissions') ?? false),
@@ -257,6 +244,20 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 }
               },
             ),
+            // Logout Option
+            PermissionMenuItem(
+              title: 'Log Out',
+              icon: Icons.logout,
+              onTap: () async {
+                await SessionManager.clearSession();
+                if (!mounted) return;
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                );
+              },
+            ),
+
           ],
         ),
       ),
