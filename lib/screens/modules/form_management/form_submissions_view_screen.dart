@@ -1853,15 +1853,38 @@ class _FormSubmissionsViewScreenState
         child: isLoading
             ? const Center(child: CircularProgressIndicator())
             : filteredSubmissions.isEmpty
-            ? const Center(
-          child: Text(
-            'No submissions found',
-            style: TextStyle(fontSize: 18),
+            ? Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.list_alt,
+                size: 64,
+                color: Colors.grey,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No submissions available.',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Once someone submits a form, you\'ll see it here.',
+                style: TextStyle(
+                  fontSize: 24,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         )
             : Column(
           children: [
-            // Example filter by user
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -1894,7 +1917,6 @@ class _FormSubmissionsViewScreenState
                   return _CustomExpansionCard(
                     submission: submission,
                     onCardTap: () {
-                      // Tapping the card => Go to detail screen
                       Navigator.push(
                         context,
                         MaterialPageRoute(
