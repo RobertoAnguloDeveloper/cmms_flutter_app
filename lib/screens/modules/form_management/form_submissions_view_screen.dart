@@ -1661,9 +1661,16 @@ import '../../../services/api_model_services/api_form_services/form_submission_v
 /// If the user taps the card, we show a detail screen with all answers
 class SubmissionDetailScreen extends StatelessWidget {
   final FormSubmissionView submission;
+  final PermissionSet permissionSet;
+  final Map<String, dynamic> sessionData;
 
-  const SubmissionDetailScreen({Key? key, required this.submission})
-      : super(key: key);
+  const SubmissionDetailScreen({
+    Key? key,
+    required this.submission,
+    required this.permissionSet,
+    required this.sessionData,
+  }) : super(key: key);
+
 
   @override
   Widget build(BuildContext context) {
@@ -1681,6 +1688,12 @@ class SubmissionDetailScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
+      ),
+      drawer: DrawerMenu(
+        onItemTapped: (index) => Navigator.pop(context),
+        parentContext: context,
+        permissionSet: permissionSet,
+        sessionData: sessionData,
       ),
       body: Container(
         color: const Color(0xFFE3F2FD),
@@ -1833,14 +1846,6 @@ class _FormSubmissionsViewScreenState
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text(
-          'Submissions - ${widget.formTitle}',
-          style: const TextStyle(color: Colors.black),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       drawer: DrawerMenu(
         onItemTapped: (index) => Navigator.pop(context),
@@ -1922,9 +1927,12 @@ class _FormSubmissionsViewScreenState
                         MaterialPageRoute(
                           builder: (_) => SubmissionDetailScreen(
                             submission: submission,
+                            permissionSet: widget.permissionSet,
+                            sessionData: widget.sessionData,
                           ),
                         ),
                       );
+
                     },
                   );
                 },
