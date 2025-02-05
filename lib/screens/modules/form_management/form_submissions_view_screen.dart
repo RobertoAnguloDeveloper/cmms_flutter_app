@@ -1671,11 +1671,6 @@ class SubmissionDetailScreen extends StatelessWidget {
     // Display a single scrollable form of Q&A
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          submission.formTitle.isNotEmpty
-              ? submission.formTitle
-              : "Submission Detail",
-        ),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -1696,20 +1691,47 @@ class SubmissionDetailScreen extends StatelessWidget {
           children: [
             // Basic info about the submission
             Card(
-              elevation: 0,
+              color: Colors.white, // Fondo blanco
+              elevation: 4, // Puedes aumentar la elevación para un efecto de sombra más fuerte
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16), // Borde más redondeado
               ),
+              margin: const EdgeInsets.symmetric(vertical: 12), // Espacio entre las cards
               child: ListTile(
-                title: Text(
-                  'Submitted by: ${submission.submittedBy}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                contentPadding: const EdgeInsets.all(16), // Agrega padding interno para mayor espacio
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Form Title: ${submission.formTitle.isNotEmpty ? submission.formTitle : "No title"}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22, // Aumento del tamaño del texto
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8), // Espacio entre el título y el resto
+                    Text(
+                      'Submitted by: ${submission.submittedBy}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18, // Aumento del tamaño del texto
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
                 ),
                 subtitle: Text(
                   'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(submission.submittedAt)}',
+                  style: const TextStyle(
+                    fontSize: 16, // Aumento del tamaño del texto
+                    color: Colors.grey,
+                  ),
                 ),
               ),
             ),
+
+
             const SizedBox(height: 16),
 
             // Show each Q&A in a pastel container
@@ -1717,8 +1739,16 @@ class SubmissionDetailScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFDE7E8),
+                  color: const Color(0xFFB3E5FC), // Azul celeste
                   borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.3), // Sombra gris tenue
+                      spreadRadius: 2,
+                      blurRadius: 5,
+                      offset: const Offset(0, 3), // Desplazamiento de la sombra
+                    ),
+                  ],
                 ),
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -1739,6 +1769,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                   ],
                 ),
               );
+
             }).toList(),
           ],
         ),
