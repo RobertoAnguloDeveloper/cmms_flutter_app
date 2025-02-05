@@ -1,6 +1,5 @@
 // lib/screens/form_management/form_submissions_view_screen.dart
 
-
 /*
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -175,7 +174,6 @@ class _FormSubmissionsViewScreenState
   }
 }
 */
-
 
 /*
 
@@ -797,9 +795,6 @@ class _FormSubmissionsViewScreenState
   }
 }
 */
-
-
-
 
 /*
 // lib/screens/form_management/form_submissions_view_screen.dart
@@ -1671,7 +1666,6 @@ class SubmissionDetailScreen extends StatelessWidget {
     required this.sessionData,
   }) : super(key: key);
 
-
   @override
   Widget build(BuildContext context) {
     // Display a single scrollable form of Q&A
@@ -1773,10 +1767,9 @@ class FormSubmissionsViewScreen extends StatefulWidget {
       _FormSubmissionsViewScreenState();
 }
 
-class _FormSubmissionsViewScreenState
-    extends State<FormSubmissionsViewScreen> {
+class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
   final FormSubmissionViewService _submissionService =
-  FormSubmissionViewService();
+      FormSubmissionViewService();
 
   List<FormSubmissionView> submissions = [];
   List<FormSubmissionView> filteredSubmissions = [];
@@ -1785,6 +1778,26 @@ class _FormSubmissionsViewScreenState
   // Example filter by user in a Dropdown
   String? _selectedUser;
   List<String> _users = [];
+  TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _searchByUserName(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        filteredSubmissions = submissions;
+      } else {
+        filteredSubmissions = submissions
+            .where((s) =>
+                s.submittedBy.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -1837,111 +1850,167 @@ class _FormSubmissionsViewScreenState
         child: Text('All'),
       ),
       ..._users.map((user) => DropdownMenuItem(
-        value: user,
-        child: Text(user),
-      ))
+            value: user,
+            child: Text(user),
+          ))
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      drawer: DrawerMenu(
-        onItemTapped: (index) => Navigator.pop(context),
-        parentContext: context,
-        permissionSet: widget.permissionSet,
-        sessionData: widget.sessionData,
-      ),
-      body: Container(
-        color: const Color(0xFFE3F2FD),
-        child: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : filteredSubmissions.isEmpty
-            ? Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.list_alt,
-                size: 64,
-                color: Colors.grey,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'No submissions available.',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Once someone submits a form, you\'ll see it here.',
-                style: TextStyle(
-                  fontSize: 24,
-                  color: Colors.grey,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        )
-            : Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
-              child: Row(
-                children: [
-                  const Text(
-                    'Filter by user:',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: _selectedUser ?? 'All',
-                      items: dropdownItems,
-                      onChanged: _filterByUser,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: filteredSubmissions.length,
-                itemBuilder: (context, index) {
-                  final submission = filteredSubmissions[index];
-                  return _CustomExpansionCard(
-                    submission: submission,
-                    onCardTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SubmissionDetailScreen(
-                            submission: submission,
-                            permissionSet: widget.permissionSet,
-                            sessionData: widget.sessionData,
-                          ),
-                        ),
-                      );
-
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
         ),
-      ),
-    );
+        drawer: DrawerMenu(
+          onItemTapped: (index) => Navigator.pop(context),
+          parentContext: context,
+          permissionSet: widget.permissionSet,
+          sessionData: widget.sessionData,
+        ),
+        body: Container(
+          color: const Color(0xFFE3F2FD),
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Search by user',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // 📦 Combina el Dropdown con el TextField
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: Colors.transparent), // Sin borde
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black
+                                      .withOpacity(0.1), // Color de la sombra
+                                  spreadRadius:
+                                      1, // Cuánto se expande la sombra
+                                  blurRadius: 5, // Desenfoque de la sombra
+                                  offset: const Offset(
+                                      0, 3), // Desplazamiento de la sombra
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                // 🔽 Dropdown integrado (sin opción "All")
+                                DropdownButton<String>(
+                                  value: _selectedUser,
+                                  hint: const Text(
+                                      "Select user"), // Texto por defecto
+                                  items: _users.map((user) {
+                                    return DropdownMenuItem(
+                                      value: user,
+                                      child: Text(user),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedUser = value;
+                                      _searchController.text = value ??
+                                          ''; // Actualiza el campo de búsqueda
+                                      _searchByUserName(value ??
+                                          ''); // Filtra automáticamente
+                                    });
+                                  },
+                                  underline:
+                                      const SizedBox(), // Oculta la línea inferior
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                ),
+                                const VerticalDivider(), // Separador visual
+                                // 🔍 TextField de búsqueda
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Enter user name...',
+                                      border: InputBorder.none, // Sin borde
+                                      prefixIcon: Icon(Icons.search),
+                                    ),
+                                    onChanged: _searchByUserName,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 📋 Mostrar lista o mensaje vacío
+                    Expanded(
+                      child: filteredSubmissions.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.list_alt, // 📋 Ícono restaurado
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No submissions available.',
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Once someone submits a form, you\'ll see it here.',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      color: Colors.grey,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: filteredSubmissions.length,
+                              itemBuilder: (context, index) {
+                                final submission = filteredSubmissions[index];
+                                return _CustomExpansionCard(
+                                  submission: submission,
+                                  onCardTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => SubmissionDetailScreen(
+                                          submission: submission,
+                                          permissionSet: widget.permissionSet,
+                                          sessionData: widget.sessionData,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                    )
+                  ],
+                ),
+        ));
   }
 }
 
@@ -1975,8 +2044,8 @@ class _CustomExpansionCardState extends State<_CustomExpansionCard> {
     final s = widget.submission;
 
     return Card(
-      color: const Color(0xFFFFE0F0), // pastel pink
-      elevation: 0,
+      color: Colors.white, // pastel pink
+      elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -1987,8 +2056,7 @@ class _CustomExpansionCardState extends State<_CustomExpansionCard> {
             borderRadius: BorderRadius.circular(12),
             onTap: widget.onCardTap, // navigate on card tap
             child: Padding(
-              padding:
-              const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               child: Row(
                 children: [
                   // Left side: Title, user, date
@@ -2021,7 +2089,8 @@ class _CustomExpansionCardState extends State<_CustomExpansionCard> {
                                 size: 16, color: Colors.grey[600]),
                             const SizedBox(width: 4),
                             Text(
-                              DateFormat('dd/MM/yyyy HH:mm').format(s.submittedAt),
+                              DateFormat('dd/MM/yyyy HH:mm')
+                                  .format(s.submittedAt),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -2056,7 +2125,7 @@ class _CustomExpansionCardState extends State<_CustomExpansionCard> {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFDE7E8),
+                      color: const Color(0xFFB3E5FC),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding: const EdgeInsets.all(16),
@@ -2086,6 +2155,3 @@ class _CustomExpansionCardState extends State<_CustomExpansionCard> {
     );
   }
 }
-
-
-
