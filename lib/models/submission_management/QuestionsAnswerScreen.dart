@@ -439,6 +439,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 }
 */
 
+import 'package:cmms_app/models/form_submission/answer_submitted.dart';
+import 'package:cmms_app/services/api_model_services/api_form_services/AnswerSubmittedService.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart'; // Asegúrate de tener el import
@@ -475,6 +477,7 @@ class QuestionsAnswerScreen extends StatefulWidget {
 class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   final FormApiService _formApiService = FormApiService();
   final AnswerApiService _answerApiService = AnswerApiService();
+  final AnswerSubmittedService _answerSubmittedService = AnswerSubmittedService();
   final FormSubmissionService _formSubmissionService = FormSubmissionService();
 
   /*
@@ -840,6 +843,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     }
   }*/
 
+
+ /*
   Future<void> _submitAnswers() async {
     try {
       // Validate required answers
@@ -906,8 +911,105 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         ),
       );
     }
+  }*/
+
+
+  Future<void> _submitAnswers() async {
+    try {
+      // Validate required fields
+      for (var question in questions) {
+        if (question['is_required'] == true && !answers.containsKey(question['id'])) {
+          _showErrorSnackBar('Please answer: ${question['text']}');
+          return;
+        }
+      }
+
+      setState(() {
+        isLoading = true;
+      });
+
+      // First create the form submission
+      final submissionResult = await _formSubmissionService.createFormSubmission(
+          context: context,
+          formId: selectedForm!['id']
+      );
+
+      final int submissionId = submissionResult['submission_id'];
+
+      // Format answers for the API
+      final formattedAnswers = answers.entries.map((entry) {
+        final question = questions.firstWhere(
+              (q) => q['id'] == entry.key,
+          orElse: () => {'type': 'text', 'text': 'Unknown Question'},
+        );
+
+        return {
+          'question_text': question['text'],
+          'question_type': question['type']?.toLowerCase() ?? 'text',
+          'answer_text': _formatAnswerValue(entry.value, question['type']),
+        };
+      }).toList();
+
+      // Submit answers
+      await _answerSubmittedService.createAnswerSubmitted(
+        context,
+        submissionId,
+        formattedAnswers,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Form submitted successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      setState(() {
+        showQuestions = false;
+        selectedForm = null;
+        answers.clear();
+        _attachedFiles.clear();
+        isLoading = false;
+      });
+
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
+  String _formatAnswerValue(dynamic value, String questionType) {
+    if (value == null) return '';
+
+    switch (questionType.toLowerCase()) {
+      case 'multiple-choices':
+        if (value is List) {
+          return value.join(', ');
+        }
+        return value.toString();
+      case 'date':
+      // Ensure date is in dd/MM/yyyy format
+        if (value is DateTime) {
+          return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+        }
+        return value.toString();
+      default:
+        return value.toString();
+    }
+  }
 
   // NUEVO: Botón para adjuntar archivos
   Widget _buildAttachmentButton() {

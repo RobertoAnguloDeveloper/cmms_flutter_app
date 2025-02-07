@@ -574,8 +574,7 @@ class FormSubmissionService {
 
       // 1. Create form submission
       final submissionData = {
-        'form_id': formId,
-        'submitted_by': userId,
+        'form_id': formId
       };
 
       print('Creating form submission with data: ${json.encode(submissionData)}');
@@ -676,6 +675,63 @@ class FormSubmissionService {
             throw Exception('Failed to upload attachment: ${responseBody.body}');
           }
         }
+      }
+
+      return {
+        'status': 'success',
+        'submission_id': submissionId,
+        'message': 'Form submitted successfully'
+      };
+
+    } catch (e, stackTrace) {
+      print('Error in submitFormWithAnswers: $e');
+      print('Stack trace: $stackTrace');
+      throw Exception('Failed to submit form: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createFormSubmission({
+    required BuildContext context,
+    required int formId,
+  }) async {
+    try {
+      String? token = await SessionManager.getToken();
+
+      // 1. Create form submission
+      final submissionData = {
+        'form_id': formId
+      };
+
+      print('Creating form submission with data: ${json.encode(submissionData)}');
+
+      var submissionUri = Uri.parse('${_http.baseUrl}/api/form-submissions');
+      var submissionResponse = await http.post(
+        submissionUri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(submissionData),
+      );
+
+      print('Form submission response: ${submissionResponse.body}');
+
+      if (submissionResponse.statusCode != 201) {
+        throw Exception('Failed to create form submission: ${submissionResponse.body}');
+      }
+
+      final submissionResult = json.decode(submissionResponse.body);
+      int? submissionId;
+
+      // Handle different response structures
+      if (submissionResult is Map) {
+        submissionId = submissionResult['id'] ??
+            submissionResult['data']?['id'] ??
+            submissionResult['submission']?['id'];
+      }
+
+      if (submissionId == null) {
+        throw Exception('Invalid submission ID in response');
       }
 
       return {

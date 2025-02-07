@@ -228,7 +228,7 @@ class AnswerApiService {
 
   // nueva modoficiacion para construir el form submission
 
-
+/*
   Future<Map<String, dynamic>> submitFormAnswers(
       BuildContext context,
       int formId,
@@ -264,7 +264,44 @@ class AnswerApiService {
     } catch (e) {
       throw Exception('Exception while submitting form: $e');
     }
+  } */
+
+  Future<Map<String, dynamic>> submitFormAnswers(
+      BuildContext context,
+      int formId,
+      List<Map<String, dynamic>> answers,
+      ) async {
+    try {
+      String? token = await SessionManager.getToken();
+
+      final response = await http.post(
+        Uri.parse('${Http().baseUrl}/form-answers'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'form_id': formId,
+          'answers': answers
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else if (response.statusCode == 401) {
+        final responseData = json.decode(response.body);
+        await ApiResponseHandler.handleExpiredToken(context, responseData);
+        throw Exception('Session expired');
+      } else {
+        throw Exception('Failed to submit answers: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error submitting answers: $e');
+    }
   }
+
+
+
 
   Future<List<Map<String, dynamic>>> getFormSubmissions(
       BuildContext context,
