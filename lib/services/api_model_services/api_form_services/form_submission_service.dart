@@ -697,7 +697,6 @@ class FormSubmissionService {
     try {
       String? token = await SessionManager.getToken();
 
-      // 1. Create form submission
       final submissionData = {
         'form_id': formId
       };
@@ -721,29 +720,27 @@ class FormSubmissionService {
       }
 
       final submissionResult = json.decode(submissionResponse.body);
-      int? submissionId;
 
-      // Handle different response structures
-      if (submissionResult is Map) {
-        submissionId = submissionResult['id'] ??
-            submissionResult['data']?['id'] ??
-            submissionResult['submission']?['id'];
+      if (submissionResult == null ||
+          !submissionResult.containsKey('submission') ||
+          submissionResult['submission'] == null ||
+          !submissionResult['submission'].containsKey('id')) {
+        print('Invalid response structure: $submissionResult');
+        throw Exception('Invalid response structure from server');
       }
 
-      if (submissionId == null) {
-        throw Exception('Invalid submission ID in response');
-      }
+      final submissionId = submissionResult['submission']['id'];
 
       return {
         'status': 'success',
         'submission_id': submissionId,
-        'message': 'Form submitted successfully'
+        'message': 'Form submission created successfully'
       };
 
     } catch (e, stackTrace) {
-      print('Error in submitFormWithAnswers: $e');
+      print('Error in createFormSubmission: $e');
       print('Stack trace: $stackTrace');
-      throw Exception('Failed to submit form: $e');
+      throw Exception('Failed to create form submission: $e');
     }
   }
 }

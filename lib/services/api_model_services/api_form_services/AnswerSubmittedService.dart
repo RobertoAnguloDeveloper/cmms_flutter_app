@@ -16,12 +16,10 @@ class AnswerSubmittedService {
       // Format the request body according to the API specification
       final Map<String, dynamic> requestBody = {
         'form_submission_id': submissionId,
-        'submissions': answers.map((answer) => {
-          'question_text': answer['question_text'],
-          'question_type_text': answer['question_type'],
-          'answer_text': answer['answer_text'],
-        }).toList(),
+        'submissions': answers,
       };
+
+      print('Sending request body: ${json.encode(requestBody)}');
 
       String? token = await SessionManager.getToken();
       final response = await http.post(
@@ -32,6 +30,9 @@ class AnswerSubmittedService {
         },
         body: json.encode(requestBody),
       );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = json.decode(response.body);
