@@ -324,10 +324,11 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
         print('Processing question: $questionText with type: $questionType and value: $answerValue');
 
-        if (questionType == 'multiple_choice' || questionType == 'multiple-choices' || questionType == 'checkbox') {
+        //if (questionType == 'multiple_choice' || questionType == 'multiple-choices' || questionType == 'checkbox') {
           // For multiple choice/checkbox, handle multiple selections
-          List<dynamic> selectedIds = answerValue is List ? answerValue : [answerValue];
-
+          //List<dynamic> selectedIds = answerValue is List ? answerValue : [answerValue];
+        if (questionType.contains('multiple_choice') || questionType.contains('checkbox')) {
+          List<dynamic> selectedIds = (answerValue is List) ? answerValue : [answerValue];
           print('Selected IDs for $questionText: $selectedIds');
 
           // Get the possible answers from the question
