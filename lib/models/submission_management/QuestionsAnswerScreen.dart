@@ -1,11 +1,15 @@
+import 'dart:io';
+import 'package:path/path.dart' as path;
 import 'package:cmms_app/services/api_model_services/api_form_services/AnswerSubmittedService.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:file_picker/file_picker.dart'; // Asegúrate de tener el import
+import 'package:file_picker/file_picker.dart';
+import 'package:http_parser/http_parser.dart';
 
 import '../../../components/drawer_menu/DrawerMenu.dart';
 import '../../../models/Permission_set.dart';
 import '../../../services/api_model_services/api_form_services/AnswerApiService.dart';
+import '../../../services/api_model_services/api_form_services/AttachmentService.dart';
 import '../../../services/api_model_services/api_form_services/FormApiService.dart';
 import '../../screens/modules/form_submission/Components/CustomSignaturePad.dart';
 import '../../screens/modules/form_submission/Components/DynamicQuestionInput.dart';
@@ -19,13 +23,13 @@ class QuestionsAnswerScreen extends StatefulWidget {
   final Map<String, dynamic> sessionData;
 
   const QuestionsAnswerScreen({
-    super.key,
+    Key? key,
     required this.formId,
     required this.formTitle,
     this.formDescription,
     required this.permissionSet,
     required this.sessionData,
-  });
+  }) : super(key: key);
 
   @override
   _QuestionsAnswerScreenState createState() => _QuestionsAnswerScreenState();
@@ -36,6 +40,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   final AnswerApiService _answerApiService = AnswerApiService();
   final AnswerSubmittedService _answerSubmittedService = AnswerSubmittedService();
   final FormSubmissionService _formSubmissionService = FormSubmissionService();
+  final AttachmentService _attachmentService = AttachmentService();
 
   bool isLoading = true;
   List<dynamic> forms = [];
@@ -44,9 +49,9 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   bool showQuestions = false;
   Map<String, dynamic>? selectedForm;
   List<String> _attachedFiles = [];
-
-  // NUEVO: Lista para almacenar las rutas de los archivos seleccionados
-
+  bool _isUploadingFiles = false;
+  int _totalFiles = 0;
+  int _uploadedFiles = 0;
 
   @override
   void initState() {
@@ -76,6 +81,86 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         });
       }
       _showErrorSnackBar('Error fetching forms: $e');
+    }
+  }
+
+  Future<void> _loadExistingAttachments(int submissionId) async {
+    try {
+      final result = await _attachmentService.fetchAttachments(
+        context,
+        filters: {'form_submission_id': submissionId},
+      );
+
+      final attachments = result['attachments'] as List;
+      // Handle the attachments as needed
+      setState(() {
+        // Update UI with existing attachments if needed
+      });
+    } catch (e) {
+      print('Error loading attachments: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading attachments: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'txt'],
+        type: FileType.custom,
+      );
+
+      if (result != null) {
+        bool hasInvalidFiles = false;
+        List<String> validFiles = [];
+
+        for (var file in result.files) {
+          if (file.path != null) {
+            final fileToCheck = File(file.path!);
+
+            // Basic validation
+            if (fileToCheck.lengthSync() > 16 * 1024 * 1024) { // 16MB limit
+              hasInvalidFiles = true;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${file.name}: File size exceeds 16MB limit'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              continue;
+            }
+
+            // If validation passes, add to valid files
+            validFiles.add(file.path!);
+          }
+        }
+
+        setState(() {
+          _attachedFiles.addAll(validFiles);
+        });
+
+        if (hasInvalidFiles) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Some files were not added due to validation errors'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error picking files: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking files: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -121,32 +206,188 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     }
   }
 
-  Future<void> _pickFiles() async {
+  Future<void> _submitAnswers() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        // Add allowed extensions if needed
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
-        type: FileType.custom,
+      setState(() {
+        isLoading = true;
+      });
+
+      final submissionResult = await _formSubmissionService.createFormSubmission(
+        context: context,
+        formId: selectedForm!['id'],
       );
 
-      if (result != null) {
-        // Validate file sizes
-        for (var file in result.files) {
-          if (file.size > 10 * 1024 * 1024) { // 10MB limit
-            throw Exception('File ${file.name} exceeds 10MB size limit');
+      final int submissionId = submissionResult['submission_id'];
+      print('Extracted submission ID: $submissionId');
+
+      if (_attachedFiles.isNotEmpty) {
+        setState(() {
+          _isUploadingFiles = true;
+          _totalFiles = _attachedFiles.length;
+          _uploadedFiles = 0;
+        });
+
+        final failedUploads = <String>[];
+        final filesData = _attachedFiles.map((filePath) => {
+          'file': File(filePath),
+          'is_signature': false,
+        }).toList();
+
+        try {
+          if (filesData.length > 1) {
+            final uploadResponse = await _attachmentService.bulkCreateAttachments(
+              context,
+              submissionId,
+              filesData,
+            );
+
+            if (uploadResponse['attachments'] != null) {
+              setState(() {
+                _uploadedFiles = _totalFiles;
+              });
+            }
+          } else {
+            for (var filePath in _attachedFiles) {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Uploading ${path.basename(filePath)}...'),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+
+                final uploadResponse = await _attachmentService.createAttachment(
+                  context,
+                  submissionId,
+                  File(filePath),
+                  false,
+                );
+
+                if (uploadResponse['attachment'] != null) {
+                  setState(() {
+                    _uploadedFiles++;
+                  });
+                } else {
+                  throw Exception('Invalid server response');
+                }
+              } catch (e) {
+                failedUploads.add(path.basename(filePath));
+              }
+            }
           }
+
+          if (failedUploads.isNotEmpty) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to upload: ${failedUploads.join(", ")}'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        } catch (e) {
+          print('Error uploading files: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error uploading files: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } finally {
+          setState(() {
+            _isUploadingFiles = false;
+          });
+        }
+      }
+
+      List<Map<String, dynamic>> formattedSubmissions = [];
+
+      answers.forEach((questionId, answerValue) {
+        Map<String, dynamic>? question = questions.firstWhere(
+              (q) => q['id'] == questionId,
+          orElse: () => null,
+        );
+
+        if (question == null) {
+          print('Warning: No question found for ID $questionId');
+          return;
         }
 
-        setState(() {
-          _attachedFiles = result.paths.whereType<String>().toList();
-        });
+        final questionType = question['type']?.toString().toLowerCase() ?? 'text';
+        final questionText = question['text']?.toString() ?? 'Unknown Question';
+
+        if (questionType.contains('multiple_choice') ||
+            questionType.contains('checkbox')) {
+          List<dynamic> selectedIds = (answerValue is List) ? answerValue : [answerValue];
+          List<dynamic> possibleAnswers = question['possible_answers'] ?? [];
+
+          for (var selectedId in selectedIds) {
+            var selectedAnswer = possibleAnswers.firstWhere(
+                  (answer) => answer['id'] == selectedId,
+              orElse: () => null,
+            );
+
+            if (selectedAnswer != null) {
+              String answerText = selectedAnswer['value']?.toString() ?? '';
+              formattedSubmissions.add({
+                'question_text': questionText,
+                'question_type_text': questionType,
+                'answer_text': answerText
+              });
+            }
+          }
+        } else {
+          formattedSubmissions.add({
+            'question_text': questionText,
+            'question_type_text': questionType,
+            'answer_text': answerValue?.toString() ?? ''
+          });
+        }
+      });
+
+      if (formattedSubmissions.isEmpty) {
+        throw Exception('No answers to submit');
       }
-    } catch (e) {
+
+      await _answerSubmittedService.createAnswerSubmitted(
+        context,
+        submissionId,
+        formattedSubmissions,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Form submitted successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      setState(() {
+        showQuestions = false;
+        selectedForm = null;
+        answers.clear();
+        _attachedFiles.clear();
+        isLoading = false;
+      });
+    } catch (e, stackTrace) {
+      print('Error in _submitAnswers: $e');
+      print('Stack trace: $stackTrace');
+
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        _isUploadingFiles = false;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error picking files: $e'),
+          content: Text('Error: ${e.toString()}'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -193,8 +434,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today,
-                        size: 16, color: Colors.grey[600]),
+                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
                       _formatDate(form['created_at']),
@@ -288,132 +528,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     );
   }
 
-  Future<void> _submitAnswers() async {
-    try {
-      setState(() {
-        isLoading = true;
-      });
-
-      // First create the form submission
-      final submissionResult = await _formSubmissionService.createFormSubmission(
-          context: context,
-          formId: selectedForm!['id']
-      );
-
-      final int submissionId = submissionResult['submission_id'];
-      print('Extracted submission ID: $submissionId');
-      print('Current answers: $answers');
-      print('Current questions: $questions');
-
-      // Format answers for the API
-      List<Map<String, dynamic>> formattedSubmissions = [];
-
-      answers.forEach((questionId, answerValue) {
-        Map<String, dynamic>? question = questions.firstWhere(
-              (q) => q['id'] == questionId,
-          orElse: () => null,
-        );
-
-        if (question == null) {
-          print('Warning: No question found for ID $questionId');
-          return;
-        }
-
-        final questionType = question['type']?.toString().toLowerCase() ?? 'text';
-        final questionText = question['text']?.toString() ?? 'Unknown Question';
-
-        print('Processing question: $questionText with type: $questionType and value: $answerValue');
-
-        //if (questionType == 'multiple_choice' || questionType == 'multiple-choices' || questionType == 'checkbox') {
-          // For multiple choice/checkbox, handle multiple selections
-          //List<dynamic> selectedIds = answerValue is List ? answerValue : [answerValue];
-        if (questionType.contains('multiple_choice') || questionType.contains('checkbox')) {
-          List<dynamic> selectedIds = (answerValue is List) ? answerValue : [answerValue];
-          print('Selected IDs for $questionText: $selectedIds');
-
-          // Get the possible answers from the question
-          List<dynamic> possibleAnswers = question['possible_answers'] ?? [];
-
-          // Create a submission for each selected answer
-          for (var selectedId in selectedIds) {
-            // Find the matching possible answer
-            var selectedAnswer = possibleAnswers.firstWhere(
-                  (answer) => answer['id'] == selectedId,
-              orElse: () => null,
-            );
-
-            if (selectedAnswer != null) {
-              String answerText = selectedAnswer['value']?.toString() ?? '';
-              print('Found answer text: $answerText for ID: $selectedId');
-
-              formattedSubmissions.add({
-                'question_text': questionText,
-                'question_type_text': questionType,  // Remove the replaceAll
-                'answer_text': answerText
-              });
-            }
-          }
-        } else {
-          // Handle other question types (text, date, etc.)
-          formattedSubmissions.add({
-            'question_text': questionText,
-            'question_type_text': questionType,  // Remove the replaceAll
-            'answer_text': answerValue?.toString() ?? ''
-          });
-        }
-      });
-
-      print('Submitting formatted answers: $formattedSubmissions');
-
-      if (formattedSubmissions.isEmpty) {
-        throw Exception('No answers to submit');
-      }
-
-      // Send the answers to the API
-      await _answerSubmittedService.createAnswerSubmitted(
-        context,
-        submissionId,
-        formattedSubmissions,
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Form submitted successfully'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      setState(() {
-        showQuestions = false;
-        selectedForm = null;
-        answers.clear();
-        _attachedFiles.clear();
-        isLoading = false;
-      });
-
-    } catch (e, stackTrace) {
-      print('Error in _submitAnswers: $e');
-      print('Stack trace: $stackTrace');
-
-      if (!mounted) return;
-      setState(() {
-        isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
-  }
-
-  // NUEVO: Botón para adjuntar archivos
   Widget _buildAttachmentButton() {
     return ElevatedButton.icon(
       onPressed: _pickFiles,
@@ -432,7 +546,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     );
   }
 
-  // NUEVO: Lista de archivos adjuntos
   Widget _buildAttachedFilesList() {
     if (_attachedFiles.isEmpty) {
       return const SizedBox();
@@ -443,17 +556,50 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       children: [
         const Text(
           'Attached Files:',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
+        const SizedBox(height: 8),
         ..._attachedFiles.map(
-              (filePath) => ListTile(
-            leading: const Icon(Icons.insert_drive_file),
-            title: Text(filePath.split('/').last),
-            subtitle: Text(filePath),
+              (filePath) => Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              leading: const Icon(Icons.insert_drive_file),
+              title: Text(
+                filePath.split('/').last,
+                style: const TextStyle(fontSize: 14),
+              ),
+              subtitle: Text(
+                'Size: ${_getFileSize(filePath)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  setState(() {
+                    _attachedFiles.remove(filePath);
+                  });
+                },
+              ),
+            ),
           ),
         ),
       ],
     );
+  }
+
+  String _getFileSize(String filePath) {
+    final file = File(filePath);
+    try {
+      final bytes = file.lengthSync();
+      if (bytes < 1024) return '$bytes B';
+      if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } catch (e) {
+      return 'Unknown size';
+    }
   }
 
   @override
@@ -479,7 +625,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                   showQuestions = false;
                   selectedForm = null;
                   answers.clear();
-                  _attachedFiles.clear(); // Limpia los archivos si regresas
+                  _attachedFiles.clear();
                 });
               }
                   : () {
@@ -496,7 +642,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       drawer: !showQuestions
           ? DrawerMenu(
         onItemTapped: (index) {
-          Navigator.of(context).pop(); // Cierra el drawer
+          Navigator.of(context).pop();
         },
         parentContext: context,
         permissionSet: widget.permissionSet,
@@ -529,18 +675,17 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                   ),
                 ),
               ),
-
-            // NUEVO: Ahora el Attachment Button y la lista se muestran aquí.
             const SizedBox(height: 16),
             _buildAttachmentButton(),
             const SizedBox(height: 16),
             _buildAttachedFilesList(),
-
             const SizedBox(height: 16),
             ...questions.map((q) => _buildQuestionCard(q)).toList(),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _submitAnswers,
+              onPressed: (isLoading || _isUploadingFiles)
+                  ? null
+                  : _submitAnswers,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
                 backgroundColor: Colors.blue,
@@ -548,7 +693,30 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
+              child: _isUploadingFiles
+                  ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.white),
+                      strokeWidth: 2,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Uploading $_uploadedFiles of $_totalFiles',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              )
+                  : const Text(
                 'Submit Answers',
                 style: TextStyle(
                   fontSize: 16,

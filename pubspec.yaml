@@ -45,6 +45,8 @@ dev_dependencies:
   path_provider: ^2.1.5
   open_file: ^3.5.10
   file_picker: ^8.1.7
+  logging: ^1.2.0
+  mime: ^1.0.0
 
 
   # The "flutter_lints" package below contains a set of recommended lints to
