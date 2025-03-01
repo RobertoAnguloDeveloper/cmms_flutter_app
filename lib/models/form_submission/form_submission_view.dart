@@ -1,15 +1,17 @@
 // lib/models/form_submission/form_submission_view.dart
 
+import '../attachment/attachment.dart';
 import 'answer_view.dart';
 
 /// Representa el "submission" (envío de formulario),
 /// con un ID, quién lo envió, cuándo, título del form, y la lista de respuestas.
 class FormSubmissionView {
-  final int submissionId;       // ID único del submission
-  final String submittedBy;     // Quién envió el formulario
-  final DateTime submittedAt;   // Cuándo se envió
-  final String formTitle;       // Nombre del formulario
-  final List<AnswerView> answers; // Todas las respuestas unificadas
+  final int submissionId;
+  final String submittedBy;
+  final DateTime submittedAt;
+  final String formTitle;
+  final List<AnswerView> answers;
+  List<Attachment> attachments; // Agregamos los adjuntos aquí
 
   FormSubmissionView({
     required this.submissionId,
@@ -17,8 +19,8 @@ class FormSubmissionView {
     required this.submittedAt,
     required this.formTitle,
     required this.answers,
+    required this.attachments, // Inicializamos en el constructor
   });
-
   /// IMPORTANTE:
   /// Este `fromJson` asume que *cada* objeto JSON trae información de UNA sola respuesta,
   /// y en 'form_submission' la info de ese submission.
@@ -28,6 +30,7 @@ class FormSubmissionView {
   ///
   /// Por eso verás que aquí se construye un 'answers: [ una sola respuesta ]'.
   /// Luego, en tu service, juntas todo en un map y transformas en un solo 'FormSubmissionView'.
+
   factory FormSubmissionView.fromJson(Map<String, dynamic> json) {
     final formSubmission = json['form_submission'] ?? {};
     final formInfo = formSubmission['form'] ?? {};
@@ -39,8 +42,6 @@ class FormSubmissionView {
         formSubmission['submitted_at'] ?? DateTime.now().toIso8601String(),
       ),
       formTitle: formInfo['title'] ?? '',
-
-      // Construimos la lista con UNA sola respuesta, extraída de este JSON puntual
       answers: [
         AnswerView(
           question: json['question'] ?? '',
@@ -48,8 +49,10 @@ class FormSubmissionView {
           answer: json['answer'] ?? '',
         )
       ],
+      attachments: [], // Se llenará en el método `getFormSubmissions`
     );
   }
+}
 
 /// OPCIONAL:
 /// Si tu backend ya regresa un JSON *unificado* con todas las respuestas
@@ -69,4 +72,4 @@ class FormSubmissionView {
 /// }
 ///
 /// Pero este caso depende 100% de cómo tu backend te envía los datos.
-}
+

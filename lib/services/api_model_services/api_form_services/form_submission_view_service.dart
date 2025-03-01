@@ -211,16 +211,21 @@ class FormSubmissionViewService {
 
 // lib/services/api_model_services/api_form_services/form_submission_view_service.dart
 
+import 'dart:typed_data';
+
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/material.dart';
 
 // Ajusta estos imports según tu estructura
+import '../../../models/attachment/attachment.dart';
 import '../../../models/form_submission/answer_view.dart';
 import '../../../models/form_submission/form_submission_view.dart';
 import '../../api_session_client_services/ApiResponseHandler.dart';
 import '../../api_session_client_services/Http.dart';
 import '../../api_session_client_services/SessionManager.dart';
+
 
 class FormSubmissionViewService {
   final Http _http = Http();
@@ -228,10 +233,51 @@ class FormSubmissionViewService {
   /// 1) Obtiene submissions de un formulario específico
   ///    Ruta: GET /api/answers-submitted?form_id=$formId
   ///    Retorna una lista de FormSubmissionView, con respuestas agrupadas.
+
+  Future<void> openAttachment(BuildContext context, int attachmentId) async {
+    try {
+      String? token = await SessionManager.getToken();
+      final url = '${_http.baseUrl}/api/attachments/$attachmentId';
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        Uint8List imageData = response.bodyBytes; // Convertir la respuesta en bytes
+
+        // Mostrar la imagen en un cuadro de diálogo
+        showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: Text('Vista previa del archivo'),
+              content: Image.memory(imageData),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cerrar'),
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        throw Exception('No se pudo cargar la imagen. Código: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error al abrir el attachment: $e');
+    }
+  }
+
+
   Future<List<FormSubmissionView>> getFormSubmissions(int formId) async {
     try {
       String? token = await SessionManager.getToken();
-
       final url = '${_http.baseUrl}/api/answers-submitted?form_id=$formId';
       print('[getFormSubmissions] GET => $url');
       print('[getFormSubmissions] Token => $token');
@@ -251,29 +297,9 @@ class FormSubmissionViewService {
         final Map<String, dynamic> responseData = json.decode(response.body);
         final List<dynamic> data = responseData['answers'] ?? [];
 
-        // Mapa para agrupar por submissionId
         final Map<int, FormSubmissionView> submissionsMap = {};
 
-        // Recorremos cada "answer item"
         for (var item in data) {
-          // Estructura esperada de "item":
-          // {
-          //   "id": 13,
-          //   "answer": "3",
-          //   "question": "Example",
-          //   "question_type": "checkbox",
-          //   "form_submission": {
-          //     "id": 53,
-          //     "submitted_at": "...",
-          //     "submitted_by": "admin",
-          //     "form": {
-          //       "id": 5,
-          //       "title": "FormTest"
-          //     }
-          //   }
-          //   ...
-          // }
-
           final formSubmission = item['form_submission'] ?? {};
           final submissionId = formSubmission['id'] ?? 0;
           final submittedBy = formSubmission['submitted_by'] ?? '';
@@ -281,13 +307,11 @@ class FormSubmissionViewService {
           final formData = formSubmission['form'] ?? {};
           final formTitle = formData['title'] ?? '';
 
-          // Parseamos fecha
           DateTime parsedDate = DateTime.now();
           if (submittedAtStr.isNotEmpty) {
             parsedDate = DateTime.parse(submittedAtStr);
           }
 
-          // Si no existe todavía, lo creamos
           if (!submissionsMap.containsKey(submissionId)) {
             submissionsMap[submissionId] = FormSubmissionView(
               submissionId: submissionId,
@@ -295,21 +319,42 @@ class FormSubmissionViewService {
               submittedBy: submittedBy,
               submittedAt: parsedDate,
               answers: [],
+              attachments: [], // Se llenará después
             );
           }
 
-          // Construimos un AnswerView
           final answerView = AnswerView(
             question: item['question'] ?? '',
             questionType: item['question_type'] ?? '',
             answer: item['answer'] ?? '',
           );
 
-          // Agregamos la respuesta a la lista de answers
           submissionsMap[submissionId]!.answers.add(answerView);
         }
 
-        // Convertimos el map en una lista final
+        // Ahora obtenemos los attachments para cada submission
+        await Future.wait(submissionsMap.keys.map((submissionId) async {
+          final attachmentsUrl =
+              '${_http.baseUrl}/api/attachments/submission/$submissionId';
+          final attachmentsResponse = await http.get(
+            Uri.parse(attachmentsUrl),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+          );
+
+          if (attachmentsResponse.statusCode == 200) {
+            final attachmentsData = json.decode(attachmentsResponse.body);
+            final List<dynamic> attachmentsList =
+                attachmentsData['attachments'] ?? [];
+
+            submissionsMap[submissionId]!.attachments = attachmentsList
+                .map((attachmentJson) => Attachment.fromJson(attachmentJson))
+                .toList();
+          }
+        }));
+
         return submissionsMap.values.toList();
       } else {
         throw Exception(
@@ -321,6 +366,7 @@ class FormSubmissionViewService {
       throw Exception('Failed to load form submissions: $e');
     }
   }
+
 
   /// 2) Obtiene TODAS las submissions usando GET /api/answers-submitted
   ///    Retorna un Map con 'answers', 'total_count', 'filters_applied'.

@@ -23,7 +23,6 @@ class SubmissionDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Display a single scrollable form of Q&A
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -44,16 +43,15 @@ class SubmissionDetailScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Basic info about the submission
             Card(
-              color: Colors.white, // Fondo blanco
-              elevation: 4, // Puedes aumentar la elevación para un efecto de sombra más fuerte
+              color: Colors.white,
+              elevation: 4,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16), // Borde más redondeado
+                borderRadius: BorderRadius.circular(16),
               ),
-              margin: const EdgeInsets.symmetric(vertical: 12), // Espacio entre las cards
+              margin: const EdgeInsets.symmetric(vertical: 12),
               child: ListTile(
-                contentPadding: const EdgeInsets.all(16), // Agrega padding interno para mayor espacio
+                contentPadding: const EdgeInsets.all(16),
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -61,16 +59,16 @@ class SubmissionDetailScreen extends StatelessWidget {
                       'Form Title: ${submission.formTitle.isNotEmpty ? submission.formTitle : "No title"}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 22, // Aumento del tamaño del texto
+                        fontSize: 22,
                         color: Colors.black87,
                       ),
                     ),
-                    const SizedBox(height: 8), // Espacio entre el título y el resto
+                    const SizedBox(height: 8),
                     Text(
                       'Submitted by: ${submission.submittedBy}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 18, // Aumento del tamaño del texto
+                        fontSize: 18,
                         color: Colors.black54,
                       ),
                     ),
@@ -79,31 +77,19 @@ class SubmissionDetailScreen extends StatelessWidget {
                 subtitle: Text(
                   'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(submission.submittedAt)}',
                   style: const TextStyle(
-                    fontSize: 16, // Aumento del tamaño del texto
+                    fontSize: 16,
                     color: Colors.grey,
                   ),
                 ),
               ),
             ),
-
-
             const SizedBox(height: 16),
-
-            // Show each Q&A in a pastel container
             ...submission.answers.map((answer) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFB3E5FC), // Azul celeste
+                  color: const Color(0xFFB3E5FC),
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.3), // Sombra gris tenue
-                      spreadRadius: 2,
-                      blurRadius: 5,
-                      offset: const Offset(0, 3), // Desplazamiento de la sombra
-                    ),
-                  ],
                 ),
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -124,14 +110,58 @@ class SubmissionDetailScreen extends StatelessWidget {
                   ],
                 ),
               );
-
             }).toList(),
+            if (submission.attachments.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Attachments:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...submission.attachments.map((attachment) {
+                return Card(
+                  color: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: Icon(
+                      Icons.attachment,
+                      color: Colors.blue[700],
+                    ),
+                    title: Text(
+                      attachment.filePath,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    onTap: () async {
+                      if (attachment.id != null) {
+                        await FormSubmissionViewService().openAttachment(context, attachment.id!);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Attachment ID is missing')),
+                        );
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
+            ]
+
+
           ],
         ),
       ),
     );
   }
 }
+
 
 /// Main screen: lists the submissions for a form, one pastel card per submission.
 class FormSubmissionsViewScreen extends StatefulWidget {
