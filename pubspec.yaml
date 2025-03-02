@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   dio: ^5.4.0        # Add this for improved HTTP requests
+  dio_smart_retry: ^5.0.0
   flutter_cache_manager: ^3.4.0  # Add this for file caching
   photo_view: ^0.14.0  # Add this for image zooming and panning
   open_filex: ^4.3.4   # Add this as replacement for open_file (newer version)
@@ -50,6 +51,7 @@ dev_dependencies:
   file_picker: ^8.1.7
   logging: ^1.2.0
   mime: ^1.0.0
+  universal_html: ^2.2.4
 
 
   # The "flutter_lints" package below contains a set of recommended lints to

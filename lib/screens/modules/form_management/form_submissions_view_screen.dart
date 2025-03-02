@@ -21,8 +21,59 @@ class SubmissionDetailScreen extends StatelessWidget {
     required this.sessionData,
   }) : super(key: key);
 
+  // Helper method to get appropriate icon for file type
+  IconData _getIconForFileType(String filePath) {
+    final extension = filePath.split('.').last.toLowerCase();
+
+    switch (extension) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        return Icons.image;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'xls':
+      case 'xlsx':
+        return Icons.table_chart;
+      case 'txt':
+        return Icons.text_snippet;
+      default:
+        return Icons.attachment;
+    }
+  }
+
+  // Helper method to get color for file type
+  Color _getColorForFileType(String filePath) {
+    final extension = filePath.split('.').last.toLowerCase();
+
+    switch (extension) {
+      case 'pdf':
+        return Colors.red;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        return Colors.blue;
+      case 'doc':
+      case 'docx':
+        return Colors.blue.shade800;
+      case 'xls':
+      case 'xlsx':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Debug flag to help troubleshoot
+    final bool hasAttachments = submission.attachments.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -30,6 +81,11 @@ class SubmissionDetailScreen extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          submission.formTitle,
+          style: const TextStyle(color: Colors.black87),
+          overflow: TextOverflow.ellipsis,
         ),
       ),
       drawer: DrawerMenu(
@@ -43,6 +99,7 @@ class SubmissionDetailScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Submission header
             Card(
               color: Colors.white,
               elevation: 4,
@@ -50,9 +107,9 @@ class SubmissionDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
               margin: const EdgeInsets.symmetric(vertical: 12),
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                title: Column(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -72,17 +129,20 @@ class SubmissionDetailScreen extends StatelessWidget {
                         color: Colors.black54,
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(submission.submittedAt)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
                   ],
-                ),
-                subtitle: Text(
-                  'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(submission.submittedAt)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
                 ),
               ),
             ),
+
+            // Form answers
             const SizedBox(height: 16),
             ...submission.answers.map((answer) {
               return Container(
@@ -111,18 +171,35 @@ class SubmissionDetailScreen extends StatelessWidget {
                 ),
               );
             }).toList(),
-            if (submission.attachments.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'Attachments:',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
+
+            // Attachments section
+            const SizedBox(height: 24),
+            const Text(
+              'Attachments:',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
               ),
-              const SizedBox(height: 8),
+            ),
+            const SizedBox(height: 8),
+
+            // Debug information
+            Text(
+              'Attachments found: ${submission.attachments.length}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+
+            // Show attachments list if any exist
+            if (hasAttachments)
               ...submission.attachments.map((attachment) {
+                // Extract just the filename for display
+                final fileName = attachment.filePath.split('\\').last;
+
                 return Card(
                   color: Colors.white,
                   elevation: 2,
@@ -131,30 +208,68 @@ class SubmissionDetailScreen extends StatelessWidget {
                   ),
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     leading: Icon(
-                      Icons.attachment,
-                      color: Colors.blue[700],
+                      _getIconForFileType(attachment.filePath),
+                      color: _getColorForFileType(attachment.filePath),
+                      size: 36,
                     ),
                     title: Text(
-                      attachment.filePath,
-                      style: const TextStyle(fontSize: 16),
+                      fileName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: Text(
+                      attachment.isSignature ? 'Signature' : 'Attachment',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.download,
+                      color: Colors.blue[700],
                     ),
                     onTap: () async {
-                      if (attachment.id != null) {
-                        await FormSubmissionViewService().openAttachment(context, attachment.id!);
-                      } else {
+                      try {
+                        if (attachment.id != null) {
+                          print('Opening attachment ${attachment.id}');
+                          await FormSubmissionViewService().openAttachment(context, attachment.id!);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Attachment ID is missing')),
+                          );
+                        }
+                      } catch (e) {
+                        print('Error opening attachment: $e');
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Attachment ID is missing')),
+                          SnackBar(content: Text('Error opening attachment: $e')),
                         );
                       }
                     },
                   ),
                 );
-              }).toList(),
-            ]
-
-
+              }).toList()
+            else
+            // If no attachments, show a message
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'No attachments found for this submission.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -275,6 +390,10 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
+          title: Text(
+            widget.formTitle,
+            style: const TextStyle(color: Colors.black87),
+          ),
         ),
         drawer: DrawerMenu(
           onItemTapped: (index) => Navigator.pop(context),
@@ -512,6 +631,20 @@ class _CustomExpansionCardState extends State<_CustomExpansionCard> {
                                 color: Colors.grey[600],
                               ),
                             ),
+                            if (s.attachments.isNotEmpty) ...[
+                              const SizedBox(width: 12),
+                              Icon(Icons.attachment,
+                                  size: 16, color: Colors.blue[600]),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${s.attachments.length} attachment${s.attachments.length > 1 ? 's' : ''}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue[600],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ],
