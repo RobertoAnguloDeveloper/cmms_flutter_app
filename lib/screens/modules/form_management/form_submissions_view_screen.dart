@@ -228,10 +228,6 @@ class SubmissionDetailScreen extends StatelessWidget {
                         color: Colors.grey[600],
                       ),
                     ),
-                    trailing: Icon(
-                      Icons.download,
-                      color: Colors.blue[700],
-                    ),
                     onTap: () async {
                       try {
                         if (attachment.id != null) {

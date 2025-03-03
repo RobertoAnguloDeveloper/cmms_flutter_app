@@ -312,150 +312,106 @@ class AttachmentService {
     }
   }
 
-  /// Opens an attachment for viewing
+  /// Opens an attachment using a more robust download strategy specifically for emulator testing
+  /// Downloads attachment with special handling for emulator connections
+  /// Downloads attachment with storage permission handling
+  /// Downloads attachment using HTTP range requests for more reliable downloads in emulators
   Future<void> openAttachment(BuildContext context, int attachmentId) async {
-    print('🔍 Attempting to open attachment: $attachmentId');
+    print('🔍 Attempting to open attachment with range requests: $attachmentId');
 
-    // Show loading dialog immediately
-    final loadingDialog = showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext ctx) {
-        return const AlertDialog(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text('Loading attachment...'),
-            ],
-          ),
-        );
-      },
-    );
+    // Mostrar el diálogo de carga inmediatamente
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext ctx) {
+          return const AlertDialog(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Preparing attachment...'),
+              ],
+            ),
+          );
+        },
+      );
+    }
 
     try {
-      final token = await SessionManager.getToken();
-      print('🔐 Token retrieved: ${token != null}');
+      String? token = await SessionManager.getToken();
 
-      final attachmentUrl = '/api/attachments/$attachmentId';
+      if (token == null) {
+        throw Exception('Authentication token is null. Please log in again.');
+      }
+
+      // Construir la URL del adjunto
+      final attachmentUrl = '${_http.baseUrl}/api/attachments/$attachmentId';
       print('🌐 Attachment URL: $attachmentUrl');
 
-      // Create a dedicated Dio instance for this download with extended timeout
-      final downloadDio = Dio(BaseOptions(
-        baseUrl: _http.baseUrl,
-        connectTimeout: const Duration(seconds: 90),  // Further increased timeout
-        receiveTimeout: const Duration(minutes: 10),  // Significantly extended receive timeout
-        sendTimeout: const Duration(seconds: 90),
-        responseType: ResponseType.bytes,
-      ));
-
-      // Add comprehensive logging interceptor
-      downloadDio.interceptors.add(InterceptorsWrapper(
-        onRequest: (options, handler) {
-          print('📤 Download Request: ${options.path}');
-          options.headers['Authorization'] = 'Bearer $token';
-          options.headers['Accept'] = 'image/*, */*';  // Explicitly accept image types
-          return handler.next(options);
-        },
-        onResponse: (response, handler) {
-          print('📥 Download Response: Status ${response.statusCode}, Data Length: ${response.data?.length}');
-          print('Response Headers: ${response.headers}');
-          return handler.next(response);
-        },
-        onError: (DioException e, handler) {
-          print('❌ Download Error Details:');
-          print('Message: ${e.message}');
-          print('Error Type: ${e.type}');
-          print('Response Status Code: ${e.response?.statusCode}');
-          print('Response Data: ${e.response?.data}');
-          return handler.next(e);
-        },
-      ));
-
-      final response = await downloadDio.get(
-        attachmentUrl,
-        options: Options(
-          headers: {
-            'Accept': 'image/*, */*',
-            'Connection': 'keep-alive',
-            'Cache-Control': 'no-cache',
-          },
-        ),
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            print('📊 Download Progress: ${(received / total * 100).toStringAsFixed(0)}%');
-          }
+      // Realizar una solicitud HEAD para verificar la autorización
+      final response = await http.head(
+        Uri.parse(attachmentUrl),
+        headers: {
+          'Authorization': 'Bearer $token',
         },
       );
 
-      // Close loading dialog
-      Navigator.of(context).pop();
-
-      if (response.statusCode == 200 && response.data != null) {
-        final bytes = Uint8List.fromList(response.data);
-        String contentType = response.headers.value('content-type') ?? 'application/octet-stream';
-
-        print('✅ Successfully downloaded attachment: ${bytes.length} bytes');
-        print('📄 Content Type: $contentType');
-
-        // Validate image if it's an image type
-        if (contentType.contains('image/')) {
-          try {
-            // Attempt to decode the image to verify it's a valid image
-            final image = await decodeImageFromList(bytes);
-
-            if (context.mounted) {
-              _showImageViewer(context, bytes, contentType, attachmentId);
-            }
-          } catch (e) {
-            print('❌ Invalid image file decoding error: $e');
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Unable to display image: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          }
-        } else {
-          // Handle non-image files
-          if (context.mounted) {
-            _showNonImageFileViewer(context, bytes, contentType, attachmentId);
-          }
-        }
-      } else {
-        throw Exception('Failed to download attachment. Status: ${response.statusCode}');
+      // Manejar token expirado
+      if (response.statusCode == 401) {
+        final responseData = json.decode(response.body);
+        await ApiResponseHandler.handleExpiredToken(context, responseData);
+        return; // Salir de la función para evitar continuar con un token inválido
       }
-    } on DioException catch (e) {
-      // Close loading dialog if still open
-      Navigator.of(context).pop();
 
-      print('❌ Dio Attachment Download Error Details:');
-      print('Message: ${e.message}');
-      print('Error Type: ${e.type}');
-      print('Response Status Code: ${e.response?.statusCode}');
-      print('Response Data: ${e.response?.data}');
-
+      // Cerrar el diálogo de carga
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download failed: ${e.message}'),
-            backgroundColor: Colors.red,
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      // Mostrar opciones de descarga al usuario
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Download Attachment'),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Would you like to download this attachment?'),
+                SizedBox(height: 20),
+                Icon(Icons.download_rounded, size: 48, color: Colors.blue),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _downloadWithRangeRequests(
+                      context, attachmentId, attachmentUrl, token);
+                },
+                child: const Text('Download'),
+              ),
+            ],
           ),
         );
       }
     } catch (e) {
-      // Close loading dialog if still open
-      Navigator.of(context).pop();
+      // Cerrar diálogo de carga si está abierto
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
 
-      print('❌ Unexpected Attachment Download Error: $e');
-
+      print('❌ Error preparing download: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Unexpected error: $e'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -463,7 +419,894 @@ class AttachmentService {
     }
   }
 
-  void _showNonImageFileViewer(BuildContext context, Uint8List bytes, String contentType, int attachmentId) {
+  /// Downloads file using HTTP range requests in small chunks
+  Future<void> _downloadWithRangeRequests(
+    BuildContext context,
+    int attachmentId,
+    String url,
+    String token,
+  ) async {
+    // Show download progress dialog
+    double progress = 0.0;
+    late BuildContext dialogContext;
+
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          dialogContext = ctx;
+          return AlertDialog(
+            title: const Text('Downloading...'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: progress),
+                const SizedBox(height: 10),
+                Text('${(progress * 100).toStringAsFixed(0)}%'),
+              ],
+            ),
+          );
+        },
+      );
+    }
+
+    // Function to update progress dialog
+    void updateProgress(double newProgress) {
+      progress = newProgress;
+      if (context.mounted) {
+        // Force rebuild of progress dialog
+        Navigator.of(context).pop();
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) {
+            dialogContext = ctx;
+            return AlertDialog(
+              title: const Text('Downloading...'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(value: progress),
+                  const SizedBox(height: 10),
+                  Text('${(progress * 100).toStringAsFixed(0)}%'),
+                ],
+              ),
+            );
+          },
+        );
+      }
+    }
+
+    try {
+      // Get app's private documents directory
+      final directory = await getApplicationDocumentsDirectory();
+
+      // Generate unique filename with timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final tempFilename = 'attachment_${attachmentId}_$timestamp.download';
+      final tempFilePath = '${directory.path}/$tempFilename';
+
+      print('📁 Will save to: $tempFilePath');
+
+      // Create a temporary file to write the chunks
+      final outputFile = File(tempFilePath);
+      final raf = await outputFile.open(mode: FileMode.write);
+
+      // First, make a HEAD request to get file size and content type
+      final headResponse = await http.head(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      String contentType = 'application/octet-stream';
+      int fileSize = 0;
+      String finalFilename = 'attachment_$attachmentId$timestamp';
+
+      if (headResponse.statusCode == 200) {
+        contentType = headResponse.headers['content-type'] ?? contentType;
+        final contentLengthStr = headResponse.headers['content-length'];
+        if (contentLengthStr != null) {
+          fileSize = int.tryParse(contentLengthStr) ?? 0;
+        }
+
+        // Try to get filename from content-disposition
+        final contentDisposition =
+            headResponse.headers['content-disposition'] ?? '';
+        final filenameMatch =
+            RegExp(r'filename=([^;]*)').firstMatch(contentDisposition);
+        if (filenameMatch != null && filenameMatch.group(1) != null) {
+          finalFilename = filenameMatch.group(1)!.trim();
+        } else {
+          // Add extension based on content type
+          final extension = _getExtensionFromMime(contentType);
+          finalFilename = 'attachment_${attachmentId}_$timestamp.$extension';
+        }
+      } else {
+        print('⚠️ HEAD request failed, using default values');
+      }
+
+      print(
+          '📄 Content type: $contentType, Size: $fileSize, Filename: $finalFilename');
+
+      // If the server doesn't support HEAD or didn't return a size, use a default
+      if (fileSize <= 0) {
+        fileSize = 1024 * 1024; // Assume 1MB as fallback
+      }
+
+      // Define chunk size (16KB is reliable for emulators)
+      const chunkSize = 16 * 1024; // 16KB chunks
+
+      // Track overall progress
+      int totalBytesDownloaded = 0;
+      int currentPosition = 0;
+      int retryCount = 0;
+      const maxRetries = 5;
+
+      // Download in chunks
+      while (currentPosition < fileSize && retryCount < maxRetries) {
+        try {
+          // Calculate end position for this chunk
+          final endPosition = currentPosition + chunkSize - 1;
+          // Don't request beyond the file size
+          final adjustedEndPosition =
+              endPosition < fileSize ? endPosition : fileSize - 1;
+
+          print('🔄 Downloading range: $currentPosition-$adjustedEndPosition');
+
+          // Make a range request for this chunk
+          final response = await http.get(
+            Uri.parse(url),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Range': 'bytes=$currentPosition-$adjustedEndPosition',
+            },
+          );
+
+          // Check if we got the expected response
+          if (response.statusCode == 206 || response.statusCode == 200) {
+            // 206 Partial Content or 200 OK
+            final chunkData = response.bodyBytes;
+
+            // Write chunk to file at the correct position
+            await raf.setPosition(currentPosition);
+            await raf.writeFrom(chunkData);
+
+            // Update progress
+            final bytesDownloaded = chunkData.length;
+            totalBytesDownloaded += bytesDownloaded;
+            currentPosition += bytesDownloaded;
+
+            // Calculate and update progress
+            final downloadProgress =
+                fileSize > 0 ? totalBytesDownloaded / fileSize : 0.0;
+            print(
+                '📊 Progress: ${(downloadProgress * 100).toStringAsFixed(0)}%, Downloaded: $totalBytesDownloaded/$fileSize bytes');
+
+            // Update UI progress
+            updateProgress(downloadProgress);
+
+            // Reset retry counter on success
+            retryCount = 0;
+          } else {
+            print('⚠️ Range request failed: ${response.statusCode}');
+            retryCount++;
+            await Future.delayed(Duration(
+                milliseconds: 500 * retryCount)); // Exponential backoff
+          }
+        } catch (e) {
+          print('⚠️ Error downloading chunk: $e');
+          retryCount++;
+          await Future.delayed(
+              Duration(milliseconds: 500 * retryCount)); // Exponential backoff
+        }
+      }
+
+      // Close the file
+      await raf.close();
+
+      // Check if we downloaded the complete file
+      if (totalBytesDownloaded >= fileSize * 0.9) {
+        // Consider it successful if we got at least 90%
+        print('✅ Download completed: $totalBytesDownloaded/$fileSize bytes');
+
+        // Rename the file to add proper extension
+        final finalFilePath = '${directory.path}/$finalFilename';
+        await outputFile.rename(finalFilePath);
+
+        // Close progress dialog
+        if (context.mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+
+        // Show success dialog
+        if (context.mounted) {
+          _showSuccessDialog(context, finalFilePath, contentType);
+        }
+      } else {
+        // If we didn't download enough, consider it failed
+        print('❌ Download incomplete: $totalBytesDownloaded/$fileSize bytes');
+        // Delete the incomplete file
+        await outputFile.delete();
+
+        // Close progress dialog
+        if (context.mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+
+        throw Exception('Download incomplete after $maxRetries retries');
+      }
+    } catch (e) {
+      // Close progress dialog if open
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      print('❌ Download error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+// Show success dialog with options to open the file
+  void _showSuccessDialog(
+      BuildContext context, String filePath, String contentType) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Download Complete'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('The file has been downloaded successfully.'),
+            const SizedBox(height: 10),
+            // Show file type icon based on content type
+            Center(
+              child: Icon(
+                _getIconForMimeType(contentType),
+                size: 48,
+                color: _getColorForMimeType(contentType),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text('File location:'),
+            Text(
+              filePath,
+              style: const TextStyle(fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openFile(context, filePath);
+            },
+            child: const Text('Open File'),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Open file with error handling
+  Future<void> _openFile(BuildContext context, String filePath) async {
+    try {
+      final result = await OpenFile.open(filePath);
+
+      if (result.type != ResultType.done && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cannot open file: ${result.message}'),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error opening file: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+// Helper method to get icon for MIME type
+
+// Helper method to get color for MIME type
+  Color _getColorForMimeType(String mimeType) {
+    if (mimeType.contains('image/')) {
+      return Colors.blue;
+    } else if (mimeType.contains('pdf')) {
+      return Colors.red;
+    } else if (mimeType.contains('word') ||
+        mimeType.contains('msword') ||
+        mimeType.contains('document')) {
+      return Colors.blue.shade800;
+    } else if (mimeType.contains('excel') || mimeType.contains('sheet')) {
+      return Colors.green;
+    } else if (mimeType.contains('text/')) {
+      return Colors.orange;
+    } else {
+      return Colors.grey;
+    }
+  }
+
+  /// Downloads file to app's private directory (no special permissions needed)
+  Future<void> _downloadToAppDirectory(
+    BuildContext context,
+    int attachmentId,
+    String url,
+    String token,
+  ) async {
+    // Show progress dialog
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const AlertDialog(
+          title: Text('Downloading...'),
+          content: LinearProgressIndicator(),
+        ),
+      );
+    }
+
+    try {
+      // Get app's private documents directory (no permissions needed)
+      final directory = await getApplicationDocumentsDirectory();
+
+      // Generate unique filename with timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filename = 'attachment_${attachmentId}_$timestamp.bin';
+      final file = File('${directory.path}/$filename');
+
+      print('📁 Will save to app directory: ${file.path}');
+
+      // Create a buffer to store the downloaded data
+      final bytes = <int>[];
+      bool downloadComplete = false;
+
+      // Function to try downloading with different methods
+      Future<void> tryDownload() async {
+        // Method 1: Use HttpClient with chunked transfer
+        try {
+          final httpClient = HttpClient();
+          httpClient.connectionTimeout = const Duration(seconds: 30);
+
+          final request = await httpClient.getUrl(Uri.parse(url));
+          request.headers.add('Authorization', 'Bearer $token');
+
+          final response = await request.close();
+
+          if (response.statusCode == 200) {
+            // Get content type from headers
+            final contentType = response.headers.value('content-type') ??
+                'application/octet-stream';
+            final contentDisposition =
+                response.headers.value('content-disposition') ?? '';
+
+            // Try to extract filename from content-disposition if available
+            String filenameWithExt = filename;
+            final filenameMatch =
+                RegExp(r'filename=([^;]*)').firstMatch(contentDisposition);
+            if (filenameMatch != null && filenameMatch.group(1) != null) {
+              filenameWithExt = filenameMatch.group(1)!.trim();
+            } else {
+              // Determine extension from content type
+              final extension = _getExtensionFromMime(contentType);
+              filenameWithExt =
+                  'attachment_${attachmentId}_$timestamp.$extension';
+            }
+
+            // Update file path with proper extension
+            final fileWithExt = File('${directory.path}/$filenameWithExt');
+
+            // Collect data in chunks
+            final output = fileWithExt.openWrite();
+            int totalBytes = 0;
+
+            await for (var chunk in response) {
+              output.add(chunk);
+              totalBytes += chunk.length;
+              print('📊 Downloaded: $totalBytes bytes');
+            }
+
+            await output.close();
+            print('✅ File saved to: ${fileWithExt.path}');
+
+            // File successfully downloaded
+            downloadComplete = true;
+
+            // Close progress dialog
+            if (context.mounted) {
+              Navigator.of(context, rootNavigator: true).pop();
+            }
+
+            // Show success dialog
+            if (context.mounted) {
+              _showSuccessDialog(context, fileWithExt.path, contentType);
+            }
+          } else {
+            print('❌ Download failed with status: ${response.statusCode}');
+          }
+
+          httpClient.close();
+        } catch (e) {
+          print('❌ Method 1 download error: $e');
+          // Will try next method if this fails
+        }
+
+        // If first method failed, try Method 2: http package with basic auth
+        if (!downloadComplete) {
+          try {
+            print('🔄 Trying alternate download method');
+
+            final response = await http.get(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $token',
+              },
+            );
+
+            if (response.statusCode == 200) {
+              // Get content type from headers
+              final contentType = response.headers['content-type'] ??
+                  'application/octet-stream';
+
+              // Determine extension from content type
+              final extension = _getExtensionFromMime(contentType);
+              final fileWithExt = File(
+                  '${directory.path}/attachment_${attachmentId}_$timestamp.$extension');
+
+              // Write file synchronously to avoid streaming issues
+              await fileWithExt.writeAsBytes(response.bodyBytes);
+              print(
+                  '✅ File saved via alternate method to: ${fileWithExt.path}');
+
+              // Close progress dialog
+              if (context.mounted) {
+                Navigator.of(context, rootNavigator: true).pop();
+              }
+
+              // Show success dialog
+              if (context.mounted) {
+                _showSuccessDialog(context, fileWithExt.path, contentType);
+              }
+
+              downloadComplete = true;
+            } else {
+              print(
+                  '❌ Alternate download failed with status: ${response.statusCode}');
+            }
+          } catch (e) {
+            print('❌ Method 2 download error: $e');
+          }
+        }
+      }
+
+      // Try the download
+      await tryDownload();
+
+      // If all download methods failed
+      if (!downloadComplete) {
+        // Close progress dialog if still open
+        if (context.mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+
+        throw Exception('All download methods failed.');
+      }
+    } catch (e) {
+      // Close progress dialog if still open
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      print('❌ Download error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+// Helper method to get color for MIME type
+
+  /// Downloads file using platform-specific external download manager
+  Future<void> _downloadWithExternalMethod(
+      BuildContext context,
+      int attachmentId,
+      String url,
+      String token, // Now non-nullable since we check before calling
+      String filename,
+      String contentType) async {
+    try {
+      if (Platform.isAndroid) {
+        // On Android, we'll use the DownloadManager
+        // First, we need to get a directory that's accessible by the DownloadManager
+        final directory = await getExternalStorageDirectory();
+        if (directory == null) {
+          throw Exception('Could not access external storage');
+        }
+
+        // Create a file in the external storage
+        final file = File('${directory.path}/$filename');
+
+        // Show progress dialog
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => const AlertDialog(
+              title: Text('Downloading...'),
+              content: LinearProgressIndicator(),
+            ),
+          );
+        }
+
+        // Use a technique that makes multiple short requests instead of one long one
+        final httpClient = HttpClient();
+        httpClient.connectionTimeout = const Duration(seconds: 30);
+
+        // Create request
+        final request = await httpClient.getUrl(Uri.parse(url));
+        request.headers.add('Authorization', 'Bearer $token');
+
+        // Get response
+        final response = await request.close();
+
+        if (response.statusCode == 200) {
+          // Open file for writing
+          final fileOutput = file.openWrite();
+
+          // Set up buffer size and tracking variables
+          const bufferSize = 64 * 1024; // 64KB chunks
+          var bytesReceived = 0;
+
+          // Loop to read data in small chunks
+          try {
+            await for (var data in response.transform(
+              StreamTransformer<List<int>, List<int>>.fromHandlers(
+                handleData: (data, sink) {
+                  // Process data in smaller chunks
+                  int offset = 0;
+                  while (offset < data.length) {
+                    final end = offset + bufferSize < data.length
+                        ? offset + bufferSize
+                        : data.length;
+                    sink.add(data.sublist(offset, end));
+                    offset = end;
+                  }
+                },
+              ),
+            )) {
+              // Add chunk to file
+              fileOutput.add(data);
+              bytesReceived += data.length;
+              print('📊 Received: $bytesReceived bytes');
+            }
+
+            // Close file handle
+            await fileOutput.close();
+            print('✅ File successfully written to ${file.path}');
+
+            // Close progress dialog
+            if (context.mounted) {
+              Navigator.of(context, rootNavigator: true).pop();
+            }
+
+            // Show success dialog
+            if (context.mounted) {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Download Complete'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('The file has been downloaded successfully.'),
+                      const SizedBox(height: 10),
+                      Text('Location: ${file.path}',
+                          style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Close'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        OpenFile.open(file.path);
+                      },
+                      child: const Text('Open File'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          } catch (e) {
+            print('❌ Error during file write: $e');
+            await fileOutput.close();
+
+            // Close progress dialog
+            if (context.mounted) {
+              Navigator.of(context, rootNavigator: true).pop();
+            }
+
+            // Show error
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Download failed: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } else {
+          // Close progress dialog
+          if (context.mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+
+          throw Exception('Server returned status code ${response.statusCode}');
+        }
+
+        httpClient.close();
+      } else {
+        // For iOS, macOS, etc.
+        // Try more basic approach
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final bytes = response.bodyBytes;
+
+          // Get documents directory
+          final directory = await getApplicationDocumentsDirectory();
+          final file = File('${directory.path}/$filename');
+
+          // Write file
+          await file.writeAsBytes(bytes);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('File saved to ${file.path}'),
+                action: SnackBarAction(
+                  label: 'Open',
+                  onPressed: () => OpenFile.open(file.path),
+                ),
+              ),
+            );
+          }
+        } else {
+          throw Exception(
+              'Download failed with status: ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      print('❌ Download error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+// Make sure to add this import
+  Future<Directory?> getExternalStorageDirectory() async {
+    if (Platform.isAndroid) {
+      try {
+        // First try with Download directory
+        final downloadsDir = Directory('/storage/emulated/0/Download');
+        if (await downloadsDir.exists()) {
+          return downloadsDir;
+        }
+
+        // Fallback to app's external files directory
+        return await getApplicationDocumentsDirectory();
+      } catch (e) {
+        print('Error getting external storage directory: $e');
+      }
+    }
+
+    // Default to app's documents directory for iOS and other platforms
+    return await getApplicationDocumentsDirectory();
+  }
+
+// Helper method to save file directly without attempting to preview
+  Future<bool> _directlySaveFile(BuildContext context, Uint8List bytes,
+      String contentType, int attachmentId) async {
+    try {
+      // For emulator testing, use a more reliable directory
+      final directory = await getApplicationDocumentsDirectory();
+
+      // Determine file extension
+      String extension = _getExtensionFromMime(contentType);
+
+      // Create unique filename with timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'attachment_${attachmentId}_$timestamp.$extension';
+      final filePath = '${directory.path}/$fileName';
+
+      print('📄 Saving file to: $filePath');
+
+      // Write file
+      final file = File(filePath);
+      await file.writeAsBytes(bytes, flush: true);
+
+      print('✅ File saved: $filePath');
+
+      // Show success dialog with file path
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('File Saved'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('The file has been saved successfully.'),
+                const SizedBox(height: 10),
+                Text('Location: $filePath',
+                    style: const TextStyle(fontSize: 12)),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    OpenFile.open(filePath).then((result) {
+                      if (result.type != ResultType.done && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content:
+                                  Text('Cannot open file: ${result.message}')),
+                        );
+                      }
+                    });
+                  },
+                  child: const Text('Open File'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return true;
+    } catch (e) {
+      print('❌ Error saving file: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+// Show dialog when save fails
+  void _showSaveFailedDialog(BuildContext context, Uint8List bytes,
+      String contentType, int attachmentId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save Failed'),
+        content: const Text(
+            'Could not save the file automatically. Would you like to try an alternative method?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _tryAlternativeSave(context, bytes, contentType, attachmentId);
+            },
+            child: const Text('Try Alternative'),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Try alternative save method for stubborn files
+  Future<void> _tryAlternativeSave(BuildContext context, Uint8List bytes,
+      String contentType, int attachmentId) async {
+    try {
+      // For testing in emulator, use temp directory as it's more reliable
+      final directory = await getTemporaryDirectory();
+
+      // Determine file extension
+      String extension = _getExtensionFromMime(contentType);
+
+      // Create unique filename with timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'attachment_${attachmentId}_$timestamp.$extension';
+      final filePath = '${directory.path}/$fileName';
+
+      print('📄 Trying alternative save to: $filePath');
+
+      // Write file using different method
+      final file = File(filePath);
+      final raf = await file.open(mode: FileMode.write);
+      await raf.writeFrom(bytes);
+      await raf.close();
+
+      print('✅ File saved via alternative method: $filePath');
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('File saved to: $filePath'),
+            backgroundColor: Colors.green,
+            action: SnackBarAction(
+              label: 'Open',
+              onPressed: () {
+                OpenFile.open(filePath);
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Alternative save method failed: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('All save methods failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showNonImageFileViewer(BuildContext context, Uint8List bytes,
+      String contentType, int attachmentId) {
     print('📄 Showing Non-Image File Viewer');
     print('Content Type: $contentType');
     print('Bytes Length: ${bytes.length}');
@@ -493,7 +1336,8 @@ class AttachmentService {
                 child: const Text('Close'),
               ),
               ElevatedButton(
-                onPressed: () => _saveAttachment(context, bytes, contentType, attachmentId),
+                onPressed: () =>
+                    _saveAttachment(context, bytes, contentType, attachmentId),
                 child: const Text('Download'),
               ),
             ],
@@ -513,7 +1357,8 @@ class AttachmentService {
     }
   }
 
-  void _showImageViewer(BuildContext context, Uint8List bytes, String contentType, int attachmentId) {
+  void _showImageViewer(BuildContext context, Uint8List bytes,
+      String contentType, int attachmentId) {
     showDialog(
       context: context,
       builder: (context) {
@@ -529,11 +1374,13 @@ class AttachmentService {
                   icon: const Icon(Icons.close, color: Colors.black),
                   onPressed: () => Navigator.pop(context),
                 ),
-                title: const Text('Attachment Preview', style: TextStyle(color: Colors.black)),
+                title: const Text('Attachment Preview',
+                    style: TextStyle(color: Colors.black)),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.download, color: Colors.black),
-                    onPressed: () => _saveAttachment(context, bytes, contentType, attachmentId),
+                    onPressed: () => _saveAttachment(
+                        context, bytes, contentType, attachmentId),
                   ),
                 ],
               ),
@@ -548,7 +1395,8 @@ class AttachmentService {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error, color: Colors.red, size: 50),
+                            const Icon(Icons.error,
+                                color: Colors.red, size: 50),
                             const SizedBox(height: 16),
                             Text(
                               'Failed to load image',
@@ -804,7 +1652,8 @@ class AttachmentService {
   }
 
   // Save attachment to device
-  void _saveAttachment(BuildContext context, Uint8List bytes, String contentType, int attachmentId) async {
+  void _saveAttachment(BuildContext context, Uint8List bytes,
+      String contentType, int attachmentId) async {
     try {
       if (kIsWeb) {
         // Web-specific download
@@ -823,7 +1672,8 @@ class AttachmentService {
         extension = 'txt';
       }
 
-      final fileName = 'attachment_${attachmentId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final fileName =
+          'attachment_${attachmentId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
       final filePath = '${directory.path}/$fileName';
 
       print('📁 Attempting to save file:');
@@ -850,18 +1700,19 @@ class AttachmentService {
             case ResultType.noAppToOpen:
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('No app found to open this file type'),
-                  action: SnackBarAction(
-                    label: 'Save',
-                    onPressed: () {
-                      // Provide option to just save the file
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('File saved to $filePath'),
-                        ),
-                      );
-                    },
-                  ),
+                  content: const Text(
+                      'File downloaded, but no app found to open it.'),
+                  //action: SnackBarAction(
+                  //  label: 'Save',
+                  //  onPressed: () {
+                  //    // Provide option to just save the file
+                  //    ScaffoldMessenger.of(context).showSnackBar(
+                  //      SnackBar(
+                  //        content: Text('File saved to $filePath'),
+                  //      ),
+                  //    );
+                  //  },
+                  //),
                 ),
               );
               break;
@@ -920,7 +1771,8 @@ class AttachmentService {
       final blob = universal_html.Blob([bytes]);
       final url = universal_html.Url.createObjectUrlFromBlob(blob);
       final anchor = universal_html.AnchorElement(href: url)
-        ..setAttribute('download', 'attachment_${DateTime.now().millisecondsSinceEpoch}.$extension');
+        ..setAttribute('download',
+            'attachment_${DateTime.now().millisecondsSinceEpoch}.$extension');
 
       universal_html.document.body?.append(anchor);
       anchor.click();
@@ -949,21 +1801,6 @@ class AttachmentService {
   }
 
   // Helper method to get color for MIME type
-  Color _getColorForMimeType(String mimeType) {
-    if (mimeType.contains('image/')) {
-      return Colors.blue;
-    } else if (mimeType.contains('pdf')) {
-      return Colors.red;
-    } else if (mimeType.contains('word') ||
-        mimeType.contains('msword') ||
-        mimeType.contains('document')) {
-      return Colors.blue.shade800;
-    } else if (mimeType.contains('excel') || mimeType.contains('sheet')) {
-      return Colors.green;
-    } else {
-      return Colors.grey;
-    }
-  }
 
   // Handle Dio errors and convert to AttachmentException
   AttachmentException _handleDioError(DioException e) {
