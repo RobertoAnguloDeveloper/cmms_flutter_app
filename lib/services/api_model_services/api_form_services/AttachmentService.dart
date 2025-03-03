@@ -136,6 +136,32 @@ class AttachmentService {
     }
   }
 
+  Future<Map<String, dynamic>> uploadSignature(
+      BuildContext context,
+      int formSubmissionId,
+      File file,
+      ) async {
+    return createAttachment(
+      context,
+      formSubmissionId,
+      file,
+      true, // Set isSignature to true
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadSignatureAttachment(
+      BuildContext context,
+      int formSubmissionId,
+      File file,
+      ) async {
+    return createAttachment(
+      context,
+      formSubmissionId,
+      file,
+      true, // isSignature set to true
+    );
+  }
+
   // Fetch attachments with filters
   Future<Map<String, dynamic>> fetchAttachments(
       BuildContext context, {

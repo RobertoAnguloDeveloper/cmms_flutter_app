@@ -1,34 +1,44 @@
-// lib/screens/modules/form_submission/Components/CustomSignaturePad.dart
+// lib/widgets/signature_pad.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../../../utils/signature_utils.dart';
+import '../services/signature_utils_service.dart';
 
-class CustomSignaturePad extends StatefulWidget {
-  final Function(File?)? onSignatureCaptured;
+class SignaturePad extends StatefulWidget {
+  final Function(File? file) onSignatureCaptured;
   final double height;
+  final bool showActions;
+  final String? initialSignaturePath;
 
-  const CustomSignaturePad({
+  const SignaturePad({
     Key? key,
-    this.onSignatureCaptured,
+    required this.onSignatureCaptured,
     this.height = 200,
+    this.showActions = true,
+    this.initialSignaturePath,
   }) : super(key: key);
 
   @override
-  CustomSignaturePadState createState() => CustomSignaturePadState();
+  SignaturePadState createState() => SignaturePadState();
 }
 
-class CustomSignaturePadState extends State<CustomSignaturePad> {
+class SignaturePadState extends State<SignaturePad> {
   final GlobalKey _signatureKey = GlobalKey();
   final List<List<Offset>> _strokes = <List<Offset>>[];
   List<Offset>? _currentStroke;
-  File? _signatureFile;
+  String? _savedSignaturePath;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _savedSignaturePath = widget.initialSignaturePath;
+  }
 
   bool get isEmpty => _strokes.isEmpty;
 
-  Future<File?> captureSignature() async {
+  Future<void> captureAndSaveSignature() async {
     if (_strokes.isEmpty) {
-      return null;
+      return;
     }
 
     setState(() {
@@ -36,16 +46,16 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
     });
 
     try {
-      final file = await SignatureUtils.exportSignature(_signatureKey);
+      final fileName = SignatureUtilsService.generateSignatureFileName();
+      final file = await SignatureUtilsService.saveSignature(_signatureKey, fileName);
+
       if (file != null) {
         setState(() {
-          _signatureFile = file;
+          _savedSignaturePath = file.path;
         });
-        if (widget.onSignatureCaptured != null) {
-          widget.onSignatureCaptured!(file);
-        }
+
+        widget.onSignatureCaptured(file);
       }
-      return file;
     } finally {
       setState(() {
         _isLoading = false;
@@ -57,11 +67,9 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
     setState(() {
       _strokes.clear();
       _currentStroke = null;
-      _signatureFile = null;
-      if (widget.onSignatureCaptured != null) {
-        widget.onSignatureCaptured!(null);
-      }
+      _savedSignaturePath = null;
     });
+    widget.onSignatureCaptured(null);
   }
 
   @override
@@ -107,33 +115,37 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
             ),
           ),
 
-        const SizedBox(height: 16),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            ElevatedButton.icon(
-              onPressed: clear,
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              label: const Text('Clear', style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[700],
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: isEmpty ? null : captureSignature,
-              icon: const Icon(Icons.check, color: Colors.white),
-              label: const Text('Save Signature', style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isEmpty ? Colors.grey : Colors.blue,
-              ),
-            ),
-          ],
-        ),
-
-        if (_signatureFile != null) ...[
+        if (widget.showActions) ...[
           const SizedBox(height: 16),
-          const Text('Captured Signature:', style: TextStyle(fontWeight: FontWeight.bold)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton.icon(
+                onPressed: clear,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Clear'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[700],
+                  foregroundColor: Colors.white,
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _strokes.isEmpty ? null : captureAndSaveSignature,
+                icon: const Icon(Icons.save),
+                label: const Text('Save Signature'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ],
+
+        // Show the saved signature if available
+        if (_savedSignaturePath != null) ...[
+          const SizedBox(height: 16),
+          const Text('Saved Signature:', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Container(
             height: 100,
@@ -144,7 +156,7 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(7),
               child: Image.file(
-                _signatureFile!,
+                File(_savedSignaturePath!),
                 fit: BoxFit.contain,
               ),
             ),

@@ -220,6 +220,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       final int submissionId = submissionResult['submission_id'];
       print('Extracted submission ID: $submissionId');
 
+      // Process and upload files including signatures
       if (_attachedFiles.isNotEmpty) {
         setState(() {
           _isUploadingFiles = true;
@@ -228,77 +229,59 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         });
 
         final failedUploads = <String>[];
-        final filesData = _attachedFiles.map((filePath) => {
-          'file': File(filePath),
-          'is_signature': false,
-        }).toList();
 
-        try {
-          if (filesData.length > 1) {
-            final uploadResponse = await _attachmentService.bulkCreateAttachments(
-              context,
-              submissionId,
-              filesData,
-            );
+        for (var filePath in _attachedFiles) {
+          try {
+            final fileExt = path.extension(filePath).toLowerCase();
+            final isSignature = filePath.contains("signature_");
 
-            if (uploadResponse['attachments'] != null) {
-              setState(() {
-                _uploadedFiles = _totalFiles;
-              });
-            }
-          } else {
-            for (var filePath in _attachedFiles) {
-              try {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Uploading ${path.basename(filePath)}...'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-
-                final uploadResponse = await _attachmentService.createAttachment(
-                  context,
-                  submissionId,
-                  File(filePath),
-                  false,
-                );
-
-                if (uploadResponse['attachment'] != null) {
-                  setState(() {
-                    _uploadedFiles++;
-                  });
-                } else {
-                  throw Exception('Invalid server response');
-                }
-              } catch (e) {
-                failedUploads.add(path.basename(filePath));
-              }
-            }
-          }
-
-          if (failedUploads.isNotEmpty) {
-            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Failed to upload: ${failedUploads.join(", ")}'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 3),
+                content: Text('Uploading ${path.basename(filePath)}...'),
+                duration: const Duration(seconds: 1),
               ),
             );
+
+            final uploadResponse = isSignature
+                ? await _attachmentService.createAttachment(
+              context,
+              submissionId,
+              File(filePath),
+              true, // isSignature = true
+            )
+                : await _attachmentService.createAttachment(
+              context,
+              submissionId,
+              File(filePath),
+              false, // isSignature = false
+            );
+
+            if (uploadResponse['attachment'] != null) {
+              setState(() {
+                _uploadedFiles++;
+              });
+            } else {
+              throw Exception('Invalid server response');
+            }
+          } catch (e) {
+            failedUploads.add(path.basename(filePath));
           }
-        } catch (e) {
-          print('Error uploading files: $e');
+        }
+
+        if (failedUploads.isNotEmpty) {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error uploading files: $e'),
-              backgroundColor: Colors.red,
+              content: Text('Failed to upload: ${failedUploads.join(", ")}'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
             ),
           );
-        } finally {
-          setState(() {
-            _isUploadingFiles = false;
-          });
         }
+
+        setState(() {
+          _isUploadingFiles = false;
+        });
       }
 
       List<Map<String, dynamic>> formattedSubmissions = [];
@@ -498,22 +481,26 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
   Widget _buildAnswerField(Map<String, dynamic> question) {
     final questionType = question['type']?.toString().toLowerCase() ?? '';
+    final questionId = question['id'];
 
     if (questionType == 'signature') {
-      return Column(
-        children: [
-          const CustomSignaturePad(),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: () {
-              final padState =
-              context.findAncestorStateOfType<CustomSignaturePadState>();
-              padState?.clear();
-            },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Clear'),
-          ),
-        ],
+      return CustomSignaturePad(
+        onSignatureCaptured: (file) {
+          if (file != null) {
+            setState(() {
+              answers[questionId] = file.path; // Store the file path in answers
+              _attachedFiles.add(file.path); // Add to attached files for uploading
+            });
+          } else {
+            setState(() {
+              if (answers.containsKey(questionId)) {
+                // If there's a previous signature file path, remove it from attachments
+                _attachedFiles.remove(answers[questionId]);
+                answers.remove(questionId);
+              }
+            });
+          }
+        },
       );
     }
 

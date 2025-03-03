@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 class FormAnswerDialog extends StatefulWidget {
@@ -14,6 +16,14 @@ class FormAnswerDialog extends StatefulWidget {
 
 class _FormAnswerDialogState extends State<FormAnswerDialog> {
   Map<int, dynamic> answers = {};
+  Map<int, File> _signatureFiles = {};
+
+  // Add this handler function
+  void _handleSignatureCaptured(int questionId, File file) {
+    setState(() {
+      _signatureFiles[questionId] = file;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
