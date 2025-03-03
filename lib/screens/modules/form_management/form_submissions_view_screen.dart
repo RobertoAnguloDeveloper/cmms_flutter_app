@@ -651,15 +651,15 @@ class _CustomExpansionCardState extends State<_CustomExpansionCard> {
                     ),
                   ),
                   // Expand arrow
-                  IconButton(
-                    icon: Icon(
-                      _expanded
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                      color: Colors.blue,
-                    ),
-                    onPressed: _toggleExpand,
-                  )
+                  //IconButton(
+                  //  icon: Icon(
+                  //    _expanded
+                  //        ? Icons.keyboard_arrow_up
+                  //        : Icons.keyboard_arrow_down,
+                  //    color: Colors.blue,
+                  //  ),
+                  //  onPressed: _toggleExpand,
+                  //)
                 ],
               ),
             ),

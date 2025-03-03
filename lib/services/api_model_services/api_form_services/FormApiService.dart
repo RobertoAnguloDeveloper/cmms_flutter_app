@@ -7,7 +7,7 @@ import '../../api_session_client_services/Http.dart';
 import '../../api_session_client_services/SessionManager.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:open_filex/open_filex.dart';
+import 'package:open_file/open_file.dart';
 
 class FormApiService {
   // GET ALL FORMS
@@ -338,7 +338,7 @@ class FormApiService {
         );
 
         // Attempt to open the file
-        final openResult = await OpenFilex.open(filePath);
+        final openResult = await OpenFile.open(filePath);
         if (openResult.type != ResultType.done) {
           // If it fails, let the user know
           ScaffoldMessenger.of(context).showSnackBar(
@@ -365,7 +365,7 @@ class FormApiService {
 
   Future<bool> _showSaveDialog(BuildContext context, String filePath) async {
     try {
-      await OpenFilex.open(filePath);
+      await OpenFile.open(filePath);
       return true;
     } catch (e) {
       if (!context.mounted) return false;

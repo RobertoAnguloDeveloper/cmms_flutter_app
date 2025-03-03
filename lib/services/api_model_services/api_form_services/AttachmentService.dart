@@ -16,7 +16,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:open_filex/open_filex.dart';
+import 'package:open_file/open_file.dart';
 import 'package:universal_html/html.dart' as universal_html;
 
 import '../../../models/attachment/attachment.dart';
@@ -673,9 +673,11 @@ class AttachmentService {
         return 'pdf';
       case 'application/msword':
       case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      case 'application/docx': // Maneja el caso del servidor
         return 'docx';
       case 'application/vnd.ms-excel':
       case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      case 'application/xlsx':
         return 'xlsx';
       default:
         return 'bin';
@@ -838,7 +840,7 @@ class AttachmentService {
 
         if (context.mounted) {
           // Automatically try to open the file
-          final result = await OpenFilex.open(filePath);
+          final result = await OpenFile.open(filePath);
 
           // Check the result of opening the file
           switch (result.type) {
