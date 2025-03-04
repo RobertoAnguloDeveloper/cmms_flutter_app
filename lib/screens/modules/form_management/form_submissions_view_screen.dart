@@ -69,6 +69,31 @@ class SubmissionDetailScreen extends StatelessWidget {
     }
   }
 
+  List<AnswerView> _processAnswers(List<AnswerView> answers) {
+    // Mapa para agrupar respuestas por pregunta
+    final Map<String, AnswerView> groupedAnswers = {};
+
+    for (var answer in answers) {
+      final key = answer.question;
+      final isCheckbox = answer.questionType.toLowerCase() == 'checkbox';
+
+      if (isCheckbox && groupedAnswers.containsKey(key)) {
+        // Si ya existe esta pregunta y es checkbox, agregamos la respuesta actual a la existente
+        final existingAnswer = groupedAnswers[key]!;
+        groupedAnswers[key] = AnswerView(
+          question: existingAnswer.question,
+          questionType: existingAnswer.questionType,
+          answer: existingAnswer.answer + ', ' + answer.answer,
+        );
+      } else {
+        // Si no existe esta pregunta o no es checkbox, la agregamos normalmente
+        groupedAnswers[key] = answer;
+      }
+    }
+
+    // Convertimos el mapa de respuestas agrupadas a una lista
+    return groupedAnswers.values.toList();
+  }
   @override
   Widget build(BuildContext context) {
     // Debug flag to help troubleshoot
@@ -144,7 +169,9 @@ class SubmissionDetailScreen extends StatelessWidget {
 
             // Form answers
             const SizedBox(height: 16),
-            ...submission.answers.map((answer) {
+            ..._processAnswers(submission.answers
+                .where((answer) => answer.questionType.toLowerCase() != 'signature')
+                .toList()).map((processedAnswer) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
@@ -156,23 +183,53 @@ class SubmissionDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      answer.question,
+                      processedAnswer.question,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      answer.answer,
-                      style: const TextStyle(fontSize: 16),
-                    ),
+                    const SizedBox(height: 12),
+                    if (processedAnswer.questionType.toLowerCase() == 'checkbox' &&
+                        processedAnswer.answer.contains(','))
+                    // Para respuestas tipo checkbox con múltiples opciones
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: processedAnswer.answer.split(',').map((option) {
+                          final trimmedOption = option.trim();
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.check_circle, size: 18, color: Colors.blue),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    trimmedOption,
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      )
+                    else
+                    // Para respuestas no-checkbox o checkbox con una sola opción
+                      Text(
+                        processedAnswer.answer,
+                        style: const TextStyle(fontSize: 16),
+                      ),
                   ],
                 ),
               );
             }).toList(),
 
-            // Attachments section
+            /// Código para mostrar attachments con las firmas al final
+// Reemplaza la sección actual de attachments con este código
+
+// Attachments section
             const SizedBox(height: 24),
             const Text(
               'Attachments:',
@@ -184,7 +241,7 @@ class SubmissionDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Debug information
+// Debug information
             Text(
               'Attachments found: ${submission.attachments.length}',
               style: TextStyle(
@@ -194,62 +251,98 @@ class SubmissionDetailScreen extends StatelessWidget {
               ),
             ),
 
-            // Show attachments list if any exist
+// Show attachments list if any exist
             if (hasAttachments)
-              ...submission.attachments.map((attachment) {
-                // Extract just the filename for display
-                final fileName = attachment.filePath.split('\\').last;
+              ...(() {
+                // Ordenar los attachments - primero los normales, luego las firmas
+                final sortedAttachments = [...submission.attachments];
+                sortedAttachments.sort((a, b) {
+                  // Si a es signature y b no, a va después (1)
+                  // Si b es signature y a no, b va después (-1)
+                  // Si ambos son signature o ambos no lo son, mantener el orden original (0)
+                  if (a.isSignature && !b.isSignature) return 1;
+                  if (!a.isSignature && b.isSignature) return -1;
+                  return 0;
+                });
 
-                return Card(
-                  color: Colors.white,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: Icon(
-                      _getIconForFileType(attachment.filePath),
-                      color: _getColorForFileType(attachment.filePath),
-                      size: 36,
+                return sortedAttachments.map((attachment) {
+                  // Extract just the filename for display
+                  final fileName = attachment.filePath.split('\\').last;
+
+                  // Buscar la pregunta relacionada con esta firma si es una firma
+                  String displayTitle = fileName;
+                  String subtitleText = attachment.isSignature ? 'Signature' : 'Attachment';
+
+                  if (attachment.isSignature) {
+                    // Buscar la pregunta de tipo signature relacionada con esta firma
+                    final signatureQuestion = submission.answers.firstWhere(
+                            (answer) => answer.questionType.toLowerCase() == 'signature' &&
+                            answer.question.isNotEmpty,
+                        orElse: () => AnswerView(question: '', questionType: '', answer: '')
+                    );
+
+                    // Si encontramos una pregunta relacionada, mostrar "Signature by: [nombre]"
+                    if (signatureQuestion.question.isNotEmpty) {
+                      displayTitle = 'Signature by: ${signatureQuestion.question}';
+                      subtitleText = 'Electronic Signature';
+                    }
+                  }
+
+                  return Card(
+                    color: Colors.white,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    title: Text(
-                      fileName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: Icon(
+                        attachment.isSignature
+                            ? Icons.draw // Icono específico para firmas
+                            : _getIconForFileType(attachment.filePath),
+                        color: attachment.isSignature
+                            ? Colors.blue.shade700 // Color específico para firmas
+                            : _getColorForFileType(attachment.filePath),
+                        size: 36,
                       ),
-                    ),
-                    subtitle: Text(
-                      attachment.isSignature ? 'Signature' : 'Attachment',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
+                      title: Text(
+                        displayTitle,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    onTap: () async {
-                      try {
-                        if (attachment.id != null) {
-                          print('Opening attachment ${attachment.id}');
-                          await FormSubmissionViewService().openAttachment(context, attachment.id!);
-                        } else {
+                      subtitle: Text(
+                        subtitleText,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      onTap: () async {
+                        try {
+                          if (attachment.id != null) {
+                            print('Opening attachment ${attachment.id}');
+                            await FormSubmissionViewService().openAttachment(context, attachment.id!);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Attachment ID is missing')),
+                            );
+                          }
+                        } catch (e) {
+                          print('Error opening attachment: $e');
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Attachment ID is missing')),
+                            SnackBar(content: Text('Error opening attachment: $e')),
                           );
                         }
-                      } catch (e) {
-                        print('Error opening attachment: $e');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error opening attachment: $e')),
-                        );
-                      }
-                    },
-                  ),
-                );
-              }).toList()
+                      },
+                    ),
+                  );
+                }).toList();
+              })()
             else
-            // If no attachments, show a message
+// If no attachments, show a message
               Container(
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.all(16),
