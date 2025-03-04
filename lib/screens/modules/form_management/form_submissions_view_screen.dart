@@ -94,6 +94,7 @@ class SubmissionDetailScreen extends StatelessWidget {
     // Convertimos el mapa de respuestas agrupadas a una lista
     return groupedAnswers.values.toList();
   }
+
   @override
   Widget build(BuildContext context) {
     // Debug flag to help troubleshoot
@@ -119,7 +120,10 @@ class SubmissionDetailScreen extends StatelessWidget {
         permissionSet: permissionSet,
         sessionData: sessionData,
       ),
-      body: Container(
+      body: // Versión corregida de la parte del ListView para evitar respuestas duplicadas
+// Reemplaza todo el bloque del ListView en el método build con este código
+
+      Container(
         color: const Color(0xFFE3F2FD),
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -167,11 +171,12 @@ class SubmissionDetailScreen extends StatelessWidget {
               ),
             ),
 
-            // Form answers
+            // Form answers - ESTA ES LA ÚNICA SECCIÓN DE RESPUESTAS
             const SizedBox(height: 16),
             ..._processAnswers(submission.answers
                 .where((answer) => answer.questionType.toLowerCase() != 'signature')
-                .toList()).map((processedAnswer) {
+                .toList())
+                .map((processedAnswer) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
@@ -226,73 +231,72 @@ class SubmissionDetailScreen extends StatelessWidget {
               );
             }).toList(),
 
-            /// Código para mostrar attachments con las firmas al final
-// Reemplaza la sección actual de attachments con este código
+            // Usar método construido para generar widgets en función de las condiciones
+            ...(() {
+              // Primero comprobamos si hay firmas o adjuntos
+              final signatures = submission.attachments.where((a) => a.isSignature).toList();
+              final regularAttachments = submission.attachments.where((a) => !a.isSignature).toList();
+              final hasSignatures = signatures.isNotEmpty;
+              final hasRegularAttachments = regularAttachments.isNotEmpty;
 
-// Attachments section
-            // Código para mostrar "Signature by: [Nombre]" en los attachments tipo firma
-// Reemplaza la sección actual de attachments con este código
+              // Lista para almacenar todos los widgets a retornar
+              final List<Widget> attachmentWidgets = [];
 
-// Attachments section
-            const SizedBox(height: 24),
-            const Text(
-              'Attachments:',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-              ),
-            ),
-            const SizedBox(height: 8),
+              // Sección de Signatures
+              // Versión mejorada para identificar correctamente el nombre de cada firma
+// Modifica solo la parte de las firmas en la sección de adjuntos
 
-// Debug information
-            Text(
-              'Attachments found: ${submission.attachments.length}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                fontStyle: FontStyle.italic,
-              ),
-            ),
+// Sección de Signatures
+              if (hasSignatures) {
+                attachmentWidgets.add(const SizedBox(height: 24));
+                attachmentWidgets.add(const Text(
+                  'Signatures:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ));
+                attachmentWidgets.add(const SizedBox(height: 8));
 
-// Show attachments list if any exist
-            if (hasAttachments)
-              ...(() {
-                // Ordenar los attachments - primero las firmas, luego los normales
-                final sortedAttachments = [...submission.attachments];
-                sortedAttachments.sort((a, b) {
-                  // Si a es signature y b no, a va primero (-1)
-                  // Si b es signature y a no, b va primero (1)
-                  // Si ambos son signature o ambos no lo son, mantener el orden original (0)
-                  if (a.isSignature && !b.isSignature) return -1;
-                  if (!a.isSignature && b.isSignature) return 1;
-                  return 0;
-                });
+                // Obtener todas las preguntas tipo signature
+                final signatureQuestions = submission.answers
+                    .where((answer) => answer.questionType.toLowerCase() == 'signature')
+                    .toList();
 
-                return sortedAttachments.map((attachment) {
-                  // Extract just the filename for display
-                  final fileName = attachment.filePath.split('\\').last;
+                // Añadir cada firma a la lista de widgets
+                for (int i = 0; i < signatures.length; i++) {
+                  final signature = signatures[i];
 
-                  // Buscar la pregunta relacionada con esta firma si es una firma
-                  String displayTitle = fileName;
-                  String subtitleText = attachment.isSignature ? 'Signature' : 'Attachment';
+                  // Intentar vincular esta firma con la pregunta correspondiente
+                  // Usamos el índice para intentar hacer coincidir la firma con la pregunta
+                  String displayTitle = 'Electronic Signature';
+                  if (i < signatureQuestions.length && signatureQuestions[i].question.isNotEmpty) {
+                    displayTitle = 'Signature by: ${signatureQuestions[i].question}';
+                  }
 
-                  if (attachment.isSignature) {
-                    // Buscar la pregunta de tipo signature relacionada con esta firma
-                    final signatureQuestion = submission.answers.firstWhere(
-                            (answer) => answer.questionType.toLowerCase() == 'signature' &&
-                            answer.question.isNotEmpty,
+                  // Si no podemos hacer coincidir por índice, intentamos buscar por el ID
+                  // si la firma tiene algún identificador que pueda coincidir con la pregunta
+                  // Esto es un respaldo en caso de que el orden de las firmas no coincida con el orden de las preguntas
+                  if (displayTitle == 'Electronic Signature' && signature.id != null) {
+                    // Intenta encontrar la pregunta que haga referencia a este ID de firma
+                    // Esto dependerá de cómo estén relacionadas las preguntas y los archivos en tu modelo de datos
+                    final matchingQuestion = signatureQuestions.firstWhere(
+                            (q) => q.answer.contains(signature.id.toString()) ||
+                            q.question.contains(signature.id.toString()),
                         orElse: () => AnswerView(question: '', questionType: '', answer: '')
                     );
 
-                    // Si encontramos una pregunta relacionada, mostrar "Signature by: [nombre]"
-                    if (signatureQuestion.question.isNotEmpty) {
-                      displayTitle = 'Signature by: ${signatureQuestion.question}';
-                      subtitleText = 'Electronic Signature';
+                    if (matchingQuestion.question.isNotEmpty) {
+                      displayTitle = 'Signature by: ${matchingQuestion.question}';
                     }
                   }
 
-                  return Card(
+                  // Para depuración - puedes quitar esto después
+                  print('Firma #${i+1}: ID=${signature.id}, Título=$displayTitle');
+
+                  // Añadir tarjeta de firma
+                  attachmentWidgets.add(Card(
                     color: Colors.white,
                     elevation: 2,
                     shape: RoundedRectangleBorder(
@@ -302,12 +306,8 @@ class SubmissionDetailScreen extends StatelessWidget {
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       leading: Icon(
-                        attachment.isSignature
-                            ? Icons.draw // Icono específico para firmas
-                            : _getIconForFileType(attachment.filePath),
-                        color: attachment.isSignature
-                            ? Colors.blue.shade700 // Color específico para firmas
-                            : _getColorForFileType(attachment.filePath),
+                        Icons.draw,
+                        color: Colors.blue.shade700,
                         size: 36,
                       ),
                       title: Text(
@@ -318,7 +318,85 @@ class SubmissionDetailScreen extends StatelessWidget {
                         ),
                       ),
                       subtitle: Text(
-                        subtitleText,
+                        'Electronic Signature',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      onTap: () async {
+                        try {
+                          if (signature.id != null) {
+                            print('Opening signature ${signature.id}');
+                            await FormSubmissionViewService()
+                                .openAttachment(context, signature.id!);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Signature ID is missing')),
+                            );
+                          }
+                        } catch (e) {
+                          print('Error opening signature: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error opening signature: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ));
+                }
+              }
+
+              // Sección de Attachments
+              if (hasRegularAttachments) {
+                attachmentWidgets.add(const SizedBox(height: 24));
+                attachmentWidgets.add(const Text(
+                  'Attachments:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ));
+                attachmentWidgets.add(const SizedBox(height: 8));
+
+                attachmentWidgets.add(Text(
+                  'Files attached: ${regularAttachments.length}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ));
+
+                // Añadir cada adjunto normal a la lista de widgets
+                for (var attachment in regularAttachments) {
+                  // Extract just the filename for display
+                  final fileName = attachment.filePath.split('\\').last;
+
+                  attachmentWidgets.add(Card(
+                    color: Colors.white,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: Icon(
+                        _getIconForFileType(attachment.filePath),
+                        color: _getColorForFileType(attachment.filePath),
+                        size: 36,
+                      ),
+                      title: Text(
+                        fileName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Attachment',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[600],
@@ -328,7 +406,8 @@ class SubmissionDetailScreen extends StatelessWidget {
                         try {
                           if (attachment.id != null) {
                             print('Opening attachment ${attachment.id}');
-                            await FormSubmissionViewService().openAttachment(context, attachment.id!);
+                            await FormSubmissionViewService()
+                                .openAttachment(context, attachment.id!);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Attachment ID is missing')),
@@ -342,34 +421,39 @@ class SubmissionDetailScreen extends StatelessWidget {
                         }
                       },
                     ),
-                  );
-                }).toList();
-              })()
-            else
-// If no attachments, show a message
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'No attachments found for this submission.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
+                  ));
+                }
+              }
+
+              // Mensaje si no hay adjuntos de ningún tipo
+              if (!hasAttachments) {
+                attachmentWidgets.add(const SizedBox(height: 24));
+                attachmentWidgets.add(Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ),
-              ),
+                  child: const Text(
+                    'No files or signatures attached to this submission.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ));
+              }
+
+              return attachmentWidgets;
+            })(),
           ],
         ),
       ),
     );
   }
 }
-
 
 /// Main screen: lists the submissions for a form, one pastel card per submission.
 class FormSubmissionsViewScreen extends StatefulWidget {
@@ -393,7 +477,7 @@ class FormSubmissionsViewScreen extends StatefulWidget {
 
 class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
   final FormSubmissionViewService _submissionService =
-  FormSubmissionViewService();
+      FormSubmissionViewService();
 
   List<FormSubmissionView> submissions = [];
   List<FormSubmissionView> filteredSubmissions = [];
@@ -417,7 +501,7 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
       } else {
         filteredSubmissions = submissions
             .where((s) =>
-            s.submittedBy.toLowerCase().contains(query.toLowerCase()))
+                s.submittedBy.toLowerCase().contains(query.toLowerCase()))
             .toList();
       }
     });
@@ -474,9 +558,9 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
         child: Text('All'),
       ),
       ..._users.map((user) => DropdownMenuItem(
-        value: user,
-        child: Text(user),
-      ))
+            value: user,
+            child: Text(user),
+          ))
     ];
 
     return Scaffold(
@@ -499,145 +583,145 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
           child: isLoading
               ? const Center(child: CircularProgressIndicator())
               : Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Search by user',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // 📦 Combina el Dropdown con el TextField
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                            color: Colors.transparent), // Sin borde
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withOpacity(0.1), // Color de la sombra
-                            spreadRadius:
-                            1, // Cuánto se expande la sombra
-                            blurRadius: 5, // Desenfoque de la sombra
-                            offset: const Offset(
-                                0, 3), // Desplazamiento de la sombra
-                          ),
-                        ],
-                      ),
-                      child: Row(
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 🔽 Dropdown integrado (sin opción "All")
-                          DropdownButton<String>(
-                            value: _selectedUser,
-                            hint: const Text(
-                                "Select user"), // Texto por defecto
-                            items: _users.map((user) {
-                              return DropdownMenuItem(
-                                value: user,
-                                child: Text(user),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedUser = value;
-                                _searchController.text = value ??
-                                    ''; // Actualiza el campo de búsqueda
-                                _searchByUserName(value ??
-                                    ''); // Filtra automáticamente
-                              });
-                            },
-                            underline:
-                            const SizedBox(), // Oculta la línea inferior
-                            icon: const Icon(Icons.arrow_drop_down),
+                          const Text(
+                            'Search by user',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          const VerticalDivider(), // Separador visual
-                          // 🔍 TextField de búsqueda
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: const InputDecoration(
-                                hintText: 'Enter user name...',
-                                border: InputBorder.none, // Sin borde
-                                prefixIcon: Icon(Icons.search),
-                              ),
-                              onChanged: _searchByUserName,
+                          const SizedBox(height: 8),
+                          // 📦 Combina el Dropdown con el TextField
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: Colors.transparent), // Sin borde
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black
+                                      .withOpacity(0.1), // Color de la sombra
+                                  spreadRadius:
+                                      1, // Cuánto se expande la sombra
+                                  blurRadius: 5, // Desenfoque de la sombra
+                                  offset: const Offset(
+                                      0, 3), // Desplazamiento de la sombra
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                // 🔽 Dropdown integrado (sin opción "All")
+                                DropdownButton<String>(
+                                  value: _selectedUser,
+                                  hint: const Text(
+                                      "Select user"), // Texto por defecto
+                                  items: _users.map((user) {
+                                    return DropdownMenuItem(
+                                      value: user,
+                                      child: Text(user),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedUser = value;
+                                      _searchController.text = value ??
+                                          ''; // Actualiza el campo de búsqueda
+                                      _searchByUserName(value ??
+                                          ''); // Filtra automáticamente
+                                    });
+                                  },
+                                  underline:
+                                      const SizedBox(), // Oculta la línea inferior
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                ),
+                                const VerticalDivider(), // Separador visual
+                                // 🔍 TextField de búsqueda
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Enter user name...',
+                                      border: InputBorder.none, // Sin borde
+                                      prefixIcon: Icon(Icons.search),
+                                    ),
+                                    onChanged: _searchByUserName,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
+                    // 📋 Mostrar lista o mensaje vacío
+                    Expanded(
+                      child: filteredSubmissions.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.list_alt, // 📋 Ícono restaurado
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No submissions available.',
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Once someone submits a form, you\'ll see it here.',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      color: Colors.grey,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: filteredSubmissions.length,
+                              itemBuilder: (context, index) {
+                                final submission = filteredSubmissions[index];
+                                return _CustomExpansionCard(
+                                  submission: submission,
+                                  onCardTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => SubmissionDetailScreen(
+                                          submission: submission,
+                                          permissionSet: widget.permissionSet,
+                                          sessionData: widget.sessionData,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                    )
                   ],
                 ),
-              ),
-              // 📋 Mostrar lista o mensaje vacío
-              Expanded(
-                child: filteredSubmissions.isEmpty
-                    ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.list_alt, // 📋 Ícono restaurado
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'No submissions available.',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Once someone submits a form, you\'ll see it here.',
-                        style: TextStyle(
-                          fontSize: 24,
-                          color: Colors.grey,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                )
-                    : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredSubmissions.length,
-                  itemBuilder: (context, index) {
-                    final submission = filteredSubmissions[index];
-                    return _CustomExpansionCard(
-                      submission: submission,
-                      onCardTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SubmissionDetailScreen(
-                              submission: submission,
-                              permissionSet: widget.permissionSet,
-                              sessionData: widget.sessionData,
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              )
-            ],
-          ),
         ));
   }
 }

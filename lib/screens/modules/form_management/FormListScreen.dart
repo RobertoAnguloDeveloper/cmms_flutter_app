@@ -238,35 +238,6 @@ class _FormListScreenState extends State<FormListScreen> {
                               Column(
                                 children: [
                                   const SizedBox(height: 42),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      if (_hasQuestions(form)) {
-                                        showDialog(
-                                          context: context,
-                                          builder: (BuildContext context) {
-                                            return FormAnswerDialog(
-                                              form: form,
-                                            );
-                                          },
-                                        );
-                                      } else {
-                                        _showEmptyFormDialog();
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Color.fromARGB(255, 255, 255, 255),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      padding: const EdgeInsets.all(20),
-                                      elevation: 1,
-                                    ),
-                                    child: const Icon(
-                                      Icons.check_circle_outline,
-                                      color: Colors.blue,
-                                      size: 32,
-                                    ),
-                                  ),
                                 ],
                               ),
                             ],
