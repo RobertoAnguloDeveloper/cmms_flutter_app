@@ -408,6 +408,8 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
     return !['date', 'datetime', 'text', 'user'].contains(questionType);
   }
 
+
+
   Widget _buildQuestionCreationCard(int index) {
     final data = _questionCreations[index];
     return QuestionCreationCard(
