@@ -230,6 +230,10 @@ class SubmissionDetailScreen extends StatelessWidget {
 // Reemplaza la sección actual de attachments con este código
 
 // Attachments section
+            // Código para mostrar "Signature by: [Nombre]" en los attachments tipo firma
+// Reemplaza la sección actual de attachments con este código
+
+// Attachments section
             const SizedBox(height: 24),
             const Text(
               'Attachments:',
@@ -254,14 +258,14 @@ class SubmissionDetailScreen extends StatelessWidget {
 // Show attachments list if any exist
             if (hasAttachments)
               ...(() {
-                // Ordenar los attachments - primero los normales, luego las firmas
+                // Ordenar los attachments - primero las firmas, luego los normales
                 final sortedAttachments = [...submission.attachments];
                 sortedAttachments.sort((a, b) {
-                  // Si a es signature y b no, a va después (1)
-                  // Si b es signature y a no, b va después (-1)
+                  // Si a es signature y b no, a va primero (-1)
+                  // Si b es signature y a no, b va primero (1)
                   // Si ambos son signature o ambos no lo son, mantener el orden original (0)
-                  if (a.isSignature && !b.isSignature) return 1;
-                  if (!a.isSignature && b.isSignature) return -1;
+                  if (a.isSignature && !b.isSignature) return -1;
+                  if (!a.isSignature && b.isSignature) return 1;
                   return 0;
                 });
 
