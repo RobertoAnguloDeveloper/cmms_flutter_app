@@ -380,7 +380,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Card(
-        elevation: 0,
+        elevation: 2,
+        color: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -441,7 +442,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   Widget _buildQuestionCard(Map<String, dynamic> question) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 0,
+      elevation: 2,
+      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
