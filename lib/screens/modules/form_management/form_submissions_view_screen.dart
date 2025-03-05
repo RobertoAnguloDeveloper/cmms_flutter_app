@@ -247,6 +247,7 @@ class SubmissionDetailScreen extends StatelessWidget {
 // Modifica solo la parte de las firmas en la sección de adjuntos
 
 // Sección de Signatures
+              // Sección de Signatures - versión mejorada
               if (hasSignatures) {
                 attachmentWidgets.add(const SizedBox(height: 24));
                 attachmentWidgets.add(const Text(
@@ -264,36 +265,41 @@ class SubmissionDetailScreen extends StatelessWidget {
                     .where((answer) => answer.questionType.toLowerCase() == 'signature')
                     .toList();
 
+                print('DEBUG: Found ${signatureQuestions.length} signature questions');
+                for (var q in signatureQuestions) {
+                  print('DEBUG: Signature question: ${q.question}, answer: ${q.answer}');
+                }
+
+                print('DEBUG: Found ${signatures.length} signature attachments');
+                for (var s in signatures) {
+                  print('DEBUG: Signature ID: ${s.id}, path: ${s.filePath}');
+                }
+
                 // Añadir cada firma a la lista de widgets
                 for (int i = 0; i < signatures.length; i++) {
                   final signature = signatures[i];
 
-                  // Intentar vincular esta firma con la pregunta correspondiente
-                  // Usamos el índice para intentar hacer coincidir la firma con la pregunta
+                  // Buscar una pregunta que corresponda a esta firma
+                  // Primero, intentar encontrar una correspondencia por orden de índice
                   String displayTitle = 'Electronic Signature';
-                  if (i < signatureQuestions.length && signatureQuestions[i].question.isNotEmpty) {
+
+                  // Si tenemos suficientes preguntas de firma, asumimos que están en el mismo orden
+                  if (i < signatureQuestions.length) {
                     displayTitle = 'Signature by: ${signatureQuestions[i].question}';
+                    print('DEBUG: Matched signature #${i+1} with question by index: ${signatureQuestions[i].question}');
                   }
-
-                  // Si no podemos hacer coincidir por índice, intentamos buscar por el ID
-                  // si la firma tiene algún identificador que pueda coincidir con la pregunta
-                  // Esto es un respaldo en caso de que el orden de las firmas no coincida con el orden de las preguntas
-                  if (displayTitle == 'Electronic Signature' && signature.id != null) {
-                    // Intenta encontrar la pregunta que haga referencia a este ID de firma
-                    // Esto dependerá de cómo estén relacionadas las preguntas y los archivos en tu modelo de datos
-                    final matchingQuestion = signatureQuestions.firstWhere(
-                            (q) => q.answer.contains(signature.id.toString()) ||
-                            q.question.contains(signature.id.toString()),
-                        orElse: () => AnswerView(question: '', questionType: '', answer: '')
-                    );
-
-                    if (matchingQuestion.question.isNotEmpty) {
-                      displayTitle = 'Signature by: ${matchingQuestion.question}';
+                  // Si no pudimos hacer coincidir por índice, intentamos buscar por contenido de la respuesta
+                  else if (signature.id != null) {
+                    for (var question in signatureQuestions) {
+                      // La respuesta a veces contiene información sobre el archivo asociado
+                      if (question.answer.contains(signature.id.toString()) ||
+                          question.answer.contains(signature.filePath)) {
+                        displayTitle = 'Signature by: ${question.question}';
+                        print('DEBUG: Matched signature #${i+1} with question by content: ${question.question}');
+                        break;
+                      }
                     }
                   }
-
-                  // Para depuración - puedes quitar esto después
-                  print('Firma #${i+1}: ID=${signature.id}, Título=$displayTitle');
 
                   // Añadir tarjeta de firma
                   attachmentWidgets.add(Card(
