@@ -52,6 +52,8 @@ dev_dependencies:
   logging: ^1.2.0
   mime: ^1.0.0
   universal_html: ^2.2.4
+  image_picker: ^1.0.4
+  permission_handler: ^10.4.3
 
 
   # The "flutter_lints" package below contains a set of recommended lints to
