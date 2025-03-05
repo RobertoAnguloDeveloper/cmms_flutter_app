@@ -248,6 +248,7 @@ class SubmissionDetailScreen extends StatelessWidget {
 
 // Sección de Signatures
               // Sección de Signatures - versión mejorada
+              // Sección de Signatures - versión con nombre de archivo
               if (hasSignatures) {
                 attachmentWidgets.add(const SizedBox(height: 24));
                 attachmentWidgets.add(const Text(
@@ -260,48 +261,13 @@ class SubmissionDetailScreen extends StatelessWidget {
                 ));
                 attachmentWidgets.add(const SizedBox(height: 8));
 
-                // Obtener todas las preguntas tipo signature
-                final signatureQuestions = submission.answers
-                    .where((answer) => answer.questionType.toLowerCase() == 'signature')
-                    .toList();
-
-                print('DEBUG: Found ${signatureQuestions.length} signature questions');
-                for (var q in signatureQuestions) {
-                  print('DEBUG: Signature question: ${q.question}, answer: ${q.answer}');
-                }
-
-                print('DEBUG: Found ${signatures.length} signature attachments');
-                for (var s in signatures) {
-                  print('DEBUG: Signature ID: ${s.id}, path: ${s.filePath}');
-                }
-
                 // Añadir cada firma a la lista de widgets
                 for (int i = 0; i < signatures.length; i++) {
                   final signature = signatures[i];
 
-                  // Buscar una pregunta que corresponda a esta firma
-                  // Primero, intentar encontrar una correspondencia por orden de índice
-                  String displayTitle = 'Electronic Signature';
+                  // Extraer solo el nombre del archivo para mostrarlo
+                  final fileName = signature.filePath.split('\\').last;
 
-                  // Si tenemos suficientes preguntas de firma, asumimos que están en el mismo orden
-                  if (i < signatureQuestions.length) {
-                    displayTitle = 'Signature by: ${signatureQuestions[i].question}';
-                    print('DEBUG: Matched signature #${i+1} with question by index: ${signatureQuestions[i].question}');
-                  }
-                  // Si no pudimos hacer coincidir por índice, intentamos buscar por contenido de la respuesta
-                  else if (signature.id != null) {
-                    for (var question in signatureQuestions) {
-                      // La respuesta a veces contiene información sobre el archivo asociado
-                      if (question.answer.contains(signature.id.toString()) ||
-                          question.answer.contains(signature.filePath)) {
-                        displayTitle = 'Signature by: ${question.question}';
-                        print('DEBUG: Matched signature #${i+1} with question by content: ${question.question}');
-                        break;
-                      }
-                    }
-                  }
-
-                  // Añadir tarjeta de firma
                   attachmentWidgets.add(Card(
                     color: Colors.white,
                     elevation: 2,
@@ -317,7 +283,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                         size: 36,
                       ),
                       title: Text(
-                        displayTitle,
+                        fileName, // Mostramos solo el nombre del archivo
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
