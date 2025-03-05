@@ -85,7 +85,7 @@ class FormSubmissionViewService {
   /// Modify the getFormSubmissions method in FormSubmissionViewService
   Future<List<FormSubmissionView>> getFormSubmissions(int formId) async {
     try {
-      // First get the list of submissions from answers endpoint
+      // First get the list of submissions from answers endpoint to identify unique submissions
       final response = await _dio.get<Map<String, dynamic>>(
         '/api/answers-submitted',
         queryParameters: {'form_id': formId},
@@ -97,53 +97,24 @@ class FormSubmissionViewService {
         final responseData = response.data!;
         final List<dynamic> data = responseData['answers'] ?? [];
 
-        // Group submissions by ID
-        final Map<int, FormSubmissionView> submissionsMap = {};
+        // Extract unique submission IDs while preserving order
+        final List<int> submissionIds = [];
+        final Set<int> processedIds = {};
 
         for (var item in data) {
           final formSubmission = item['form_submission'] ?? {};
           final submissionId = formSubmission['id'] ?? 0;
-
-          // Skip invalid submissions
-          if (submissionId == 0) continue;
-
-          final submittedBy = formSubmission['submitted_by'] ?? '';
-          final submittedAtStr = formSubmission['submitted_at'] ?? '';
-          final formData = formSubmission['form'] ?? {};
-          final formTitle = formData['title'] ?? '';
-
-          DateTime parsedDate = DateTime.now();
-          if (submittedAtStr.isNotEmpty) {
-            try {
-              parsedDate = DateTime.parse(submittedAtStr);
-            } catch (e) {
-              print('Error parsing date: $e');
-            }
+          if (submissionId > 0 && !processedIds.contains(submissionId)) {
+            submissionIds.add(submissionId);
+            processedIds.add(submissionId);
           }
-
-          if (!submissionsMap.containsKey(submissionId)) {
-            submissionsMap[submissionId] = FormSubmissionView(
-              submissionId: submissionId,
-              formTitle: formTitle,
-              submittedBy: submittedBy,
-              submittedAt: parsedDate,
-              answers: [],
-              attachments: [],
-            );
-          }
-
-          final answerView = AnswerView(
-            question: item['question'] ?? '',
-            questionType: item['question_type'] ?? '',
-            answer: item['answer'] ?? '',
-          );
-
-          submissionsMap[submissionId]!.answers.add(answerView);
         }
 
-        // Now fetch complete submission data for each unique submission ID
-        // This is important to get the attachments
-        await Future.wait(submissionsMap.keys.map((submissionId) async {
+        // Create a list to hold the complete submissions
+        final List<FormSubmissionView> submissionsList = [];
+
+        // Process submissions sequentially
+        for (var submissionId in submissionIds) {
           try {
             final detailResponse = await _dio.get<Map<String, dynamic>>(
               '/api/form-submissions/$submissionId',
@@ -151,21 +122,60 @@ class FormSubmissionViewService {
 
             if (detailResponse.statusCode == 200 && detailResponse.data != null) {
               final submissionData = detailResponse.data!;
-              final List<dynamic> attachmentsList = submissionData['attachments'] ?? [];
 
-              // Map the attachment data to your Attachment model
-              submissionsMap[submissionId]!.attachments = attachmentsList
+              // Extract basic submission info
+              final formData = submissionData['form'] ?? {};
+              final formTitle = formData['title'] ?? '';
+              final submittedBy = submissionData['submitted_by'] ?? '';
+              final submittedAtStr = submissionData['submitted_at'] ?? '';
+
+              DateTime parsedDate = DateTime.now();
+              if (submittedAtStr.isNotEmpty) {
+                try {
+                  parsedDate = DateTime.parse(submittedAtStr);
+                } catch (e) {
+                  print('Error parsing date: $e');
+                }
+              }
+
+              // Extract answers in the correct order
+              final List<dynamic> answersData = submissionData['answers'] ?? [];
+              final List<AnswerView> answers = answersData.map((answerJson) =>
+                  AnswerView(
+                    question: answerJson['question'] ?? '',
+                    questionType: answerJson['question_type'] ?? '',
+                    answer: answerJson['answer'] ?? '',
+                  )
+              ).toList();
+
+              // Extract attachments
+              final List<dynamic> attachmentsList = submissionData['attachments'] ?? [];
+              final List<Attachment> attachments = attachmentsList
                   .map((attachmentJson) => Attachment.fromJson(attachmentJson))
                   .toList();
 
-              print('Found ${submissionsMap[submissionId]!.attachments.length} attachments for submission $submissionId');
+              // Create the submission view with ordered data
+              final submissionView = FormSubmissionView(
+                submissionId: submissionId,
+                formTitle: formTitle,
+                submittedBy: submittedBy,
+                submittedAt: parsedDate,
+                answers: answers,
+                attachments: attachments,
+              );
+
+              submissionsList.add(submissionView);
+              print('Processed submission $submissionId with ${answers.length} answers and ${attachments.length} attachments');
             }
           } catch (e) {
             print('Error fetching details for submission $submissionId: $e');
           }
-        }));
+        }
 
-        return submissionsMap.values.toList();
+        // Sort submissions by date - newest first
+        submissionsList.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+
+        return submissionsList;
       } else {
         throw Exception(
           'Failed to fetch form submissions. Status: ${response.statusCode}',
