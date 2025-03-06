@@ -2,6 +2,7 @@
 
 import 'dart:typed_data';
 
+import 'package:cmms_app/screens/modules/form_management/pdf_export_submission_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../components/drawer_menu/DrawerMenu.dart';
@@ -143,6 +144,7 @@ class SubmissionDetailScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             // Submission header
+            // Submission header
             Card(
               color: Colors.white,
               elevation: 4,
@@ -155,13 +157,41 @@ class SubmissionDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Form Title: ${submission.formTitle.isNotEmpty ? submission.formTitle : "No title"}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 22,
-                        color: Colors.black87,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Título con Expanded para evitar desbordamiento
+                        Expanded(
+                          child: Text(
+                            'Form Title: ${submission.formTitle.isNotEmpty ? submission.formTitle : "No title"}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        // Botón de exportar a PDF
+                        IconButton(
+                          icon: const Icon(
+                            Icons.ios_share,
+                            size: 28,
+                            color: Colors.blue,
+                          ),
+                          tooltip: 'Export to PDF',
+                          onPressed: () {
+                            // Mostrar el diálogo de exportación de PDF
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return PdfExportDialog(
+                                  submissionId: submission.submissionId,
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -184,7 +214,6 @@ class SubmissionDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
-
             // Form answers - ESTA ES LA ÚNICA SECCIÓN DE RESPUESTAS
             const SizedBox(height: 16),
             ..._processAnswers(submission.answers
