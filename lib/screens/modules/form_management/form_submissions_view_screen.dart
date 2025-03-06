@@ -1,5 +1,7 @@
 // lib/screens/form_management/form_submissions_view_screen.dart
 
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../components/drawer_menu/DrawerMenu.dart';
@@ -93,6 +95,18 @@ class SubmissionDetailScreen extends StatelessWidget {
 
     // Convertimos el mapa de respuestas agrupadas a una lista
     return groupedAnswers.values.toList();
+  }
+
+  Future<Uint8List> _loadSignatureImage(BuildContext context, int attachmentId) async {
+    try {
+      final service = FormSubmissionViewService();
+      // Asumiendo que el servicio tiene un método para obtener la imagen como bytes
+      // Si no existe, necesitarás implementarlo
+      return await service.getAttachmentBytes(attachmentId);
+    } catch (e) {
+      print('Error loading signature image: $e');
+      throw e;
+    }
   }
 
   @override
@@ -250,6 +264,7 @@ class SubmissionDetailScreen extends StatelessWidget {
               // Sección de Signatures - versión mejorada
               // Sección de Signatures - versión con nombre de archivo
               // Sección de Signatures mejorada
+              // Sección de Signatures mejorada con imágenes precargadas
               if (hasSignatures) {
                 attachmentWidgets.add(const SizedBox(height: 24));
                 attachmentWidgets.add(const Text(
@@ -266,6 +281,16 @@ class SubmissionDetailScreen extends StatelessWidget {
                 final signatureQuestions = submission.answers
                     .where((answer) => answer.questionType.toLowerCase() == 'signature')
                     .toList();
+
+                // Para depuración
+                print("DEBUG - Signature Questions:");
+                for (var q in signatureQuestions) {
+                  print("Question: ${q.question}, Answer: ${q.answer}");
+                }
+                print("DEBUG - Signature Files:");
+                for (var s in signatures) {
+                  print("File: ${s.filePath}, ID: ${s.id}");
+                }
 
                 // Añadir cada firma a la lista de widgets
                 for (var signature in signatures) {
@@ -302,7 +327,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                     }
                   }
 
-                  // Añadir tarjeta de firma
+                  // Añadir tarjeta de firma con la imagen precargada
                   attachmentWidgets.add(Card(
                     color: Colors.white,
                     elevation: 2,
@@ -310,45 +335,104 @@ class SubmissionDetailScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      leading: Icon(
-                        Icons.draw,
-                        color: Colors.blue.shade700,
-                        size: 36,
-                      ),
-                      title: Text(
-                        questionName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Encabezado con título
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                          child: Text(
+                            questionName, // Usar el nombre correcto de la pregunta
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      ),
-                      subtitle: Text(
-                        'Electronic Signature',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+
+                        // Imagen de la firma
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          width: double.infinity,
+                          child: signature.id != null
+                              ? FutureBuilder<Uint8List>(
+                            future: _loadSignatureImage(context, signature.id!),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return Container(
+                                  height: 100,
+                                  alignment: Alignment.center,
+                                  child: const CircularProgressIndicator(),
+                                );
+                              } else if (snapshot.hasError) {
+                                return Container(
+                                  height: 100,
+                                  alignment: Alignment.center,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.error_outline, color: Colors.red, size: 32),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Could not load signature',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              } else if (snapshot.hasData) {
+                                return Container(
+                                  constraints: BoxConstraints(maxHeight: 150),
+                                  child: Image.memory(
+                                    snapshot.data!,
+                                    fit: BoxFit.contain,
+                                  ),
+                                );
+                              } else {
+                                return Container(
+                                  height: 100,
+                                  alignment: Alignment.center,
+                                  child: Text('No signature data available'),
+                                );
+                              }
+                            },
+                          )
+                              : Container(
+                            height: 100,
+                            alignment: Alignment.center,
+                            child: Text('Signature ID missing'),
+                          ),
                         ),
-                      ),
-                      onTap: () async {
-                        try {
-                          if (signature.id != null) {
-                            print('Opening signature ${signature.id}');
-                            await FormSubmissionViewService()
-                                .openAttachment(context, signature.id!);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Signature ID is missing')),
-                            );
-                          }
-                        } catch (e) {
-                          print('Error opening signature: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error opening signature: $e')),
-                          );
-                        }
-                      },
+
+                        // Botón para ver en pantalla completa
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.fullscreen),
+                              label: const Text('View Full Size'),
+                              onPressed: () async {
+                                try {
+                                  if (signature.id != null) {
+                                    await FormSubmissionViewService()
+                                        .openAttachment(context, signature.id!);
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Signature ID is missing')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  print('Error opening signature: $e');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error opening signature: $e')),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ));
                 }

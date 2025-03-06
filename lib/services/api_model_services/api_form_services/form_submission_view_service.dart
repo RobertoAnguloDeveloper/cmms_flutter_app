@@ -1,6 +1,7 @@
 // 📂 lib/services/api_model_services/api_form_services/form_submission_view_service.dart
 
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:dio_smart_retry/dio_smart_retry.dart';
 import 'package:flutter/material.dart';
@@ -72,6 +73,30 @@ class FormSubmissionViewService {
 
     // Initialize attachment service
     _attachmentService = AttachmentService();
+  }
+
+  // Añadir al FormSubmissionViewService.dart
+  Future<Uint8List> getAttachmentBytes(int attachmentId) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        '/api/attachments/$attachmentId',
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {
+            'Accept': '*/*',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return Uint8List.fromList(response.data!);
+      } else {
+        throw Exception('Failed to load attachment: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      print('Error downloading attachment: ${e.message}');
+      throw Exception('Network error: ${e.message}');
+    }
   }
 
   /// Opens an attachment for viewing
