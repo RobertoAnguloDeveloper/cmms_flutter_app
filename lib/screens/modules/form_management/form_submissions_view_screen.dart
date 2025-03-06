@@ -265,6 +265,7 @@ class SubmissionDetailScreen extends StatelessWidget {
               // Sección de Signatures - versión con nombre de archivo
               // Sección de Signatures mejorada
               // Sección de Signatures mejorada con imágenes precargadas
+              // Sección de Signatures mejorada con los nuevos campos
               if (hasSignatures) {
                 attachmentWidgets.add(const SizedBox(height: 24));
                 attachmentWidgets.add(const Text(
@@ -281,16 +282,6 @@ class SubmissionDetailScreen extends StatelessWidget {
                 final signatureQuestions = submission.answers
                     .where((answer) => answer.questionType.toLowerCase() == 'signature')
                     .toList();
-
-                // Para depuración
-                print("DEBUG - Signature Questions:");
-                for (var q in signatureQuestions) {
-                  print("Question: ${q.question}, Answer: ${q.answer}");
-                }
-                print("DEBUG - Signature Files:");
-                for (var s in signatures) {
-                  print("File: ${s.filePath}, ID: ${s.id}");
-                }
 
                 // Añadir cada firma a la lista de widgets
                 for (var signature in signatures) {
@@ -327,6 +318,11 @@ class SubmissionDetailScreen extends StatelessWidget {
                     }
                   }
 
+                  // Determinar el texto a mostrar para el autor de la firma
+                  final String signatureAuthorText = signature.signatureAuthor != null && signature.signatureAuthor!.isNotEmpty
+                      ? signature.signatureAuthor!
+                      : questionName;
+
                   // Añadir tarjeta de firma con la imagen precargada
                   attachmentWidgets.add(Card(
                     color: Colors.white,
@@ -342,7 +338,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                           child: Text(
-                            questionName, // Usar el nombre correcto de la pregunta
+                            'Signature by: $signatureAuthorText',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -350,9 +346,23 @@ class SubmissionDetailScreen extends StatelessWidget {
                           ),
                         ),
 
+                        // Mostrar el cargo/posición si está disponible
+                        if (signature.signaturePosition != null && signature.signaturePosition!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              signature.signaturePosition!,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+
                         // Imagen de la firma
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           width: double.infinity,
                           child: signature.id != null
                               ? FutureBuilder<Uint8List>(
