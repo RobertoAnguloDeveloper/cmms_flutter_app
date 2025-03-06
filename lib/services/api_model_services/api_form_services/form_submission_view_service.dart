@@ -90,6 +90,10 @@ class FormSubmissionViewService {
 
       if (response.statusCode == 200 && response.data != null) {
         return Uint8List.fromList(response.data!);
+      } else if (response.statusCode == 401) {
+        // No podemos usar context aquí porque no lo tenemos como parámetro
+        // Mejor lanzar la excepción y dejar que el widget que usa este método lo maneje
+        throw Exception('Session expired');
       } else {
         throw Exception('Failed to load attachment: ${response.statusCode}');
       }
@@ -108,7 +112,10 @@ class FormSubmissionViewService {
   /// Route: GET /api/answers-submitted?form_id=$formId
   /// Returns a list of FormSubmissionView with grouped answers
   /// Modify the getFormSubmissions method in FormSubmissionViewService
-  Future<List<FormSubmissionView>> getFormSubmissions(int formId) async {
+  /// Gets form submissions for a specific form
+  /// Route: GET /api/answers-submitted?form_id=$formId
+  /// Returns a list of FormSubmissionView with grouped answers
+  Future<List<FormSubmissionView>> getFormSubmissions(int formId, [BuildContext? context]) async {
     try {
       // First get the list of submissions from answers endpoint to identify unique submissions
       final response = await _dio.get<Map<String, dynamic>>(
@@ -191,6 +198,12 @@ class FormSubmissionViewService {
 
               submissionsList.add(submissionView);
               print('Processed submission $submissionId with ${answers.length} answers and ${attachments.length} attachments');
+            } else if (detailResponse.statusCode == 401 && context != null && context.mounted) {
+              await ApiResponseHandler.handleExpiredToken(
+                  context,
+                  detailResponse.data as Map<String, dynamic>
+              );
+              throw Exception('Session expired');
             }
           } catch (e) {
             print('Error fetching details for submission $submissionId: $e');
@@ -201,6 +214,14 @@ class FormSubmissionViewService {
         submissionsList.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
 
         return submissionsList;
+      } else if (response.statusCode == 401) {
+        if (context != null && context.mounted) {
+          await ApiResponseHandler.handleExpiredToken(
+              context,
+              response.data as Map<String, dynamic>
+          );
+        }
+        throw Exception('Session expired');
       } else {
         throw Exception(
           'Failed to fetch form submissions. Status: ${response.statusCode}',
@@ -271,6 +292,14 @@ class FormSubmissionViewService {
             'Endpoint /api/form-submissions/all not found (404). '
                 'Check if this endpoint exists on your backend.'
         );
+      } else if (response.statusCode == 401) {
+        if (context.mounted) {
+          await ApiResponseHandler.handleExpiredToken(
+              context,
+              {'message': 'Session expired'} // Crear un mapa básico si la respuesta no es un map
+          );
+        }
+        throw Exception('Session expired');
       } else {
         throw Exception('Failed to load submissions: ${response.statusCode}');
       }
@@ -298,6 +327,14 @@ class FormSubmissionViewService {
 
       if (response.statusCode == 200 && response.data != null) {
         return response.data!;
+      } else if (response.statusCode == 401) {
+        if (context.mounted) {
+          await ApiResponseHandler.handleExpiredToken(
+              context,
+              response.data as Map<String, dynamic>
+          );
+        }
+        throw Exception('Session expired');
       } else if (response.statusCode == 404) {
         throw Exception(
             'Endpoint not found (404). Check the route on your backend.'

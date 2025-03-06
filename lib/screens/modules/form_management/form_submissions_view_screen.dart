@@ -609,7 +609,7 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
       setState(() => isLoading = true);
 
       // This call now returns one FormSubmissionView per submission
-      final data = await _submissionService.getFormSubmissions(widget.formId);
+      final data = await _submissionService.getFormSubmissions(widget.formId, context);
 
       submissions = data;
       filteredSubmissions = data;
