@@ -2708,6 +2708,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   Map<int, bool> _questionValidityMap = {};
   bool _validatingForm = false;
   bool _cameraErrorDetected = false;
+  Map<String, Map<String, dynamic>> signatureFiles = {};
 
   @override
   void initState() {
@@ -2977,6 +2978,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     }
   }
 
+
+  /*
   Future<void> _submitAnswers() async {
     try {
       _validateFormSubmission();
@@ -3154,6 +3157,235 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         ),
       );
     }
+  }*/
+
+
+  Future<void> _submitAnswers() async {
+    try {
+      _validateFormSubmission();
+
+      if (!_canSubmitForm) {
+        _showErrorSnackBar('Please complete all required questions');
+        return;
+      }
+
+      setState(() {
+        isLoading = true;
+      });
+
+      final submissionResult = await _formSubmissionService.createFormSubmission(
+        context: context,
+        formId: selectedForm!['id'],
+      );
+
+      final int submissionId = submissionResult['submission_id'];
+      print('Extracted submission ID: $submissionId');
+
+      // Handle signature files separately
+      if (signatureFiles.isNotEmpty) {
+        final attachmentService = AttachmentService();
+
+        for (var entry in signatureFiles.entries) {
+          final questionId = int.parse(entry.key);
+          final signatureData = entry.value;
+
+          final filePath = signatureData['path'] as String;
+          final signatureAuthor = signatureData['author'] as String?;
+
+          final question = questions.firstWhere(
+                (q) => q['id'] == questionId,
+            orElse: () => null,
+          );
+
+          // The question text becomes the signature position
+          final signaturePosition = question != null ? question['text'] : 'Form Signature';
+
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Uploading signature: ${path.basename(filePath)}...'),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+
+            await attachmentService.createAttachment(
+              context,
+              submissionId,
+              File(filePath),
+              true, // isSignature
+              signatureAuthor: signatureAuthor,
+              signaturePosition: signaturePosition,
+            );
+
+            setState(() {
+              _uploadedFiles++;
+            });
+          } catch (e) {
+            print('Error uploading signature: $e');
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to upload signature: ${path.basename(filePath)}'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      }
+
+      // Handle regular file attachments
+      if (_attachedFiles.isNotEmpty) {
+        setState(() {
+          _isUploadingFiles = true;
+          _totalFiles = _attachedFiles.length;
+          _uploadedFiles = 0;
+        });
+
+        final failedUploads = <String>[];
+
+        for (var filePath in _attachedFiles) {
+          try {
+            final fileExt = path.extension(filePath).toLowerCase();
+            final isSignature = filePath.contains("signature_");
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Uploading ${path.basename(filePath)}...'),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+
+            final uploadResponse = await _attachmentService.createAttachment(
+              context,
+              submissionId,
+              File(filePath),
+              isSignature,
+            );
+
+            if (uploadResponse['attachment'] != null) {
+              setState(() {
+                _uploadedFiles++;
+              });
+            } else {
+              throw Exception('Invalid server response');
+            }
+          } catch (e) {
+            failedUploads.add(path.basename(filePath));
+          }
+        }
+
+        if (failedUploads.isNotEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload: ${failedUploads.join(", ")}'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+
+        setState(() {
+          _isUploadingFiles = false;
+        });
+      }
+
+      // Format and submit answers
+      List<Map<String, dynamic>> formattedSubmissions = [];
+
+      answers.forEach((questionId, answerValue) {
+        Map<String, dynamic>? question = questions.firstWhere(
+              (q) => q['id'] == questionId,
+          orElse: () => null,
+        );
+
+        if (question == null) {
+          print('Warning: No question found for ID $questionId');
+          return;
+        }
+
+        final questionType = question['type']?.toString().toLowerCase() ?? 'text';
+        final questionText = question['text']?.toString() ?? 'Unknown Question';
+
+        if (questionType.contains('multiple_choice') ||
+            questionType.contains('checkbox')) {
+          List<dynamic> selectedIds = (answerValue is List) ? answerValue : [answerValue];
+          List<dynamic> possibleAnswers = question['possible_answers'] ?? [];
+
+          for (var selectedId in selectedIds) {
+            var selectedAnswer = possibleAnswers.firstWhere(
+                  (answer) => answer['id'] == selectedId,
+              orElse: () => null,
+            );
+
+            if (selectedAnswer != null) {
+              String answerText = selectedAnswer['value']?.toString() ?? '';
+              formattedSubmissions.add({
+                'question_text': questionText,
+                'question_type_text': questionType,
+                'answer_text': answerText
+              });
+            }
+          }
+        } else {
+          formattedSubmissions.add({
+            'question_text': questionText,
+            'question_type_text': questionType,
+            'answer_text': answerValue?.toString() ?? ''
+          });
+        }
+      });
+
+      if (formattedSubmissions.isEmpty) {
+        throw Exception('No answers to submit');
+      }
+
+      await _answerSubmittedService.createAnswerSubmitted(
+        context,
+        submissionId,
+        formattedSubmissions,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Form submitted successfully'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      setState(() {
+        showQuestions = false;
+        selectedForm = null;
+        answers.clear();
+        _attachedFiles.clear();
+        signatureFiles.clear(); // Clear signature files
+        isLoading = false;
+        _canSubmitForm = false;
+        _questionValidityMap = {};
+        _validatingForm = false;
+      });
+    } catch (e, stackTrace) {
+      print('Error in _submitAnswers: $e');
+      print('Stack trace: $stackTrace');
+
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        _isUploadingFiles = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Widget _buildFormCard(Map<String, dynamic> form) {
@@ -3301,11 +3533,22 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
     if (questionType == 'signature') {
       return CustomSignaturePad(
-        onSignatureCaptured: (file) {
+        onSignatureCaptured: (file, {String? author, String? position}) {
           if (file != null) {
             setState(() {
+              // Store the file path in answers for form validation
               answers[questionId] = file.path;
+
+              // Store the file path in attachedFiles for displaying in the UI
               _attachedFiles.add(file.path);
+
+              // Also store in signatureFiles with metadata
+              signatureFiles[questionId.toString()] = {
+                'path': file.path,
+                'author': author ?? widget.sessionData['fullname'] ?? '',
+                'position': position ?? question['text'] ?? 'Form Signature'
+              };
+
               _validateFormSubmission();
             });
           } else {
@@ -3313,6 +3556,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               if (answers.containsKey(questionId)) {
                 _attachedFiles.remove(answers[questionId]);
                 answers.remove(questionId);
+                signatureFiles.remove(questionId.toString());
                 _validateFormSubmission();
               }
             });
