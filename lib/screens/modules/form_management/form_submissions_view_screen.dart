@@ -249,6 +249,7 @@ class SubmissionDetailScreen extends StatelessWidget {
 // Sección de Signatures
               // Sección de Signatures - versión mejorada
               // Sección de Signatures - versión con nombre de archivo
+              // Sección de Signatures mejorada
               if (hasSignatures) {
                 attachmentWidgets.add(const SizedBox(height: 24));
                 attachmentWidgets.add(const Text(
@@ -261,13 +262,47 @@ class SubmissionDetailScreen extends StatelessWidget {
                 ));
                 attachmentWidgets.add(const SizedBox(height: 8));
 
+                // Obtener todas las preguntas tipo signature
+                final signatureQuestions = submission.answers
+                    .where((answer) => answer.questionType.toLowerCase() == 'signature')
+                    .toList();
+
                 // Añadir cada firma a la lista de widgets
-                for (int i = 0; i < signatures.length; i++) {
-                  final signature = signatures[i];
+                for (var signature in signatures) {
+                  // Buscar la pregunta correspondiente para esta firma específica
+                  String questionName = 'Electronic Signature';
 
-                  // Extraer solo el nombre del archivo para mostrarlo
-                  final fileName = signature.filePath.split('\\').last;
+                  // Buscar coincidencia basada en los nombres de archivos
+                  for (var question in signatureQuestions) {
+                    // Extraer el nombre base del archivo de la respuesta de la pregunta
+                    String answerFileName = "";
+                    if (question.answer.contains('/')) {
+                      // Si la respuesta contiene una ruta, extraer el nombre del archivo
+                      answerFileName = question.answer.split('/').last;
+                      if (answerFileName.contains('.')) {
+                        answerFileName = answerFileName.split('.').first;
+                      }
+                    }
 
+                    // Extraer el nombre base del archivo de la firma
+                    String signatureFileName = "";
+                    if (signature.filePath.contains('\\')) {
+                      signatureFileName = signature.filePath.split('\\').last;
+                      if (signatureFileName.contains('_')) {
+                        // Obtener la parte principal del nombre (antes de los timestamp)
+                        signatureFileName = signatureFileName.split('_').first + "_" + signatureFileName.split('_')[1];
+                      }
+                    }
+
+                    // Verificar si los nombres de archivo coinciden
+                    if (!answerFileName.isEmpty && !signatureFileName.isEmpty &&
+                        signatureFileName.contains(answerFileName)) {
+                      questionName = question.question;
+                      break;
+                    }
+                  }
+
+                  // Añadir tarjeta de firma
                   attachmentWidgets.add(Card(
                     color: Colors.white,
                     elevation: 2,
@@ -283,7 +318,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                         size: 36,
                       ),
                       title: Text(
-                        fileName, // Mostramos solo el nombre del archivo
+                        questionName,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
