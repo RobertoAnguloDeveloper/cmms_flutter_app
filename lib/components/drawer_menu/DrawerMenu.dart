@@ -108,7 +108,7 @@ class _DrawerMenuState extends State<DrawerMenu> {
             // DRAWER MENU USER PERMISSIONS MANAGER
             // //2-OPTION User Management - Visible if 'view_all_users'
             if (_isSuperUser &&
-                (widget.permissionSet?.hasPermission('view_all_users') ??
+                (widget.permissionSet?.hasPermission('view_users') ??
                     false))
               PermissionMenuItem(
                 title: 'Users Management',
@@ -191,8 +191,8 @@ class _DrawerMenuState extends State<DrawerMenu> {
     icon: FontAwesomeIcons.clipboardList,
     // Eliminamos condition: () => _isSuperUser,
     hasPermission: () =>
-    (widget.permissionSet?.hasPermission('view_submissions') ?? false) &&
-    (widget.permissionSet?.hasPermission('create_submissions') ?? false),
+    (widget.permissionSet?.hasPermission('view_form_submissions') ?? false) &&
+    (widget.permissionSet?.hasPermission('create_form_submissions') ?? false),
     onTap: () {
     Navigator.pushReplacement(
     context,
@@ -227,7 +227,7 @@ class _DrawerMenuState extends State<DrawerMenu> {
               title: 'View Form',
               icon: FontAwesomeIcons.clipboardList,
               hasPermission: () =>
-              (widget.permissionSet?.hasPermission('view_submissions') ?? false),
+              (widget.permissionSet?.hasPermission('view_form_submissions') ?? false),
               onTap: () {
                 if (widget.sessionData != null && widget.permissionSet != null) {
                   Navigator.push(
