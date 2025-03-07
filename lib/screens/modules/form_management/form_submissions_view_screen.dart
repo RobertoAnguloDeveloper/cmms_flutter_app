@@ -731,35 +731,108 @@ class FormSubmissionsViewScreen extends StatefulWidget {
       _FormSubmissionsViewScreenState();
 }
 
+// Actualización en la clase _FormSubmissionsViewScreenState
+
 class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
-  final FormSubmissionViewService _submissionService =
-      FormSubmissionViewService();
+  final FormSubmissionViewService _submissionService = FormSubmissionViewService();
 
   List<FormSubmissionView> submissions = [];
   List<FormSubmissionView> filteredSubmissions = [];
   bool isLoading = true;
 
-  // Example filter by user in a Dropdown
+  // Filter by user (solo search, sin dropdown)
   String? _selectedUser;
-  List<String> _users = [];
   TextEditingController _searchController = TextEditingController();
+
+  // Filter by date
+  DateTime? _selectedDate;
+  TextEditingController _dateController = TextEditingController();
 
   @override
   void dispose() {
     _searchController.dispose();
+    _dateController.dispose();
     super.dispose();
   }
 
   void _searchByUserName(String query) {
     setState(() {
-      if (query.isEmpty) {
-        filteredSubmissions = submissions;
-      } else {
-        filteredSubmissions = submissions
-            .where((s) =>
-                s.submittedBy.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
+      _applyFilters(userQuery: query);
+    });
+  }
+
+  // Método para aplicar ambos filtros (usuario y fecha)
+  void _applyFilters({String? userQuery, DateTime? date}) {
+    // Guardar los valores proporcionados si no son nulos
+    if (userQuery != null) {
+      _selectedUser = userQuery.isEmpty ? null : userQuery;
+    }
+    if (date != null) {
+      _selectedDate = date;
+    }
+
+    // Comenzar con todos los envíos
+    List<FormSubmissionView> result = [...submissions];
+
+    // Filtrar por usuario si hay uno seleccionado
+    if (_selectedUser != null && _selectedUser!.isNotEmpty) {
+      result = result
+          .where((s) => s.submittedBy.toLowerCase().contains(_selectedUser!.toLowerCase()))
+          .toList();
+    }
+
+    // Filtrar por fecha si hay una seleccionada
+    if (_selectedDate != null) {
+      result = result.where((s) {
+        // Comparar solo año, mes y día (ignorar hora, minutos, segundos)
+        return s.submittedAt.year == _selectedDate!.year &&
+            s.submittedAt.month == _selectedDate!.month &&
+            s.submittedAt.day == _selectedDate!.day;
+      }).toList();
+    }
+
+    // Actualizar la lista filtrada
+    setState(() {
+      filteredSubmissions = result;
+    });
+  }
+
+  // Método para mostrar el selector de fecha
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2015),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.blue,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _dateController.text = DateFormat('dd/MM/yyyy').format(picked);
+        _applyFilters(date: picked);
+      });
+    }
+  }
+
+  // Método para limpiar los filtros de fecha
+  void _clearDateFilter() {
+    setState(() {
+      _selectedDate = null;
+      _dateController.clear();
+      _applyFilters();
     });
   }
 
@@ -774,14 +847,10 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
       setState(() => isLoading = true);
 
       // This call now returns one FormSubmissionView per submission
-      final data =
-          await _submissionService.getFormSubmissions(widget.formId, context);
+      final data = await _submissionService.getFormSubmissions(widget.formId, context);
 
       submissions = data;
       filteredSubmissions = data;
-
-      // Build list of unique "submittedBy" for filtering
-      _users = submissions.map((s) => s.submittedBy).toSet().toList()..sort();
 
       setState(() => isLoading = false);
     } catch (e) {
@@ -792,33 +861,8 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
     }
   }
 
-  void _filterByUser(String? user) {
-    if (user == null || user == 'All') {
-      setState(() {
-        _selectedUser = 'All';
-        filteredSubmissions = submissions;
-      });
-    } else {
-      setState(() {
-        _selectedUser = user;
-        filteredSubmissions =
-            submissions.where((s) => s.submittedBy == user).toList();
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final dropdownItems = <DropdownMenuItem<String>>[
-      const DropdownMenuItem(
-        value: 'All',
-        child: Text('All'),
-      ),
-      ..._users.map((user) => DropdownMenuItem(
-            value: user,
-            child: Text(user),
-          ))
-    ];
 
     return Scaffold(
         appBar: AppBar(
@@ -840,153 +884,202 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
           child: isLoading
               ? const Center(child: CircularProgressIndicator())
               : Column(
+            children: [
+              // Filtro de usuario
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Search by user',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.blue,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // 📦 Combina el Dropdown con el TextField
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                  color: Colors.transparent), // Sin borde
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black
-                                      .withOpacity(0.1), // Color de la sombra
-                                  spreadRadius:
-                                      1, // Cuánto se expande la sombra
-                                  blurRadius: 5, // Desenfoque de la sombra
-                                  offset: const Offset(
-                                      0, 3), // Desplazamiento de la sombra
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                // 🔽 Dropdown integrado (sin opción "All")
-                                DropdownButton<String>(
-                                  value: _selectedUser,
-                                  hint: const Text(
-                                      "Select user"), // Texto por defecto
-                                  items: _users.map((user) {
-                                    return DropdownMenuItem(
-                                      value: user,
-                                      child: Text(user),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _selectedUser = value;
-                                      _searchController.text = value ??
-                                          ''; // Actualiza el campo de búsqueda
-                                      _searchByUserName(value ??
-                                          ''); // Filtra automáticamente
-                                    });
-                                  },
-                                  underline:
-                                      const SizedBox(), // Oculta la línea inferior
-                                  icon: const Icon(Icons.arrow_drop_down),
-                                ),
-                                const VerticalDivider(), // Separador visual
-                                // 🔍 TextField de búsqueda
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Enter user name...',
-                                      border: InputBorder.none, // Sin borde
-                                      prefixIcon: Icon(Icons.search),
-                                    ),
-                                    onChanged: _searchByUserName,
-                                  ),
-                                ),
-                              ],
-                            ),
+                    const Text(
+                      'Search by user',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Solo TextField para buscar usuario
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.transparent), // Sin borde
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 5,
+                            offset: const Offset(0, 3),
                           ),
                         ],
                       ),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter user name...',
+                          border: InputBorder.none,
+                          prefixIcon: Icon(Icons.search),
+                          suffixIcon: Icon(Icons.person_outline),
+                        ),
+                        onChanged: _searchByUserName,
+                      ),
                     ),
-                    // 📋 Mostrar lista o mensaje vacío
-                    Expanded(
-                      child: filteredSubmissions.isEmpty
-                          ? const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.list_alt, // 📋 Ícono restaurado
-                                    size: 64,
-                                    color: Colors.grey,
-                                  ),
-                                  SizedBox(height: 16),
-                                  Text(
-                                    'No submissions available.',
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Once someone submits a form, you\'ll see it here.',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      color: Colors.grey,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: filteredSubmissions.length,
-                              itemBuilder: (context, index) {
-                                final submission = filteredSubmissions[index];
-                                return _CustomExpansionCard(
-                                  submission: submission,
-                                  onCardTap: () async {
-                                    // Navegar a la pantalla de detalles y esperar un resultado
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => SubmissionDetailScreen(
-                                          submission: submission,
-                                          permissionSet: widget.permissionSet,
-                                          sessionData: widget.sessionData,
-                                        ),
-                                      ),
-                                    );
-
-                                    // Si result es true, significa que se eliminó un submission
-                                    // y debemos actualizar la lista
-                                    if (result == true) {
-                                      // Recargar los submissions
-                                      _loadSubmissions();
-                                    }
-                                  },
-                                );
-                              },
-                            ),
-                    )
                   ],
                 ),
+              ),
+
+              // Nuevo: Filtro de fecha
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Filter by date',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Selector de fecha con diseño consistente
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 5,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.calendar_today),
+                            onPressed: () => _selectDate(context),
+                          ),
+                          const VerticalDivider(), // Separador visual
+                          // Campo de texto para mostrar la fecha seleccionada
+                          Expanded(
+                            child: TextField(
+                              controller: _dateController,
+                              decoration: const InputDecoration(
+                                hintText: 'Select date...',
+                                border: InputBorder.none,
+                              ),
+                              readOnly: true,
+                              onTap: () => _selectDate(context),
+                            ),
+                          ),
+                          // Botón para limpiar la fecha seleccionada
+                          if (_selectedDate != null)
+                            IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: _clearDateFilter,
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // Badge que muestra cuántos registros se están mostrando
+                    if (filteredSubmissions.length != submissions.length)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            'Showing ${filteredSubmissions.length} of ${submissions.length} submissions',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Mostrar lista o mensaje vacío
+              Expanded(
+                child: filteredSubmissions.isEmpty
+                    ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.list_alt,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'No submissions available.',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Once someone submits a form, you\'ll see it here.',
+                        style: TextStyle(
+                          fontSize: 24,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+                    : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredSubmissions.length,
+                  itemBuilder: (context, index) {
+                    final submission = filteredSubmissions[index];
+                    return _CustomExpansionCard(
+                      submission: submission,
+                      onCardTap: () async {
+                        // Navegar a la pantalla de detalles y esperar un resultado
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SubmissionDetailScreen(
+                              submission: submission,
+                              permissionSet: widget.permissionSet,
+                              sessionData: widget.sessionData,
+                            ),
+                          ),
+                        );
+
+                        // Si result es true, significa que se eliminó un submission
+                        // y debemos actualizar la lista
+                        if (result == true) {
+                          // Recargar los submissions
+                          _loadSubmissions();
+                        }
+                      },
+                    );
+                  },
+                ),
+              )
+            ],
+          ),
         ));
   }
 }
