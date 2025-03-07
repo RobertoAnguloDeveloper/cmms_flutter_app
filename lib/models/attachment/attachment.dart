@@ -7,6 +7,8 @@ class Attachment {
   final bool isSignature;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? signatureAuthor;  // Nuevo campo
+  final String? signaturePosition;  // Nuevo campo
 
   Attachment({
     this.id,
@@ -16,6 +18,8 @@ class Attachment {
     this.isSignature = false,
     this.createdAt,
     this.updatedAt,
+    this.signatureAuthor,  // Añadido
+    this.signaturePosition,  // Añadido
   });
 
   factory Attachment.fromJson(Map<String, dynamic> json) {
@@ -27,6 +31,8 @@ class Attachment {
       isSignature: json['is_signature'] ?? false,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      signatureAuthor: json['signature_author'],  // Añadido
+      signaturePosition: json['signature_position'],  // Añadido
     );
   }
 
@@ -38,5 +44,7 @@ class Attachment {
     'is_signature': isSignature,
     'created_at': createdAt?.toIso8601String(),
     'updated_at': updatedAt?.toIso8601String(),
+    'signature_author': signatureAuthor,  // Añadido
+    'signature_position': signaturePosition,  // Añadido
   };
 }

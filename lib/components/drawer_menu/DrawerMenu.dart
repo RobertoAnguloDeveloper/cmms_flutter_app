@@ -87,18 +87,15 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 ),
               ),
             ),
-            const Divider(
-              color: Colors.grey,
-              indent: 10,
-              endIndent: 10,
-            ),
+            const Divider(color: Colors.grey, indent: 10, endIndent: 10),
 
             //DRAWER MENU OPTIONS
             //1-OPTION HOME
             PermissionMenuItem(
               title: 'Home',
               icon: FontAwesomeIcons.home,
-              onTap: () => DrawerMenuNavigationHelper.navigateToHome(
+              onTap:
+                  () => DrawerMenuNavigationHelper.navigateToHome(
                 context: context,
                 sessionData: widget.sessionData,
                 permissionSet: widget.permissionSet,
@@ -108,8 +105,9 @@ class _DrawerMenuState extends State<DrawerMenu> {
             // DRAWER MENU USER PERMISSIONS MANAGER
             // //2-OPTION User Management - Visible if 'view_all_users'
             if (_isSuperUser &&
-                (widget.permissionSet?.hasPermission('view_users') ??
-                    false))
+
+                (widget.permissionSet?.hasPermission('view_users') ?? false))
+
               PermissionMenuItem(
                 title: 'Users Management',
                 icon: FontAwesomeIcons.userGroup,
@@ -117,7 +115,8 @@ class _DrawerMenuState extends State<DrawerMenu> {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => UsersListScreen(
+                      builder:
+                          (context) => UsersListScreen(
                         permissionSet: widget.permissionSet!,
                         sessionData: widget.sessionData!,
                       ),
@@ -136,7 +135,8 @@ class _DrawerMenuState extends State<DrawerMenu> {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => UsersPage(
+                      builder:
+                          (context) => UsersPage(
                         permissionSet: widget.permissionSet!,
                         sessionData: widget.sessionData!,
                       ),
@@ -155,7 +155,8 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => PermissionsByRoleScreen(
+                    builder:
+                        (context) => PermissionsByRoleScreen(
                       permissionSet: widget.permissionSet!,
                       sessionData: widget.sessionData!,
                     ),
@@ -169,16 +170,18 @@ class _DrawerMenuState extends State<DrawerMenu> {
             PermissionMenuItem(
               title: 'Form Management',
               icon: FontAwesomeIcons.fileCircleCheck,
-              hasPermission: () =>
-                  (widget.permissionSet?.hasPermission('view_forms') ??
-                      false) &&
+              hasPermission:
+                  () =>
+              (widget.permissionSet?.hasPermission('view_forms') ??
+                  false) &&
                   (widget.permissionSet?.hasPermission('create_forms') ??
                       false),
               onTap: () {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => FormListScreen(
+                    builder:
+                        (context) => FormListScreen(
                       permissionSet: widget.permissionSet!,
                       sessionData: widget.sessionData!,
                     ),
@@ -186,28 +189,38 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
-    PermissionMenuItem(
-    title: 'Form Submission',
-    icon: FontAwesomeIcons.clipboardList,
-    // Eliminamos condition: () => _isSuperUser,
-    hasPermission: () =>
-    (widget.permissionSet?.hasPermission('view_form_submissions') ?? false) &&
-    (widget.permissionSet?.hasPermission('create_form_submissions') ?? false),
-    onTap: () {
-    Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-    builder: (context) => QuestionsAnswerScreen(
-    formTitle: 'Form Title',
-    formDescription: 'Description of the form',
-    permissionSet: widget.permissionSet!,
-    sessionData: widget.sessionData!,
-    formId: 0,
-    ),
-    ),
-    );
-    },
-    ),
+
+            PermissionMenuItem(
+              title: 'Form Submission',
+              icon: FontAwesomeIcons.clipboardList,
+              // Eliminamos condition: () => _isSuperUser,
+              hasPermission:
+                  () =>
+              (widget.permissionSet?.hasPermission(
+                'view_form_submissions',
+              ) ??
+                  false) &&
+                  (widget.permissionSet?.hasPermission(
+                    'create_form_submissions',
+                  ) ??
+                      false),
+              onTap: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => QuestionsAnswerScreen(
+                      formTitle: 'Form Title',
+                      formDescription: 'Description of the form',
+                      permissionSet: widget.permissionSet!,
+                      sessionData: widget.sessionData!,
+                      formId: 0,
+                    ),
+                  ),
+                );
+              },
+            ),
+
             PermissionMenuItem(
               title: 'Drafts',
               icon: FontAwesomeIcons.save,
@@ -215,7 +228,8 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => DraftsScreen(
+                    builder:
+                        (context) => DraftsScreen(
                       permissionSet: widget.permissionSet!,
                       sessionData: widget.sessionData!,
                     ),
@@ -226,16 +240,26 @@ class _DrawerMenuState extends State<DrawerMenu> {
             PermissionMenuItem(
               title: 'View Form',
               icon: FontAwesomeIcons.clipboardList,
-              hasPermission: () =>
-              (widget.permissionSet?.hasPermission('view_form_submissions') ?? false),
+
+              hasPermission:
+                  () =>
+              (widget.permissionSet?.hasPermission(
+                'view_form_submissions',
+              ) ??
+                  false),
+
               onTap: () {
-                if (widget.sessionData != null && widget.permissionSet != null) {
+                if (widget.sessionData != null &&
+                    widget.permissionSet != null) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => FormSubmissionsViewScreen(
+                      builder:
+                          (context) => FormSubmissionsViewScreen(
                         formId: widget.sessionData!['current_form_id'] ?? 0,
-                        formTitle: widget.sessionData!['current_form_title'] ?? 'Form Submissions',
+                        formTitle:
+                        widget.sessionData!['current_form_title'] ??
+                            'Form Submissions',
                         permissionSet: widget.permissionSet!,
                         sessionData: widget.sessionData!,
                       ),
@@ -257,7 +281,6 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
-
           ],
         ),
       ),
