@@ -686,7 +686,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 ),
                 icon: const Icon(Icons.attach_file, color: Colors.white),
                 label: const Text(
-                  'Attach Files',
+                  'Attach Filesssss',
                   style: TextStyle(color: Colors.white),
                 ),
               ),
@@ -1074,106 +1074,192 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         child: isLoading
             ? const Center(child: CircularProgressIndicator())
             : showQuestions
-            ? ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (selectedForm?['description'] != null)
-              Card(
-                elevation: 0,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    selectedForm!['description'],
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 16),
-            _buildAttachmentButtons(),
-            const SizedBox(height: 16),
-            _buildAttachedFilesList(),
-            const SizedBox(height: 16),
-            ...questions.map((q) => _buildQuestionCard(q)).toList(),
-            const SizedBox(height: 24),
-            // Submit button that's disabled until all required questions are answered
-            ElevatedButton(
-              onPressed: (isLoading || _isUploadingFiles || !_canSubmitForm)
-                  ? null
-                  : _submitAnswers,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                backgroundColor: Colors.blue,
-                disabledBackgroundColor: Colors.grey[300],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _isUploadingFiles
-                  ? Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white),
-                      strokeWidth: 2,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Uploading $_uploadedFiles of $_totalFiles',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              )
-                  : Text(
-                _validatingForm && !_canSubmitForm
-                    ? 'Complete required questions to submit'
-                    : 'Submit Answers',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: _canSubmitForm ? Colors.white : Colors.grey[600],
-                ),
-              ),
-            ),
-            // Error message when user tries to submit with incomplete required fields
-            if (_validatingForm && !_canSubmitForm)
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: const Text(
-                  'Please complete all required questions marked with a red asterisk (*)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.red,
-                  ),
-                ),
-              ),
-          ],
-        )
+            ? _buildQuestionsList()
             : ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: forms.length,
           itemBuilder: (context, index) => _buildFormCard(forms[index]),
         ),
       ),
+    );
+  }
+
+  Widget _buildQuestionsList() {
+    // Calcular la altura de la cabecera según su contenido
+    final double headerHeight = selectedForm?['description'] != null ? 200 : 150;
+
+    return Stack(
+      children: [
+        // Contenido principal desplazable (con padding superior para evitar superposición)
+        Positioned.fill(
+          child: CustomScrollView(
+            slivers: [
+              // Espacio en blanco para compensar el header fijo
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: headerHeight,
+                ),
+              ),
+
+              // Lista de archivos adjuntos
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildAttachedFilesList(),
+                ),
+              ),
+
+              // Preguntas del formulario
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                      return _buildQuestionCard(questions[index]);
+                    },
+                    childCount: questions.length,
+                  ),
+                ),
+              ),
+
+              // Botón de enviar y mensaje de validación
+              SliverPadding(
+                padding: const EdgeInsets.all(16.0),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ElevatedButton(
+                        onPressed: (isLoading || _isUploadingFiles || !_canSubmitForm)
+                            ? null
+                            : _submitAnswers,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                          backgroundColor: Colors.blue,
+                          disabledBackgroundColor: Colors.grey[300],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isUploadingFiles
+                            ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white),
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Uploading $_uploadedFiles of $_totalFiles',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        )
+                            : Text(
+                          _validatingForm && !_canSubmitForm
+                              ? 'Complete required questions to submit'
+                              : 'Submit Answers',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: _canSubmitForm ? Colors.white : Colors.grey[600],
+                          ),
+                        ),
+                      ),
+
+                      // Error message when user tries to submit with incomplete required fields
+                      if (_validatingForm && !_canSubmitForm)
+                        Container(
+                          margin: const EdgeInsets.only(top: 12),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: const Text(
+                            'Please complete all required questions marked with a red asterisk (*)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ),
+
+                      // Padding de espacio al final
+                      const SizedBox(height: 50),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Header fijo (Descripción del formulario y botones)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            width: MediaQuery.of(context).size.width, // Ancho completo de la pantalla
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3F2FD),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch, // Asegura que los hijos ocupen todo el ancho
+                children: [
+                  // Descripción del formulario (si existe)
+                  if (selectedForm?['description'] != null)
+                    Card(
+                      elevation: 0,
+                      color: Colors.white,
+                      margin: EdgeInsets.zero, // Elimina márgenes adicionales
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          selectedForm!['description'],
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Espacio entre descripción y botones (si hay descripción)
+                  if (selectedForm?['description'] != null)
+                    const SizedBox(height: 16),
+
+                  // Botones de adjuntar archivo y tomar foto
+                  _buildAttachmentButtons(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
