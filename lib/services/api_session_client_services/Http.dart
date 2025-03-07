@@ -8,9 +8,9 @@ class Http {
   final String baseUrl = kIsWeb
         // ? "http://3.129.92.139" // URL WEB
      // : "http://3.129.92.139"; // URL ANDROID
-      ? "http://3.144.104.212" // URL WEB
+      ? "http://localhost:5000" // URL WEB
       //? "" // URL WEB
-      : "http://3.144.104.212"; // URL ANDROID
+      : "http://10.0.2.2:5000"; // URL ANDROID
 
   Future<http.Response> login(String path, dynamic data) async {
     final url = Uri.parse('$baseUrl$path');
