@@ -37,6 +37,9 @@ class _DrawerMenuState extends State<DrawerMenu> {
   String? _userEmail;
   bool _isSuperUser = false;
 
+  bool _isUsersExpanded = false;
+  bool _isFormsExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +55,18 @@ class _DrawerMenuState extends State<DrawerMenu> {
       });
     }
   }
+
+  bool _hasAnyUserPermission() {
+    return _isSuperUser || (widget.permissionSet?.hasPermission('view_users') ?? false);
+  }
+
+  bool _hasAnyFormPermission() {
+    return (widget.permissionSet?.hasPermission('view_forms') ?? false) ||
+        (widget.permissionSet?.hasPermission('create_forms') ?? false) ||
+        (widget.permissionSet?.hasPermission('view_form_submissions') ?? false) ||
+        (widget.permissionSet?.hasPermission('create_form_submissions') ?? false);
+  }
+
 
   //BUILD WIDGET DRAWER MENU
   @override
@@ -89,147 +104,274 @@ class _DrawerMenuState extends State<DrawerMenu> {
             ),
             const Divider(color: Colors.grey, indent: 10, endIndent: 10),
 
-            //DRAWER MENU OPTIONS
-            //1-OPTION HOME
+            // DRAWER MENU OPTIONS
+            // 1-OPTION HOME
             PermissionMenuItem(
-              title: 'Home',
+              title: 'HOME',
               icon: FontAwesomeIcons.home,
-              onTap:
-                  () => DrawerMenuNavigationHelper.navigateToHome(
+              onTap: () => DrawerMenuNavigationHelper.navigateToHome(
                 context: context,
                 sessionData: widget.sessionData,
                 permissionSet: widget.permissionSet,
               ),
             ),
 
-            // DRAWER MENU USER PERMISSIONS MANAGER
-            // //2-OPTION User Management - Visible if 'view_all_users'
-            if (_isSuperUser &&
-
-                (widget.permissionSet?.hasPermission('view_users') ?? false))
-
-              PermissionMenuItem(
-                title: 'Users Management',
-                icon: FontAwesomeIcons.userGroup,
+            // CATEGORÍA DE USUARIOS
+            if (_hasAnyUserPermission()) ...[
+              const SizedBox(height: 8),
+              InkWell(
                 onTap: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => UsersListScreen(
-                        permissionSet: widget.permissionSet!,
-                        sessionData: widget.sessionData!,
-                      ),
-                    ),
-                  );
+                  setState(() {
+                    _isUsersExpanded = !_isUsersExpanded;
+                  });
                 },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        FontAwesomeIcons.users,
+                        size: 20,
+                        color: const Color.fromARGB(255, 34, 118, 186),
+                      ),
+                      const SizedBox(width: 32),
+                      const Text(
+                        'USERS',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Color.fromARGB(255, 73, 70, 70),
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        _isUsersExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        color: const Color.fromARGB(255, 73, 70, 70),
+                      ),
+                    ],
+                  ),
+                ),
               ),
 
-            // DRAWER MENU USER VIEW USERS
-            if (!_isSuperUser &&
-                (widget.permissionSet?.hasPermission('view_users') ?? false))
-              PermissionMenuItem(
-                title: 'View users',
-                icon: FontAwesomeIcons.users,
-                onTap: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => UsersPage(
-                        permissionSet: widget.permissionSet!,
-                        sessionData: widget.sessionData!,
+              // Submenú de USERS con estilo mejorado
+              if (_isUsersExpanded) ...[
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.only(left: 16.0, right: 16.0, top: 8.0, bottom: 8.0),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F7FA),
+                    borderRadius: BorderRadius.circular(8.0),
+                    border: Border.all(color: const Color(0xFFE0E5ED), width: 1.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
                       ),
-                    ),
-                  );
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // OPCIÓN: User Management (superusuarios con permiso view_users)
+                      if (_isSuperUser && (widget.permissionSet?.hasPermission('view_users') ?? false))
+                        PermissionMenuItem(
+                          title: 'Users Management',
+                          icon: FontAwesomeIcons.userGroup,
+                          indent: 8.0,
+                          onTap: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => UsersListScreen(
+                                  permissionSet: widget.permissionSet!,
+                                  sessionData: widget.sessionData!,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                      // OPCIÓN: View Users (usuarios no superusuarios con permiso view_users)
+                      if (!_isSuperUser && (widget.permissionSet?.hasPermission('view_users') ?? false))
+                        PermissionMenuItem(
+                          title: 'View users',
+                          icon: FontAwesomeIcons.users,
+                          indent: 8.0,
+                          onTap: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => UsersPage(
+                                  permissionSet: widget.permissionSet!,
+                                  sessionData: widget.sessionData!,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                      // OPCIÓN: Assign Permissions (solo superusuarios)
+                      PermissionMenuItem(
+                        title: 'Assign permissions',
+                        icon: FontAwesomeIcons.userLock,
+                        condition: () => _isSuperUser,
+                        indent: 8.0,
+                        onTap: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PermissionsByRoleScreen(
+                                permissionSet: widget.permissionSet!,
+                                sessionData: widget.sessionData!,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+
+            // CATEGORÍA DE FORMULARIOS
+            if (_hasAnyFormPermission()) ...[
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _isFormsExpanded = !_isFormsExpanded;
+                  });
                 },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        FontAwesomeIcons.fileAlt,
+                        size: 20,
+                        color: const Color.fromARGB(255, 34, 118, 186),
+                      ),
+                      const SizedBox(width: 32),
+                      const Text(
+                        'FORMS',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Color.fromARGB(255, 73, 70, 70),
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        _isFormsExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        color: const Color.fromARGB(255, 73, 70, 70),
+                      ),
+                    ],
+                  ),
+                ),
               ),
 
-            // DRAWER MENU PERMISSION-ROLE ASSIGN
-            // 6-OPTION Form management - Visible if 'super_user'
-            PermissionMenuItem(
-              title: 'Assign permissions',
-              icon: FontAwesomeIcons.userLock,
-              condition: () => _isSuperUser,
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => PermissionsByRoleScreen(
-                      permissionSet: widget.permissionSet!,
-                      sessionData: widget.sessionData!,
-                    ),
+              // Submenú de FORMS con estilo mejorado
+              if (_isFormsExpanded) ...[
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.only(left: 16.0, right: 16.0, top: 8.0, bottom: 8.0),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F7FA),
+                    borderRadius: BorderRadius.circular(8.0),
+                    border: Border.all(color: const Color(0xFFE0E5ED), width: 1.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
+                  child: Column(
+                    children: [
+                      // OPCIÓN: Form Management
+                      PermissionMenuItem(
+                        title: 'Form Designer',
+                        icon: FontAwesomeIcons.fileCircleCheck,
+                        indent: 8.0,
+                        hasPermission: () =>
+                        (widget.permissionSet?.hasPermission('view_forms') ?? false) &&
+                            (widget.permissionSet?.hasPermission('create_forms') ?? false),
+                        onTap: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FormListScreen(
+                                permissionSet: widget.permissionSet!,
+                                sessionData: widget.sessionData!,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
 
-            // DRAWER MENU USER FORM OPTION
-            // //4-OPTION Form management - Visible if 'view_forms'
-            PermissionMenuItem(
-              title: 'Form Management',
-              icon: FontAwesomeIcons.fileCircleCheck,
-              hasPermission:
-                  () =>
-              (widget.permissionSet?.hasPermission('view_forms') ??
-                  false) &&
-                  (widget.permissionSet?.hasPermission('create_forms') ??
-                      false),
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => FormListScreen(
-                      permissionSet: widget.permissionSet!,
-                      sessionData: widget.sessionData!,
-                    ),
+                      // OPCIÓN: Form Submission
+                      PermissionMenuItem(
+                        title: 'Submit Forms',
+                        icon: FontAwesomeIcons.clipboardList,
+                        indent: 8.0,
+                        hasPermission: () =>
+                        (widget.permissionSet?.hasPermission('view_form_submissions') ?? false) &&
+                            (widget.permissionSet?.hasPermission('create_form_submissions') ?? false),
+                        onTap: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => QuestionsAnswerScreen(
+                                formTitle: 'Form Title',
+                                formDescription: 'Description of the form',
+                                permissionSet: widget.permissionSet!,
+                                sessionData: widget.sessionData!,
+                                formId: 0,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // OPCIÓN: View Form
+                      PermissionMenuItem(
+                        title: 'View Submissions',
+                        icon: FontAwesomeIcons.clipboardCheck,
+                        indent: 8.0,
+                        hasPermission: () =>
+                        (widget.permissionSet?.hasPermission('view_form_submissions') ?? false),
+                        onTap: () {
+                          if (widget.sessionData != null && widget.permissionSet != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FormSubmissionsViewScreen(
+                                  formId: widget.sessionData!['current_form_id'] ?? 0,
+                                  formTitle: widget.sessionData!['current_form_title'] ?? 'Form Submissions',
+                                  permissionSet: widget.permissionSet!,
+                                  sessionData: widget.sessionData!,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
+                ),
+              ],
+            ],
 
+            // DRAFTS como módulo independiente
+            const SizedBox(height: 8),
             PermissionMenuItem(
-              title: 'Form Submission',
-              icon: FontAwesomeIcons.clipboardList,
-              // Eliminamos condition: () => _isSuperUser,
-              hasPermission:
-                  () =>
-              (widget.permissionSet?.hasPermission(
-                'view_form_submissions',
-              ) ??
-                  false) &&
-                  (widget.permissionSet?.hasPermission(
-                    'create_form_submissions',
-                  ) ??
-                      false),
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => QuestionsAnswerScreen(
-                      formTitle: 'Form Title',
-                      formDescription: 'Description of the form',
-                      permissionSet: widget.permissionSet!,
-                      sessionData: widget.sessionData!,
-                      formId: 0,
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            PermissionMenuItem(
-              title: 'Drafts',
+              title: 'DRAFTS',
               icon: FontAwesomeIcons.save,
               onTap: () {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder:
-                        (context) => DraftsScreen(
+                    builder: (context) => DraftsScreen(
                       permissionSet: widget.permissionSet!,
                       sessionData: widget.sessionData!,
                     ),
@@ -237,40 +379,13 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
-            PermissionMenuItem(
-              title: 'View Form',
-              icon: FontAwesomeIcons.clipboardList,
 
-              hasPermission:
-                  () =>
-              (widget.permissionSet?.hasPermission(
-                'view_form_submissions',
-              ) ??
-                  false),
+            const SizedBox(height: 16),
+            const Divider(color: Colors.grey, indent: 10, endIndent: 10),
 
-              onTap: () {
-                if (widget.sessionData != null &&
-                    widget.permissionSet != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => FormSubmissionsViewScreen(
-                        formId: widget.sessionData!['current_form_id'] ?? 0,
-                        formTitle:
-                        widget.sessionData!['current_form_title'] ??
-                            'Form Submissions',
-                        permissionSet: widget.permissionSet!,
-                        sessionData: widget.sessionData!,
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-            // Logout Option
+            // OPCIÓN: Log Out (siempre visible)
             PermissionMenuItem(
-              title: 'Log Out',
+              title: 'LOG OUT',
               icon: Icons.logout,
               onTap: () async {
                 await SessionManager.clearSession();
