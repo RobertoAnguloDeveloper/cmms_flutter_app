@@ -98,7 +98,8 @@ class SubmissionDetailScreen extends StatelessWidget {
     return groupedAnswers.values.toList();
   }
 
-  Future<Uint8List> _loadSignatureImage(BuildContext context, int attachmentId) async {
+  Future<Uint8List> _loadSignatureImage(
+      BuildContext context, int attachmentId) async {
     try {
       final service = FormSubmissionViewService();
       // Asumiendo que el servicio tiene un método para obtener la imagen como bytes
@@ -138,7 +139,7 @@ class SubmissionDetailScreen extends StatelessWidget {
       body: // Versión corregida de la parte del ListView para evitar respuestas duplicadas
 // Reemplaza todo el bloque del ListView en el método build con este código
 
-      Container(
+          Container(
         color: const Color(0xFFE3F2FD),
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -171,25 +172,116 @@ class SubmissionDetailScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // Botón de exportar a PDF
-                        IconButton(
-                          icon: const Icon(
-                            Icons.ios_share,
-                            size: 28,
-                            color: Colors.blue,
-                          ),
-                          tooltip: 'Export to PDF',
-                          onPressed: () {
-                            // Mostrar el diálogo de exportación de PDF
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return PdfExportDialog(
-                                  submissionId: submission.submissionId,
+                        // Botones de acción agrupados
+                        Row(
+                          children: [
+                            // Botón de exportar a PDF
+                            IconButton(
+                              icon: const Icon(
+                                Icons.ios_share,
+                                size: 28,
+                                color: Colors.blue,
+                              ),
+                              tooltip: 'Export to PDF',
+                              onPressed: () {
+                                // Mostrar el diálogo de exportación de PDF
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return PdfExportDialog(
+                                      submissionId: submission.submissionId,
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
+                            ),
+                            // Botón de eliminar
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 28,
+                                color: Colors.red,
+                              ),
+                              tooltip: 'Delete Submission',
+                              onPressed: () {
+                                // Mostrar diálogo de confirmación para eliminar
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text('Delete Submission'),
+                                      content: const Text(
+                                        'Are you sure you want to delete this submission? This action cannot be undone.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            Navigator.pop(
+                                                context); // Cerrar diálogo de confirmación
+
+                                            // Mostrar indicador de carga
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    'Deleting submission...'),
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+
+                                            try {
+                                              // Usar el nuevo método para eliminar la presentación
+                                              final FormSubmissionViewService
+                                                  service =
+                                                  FormSubmissionViewService();
+                                              final bool success = await service
+                                                  .deleteFormSubmission(context,
+                                                      submission.submissionId);
+
+                                              if (success && context.mounted) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                        'Submission deleted successfully'),
+                                                    backgroundColor:
+                                                        Colors.green,
+                                                  ),
+                                                );
+                                                // Volver a la pantalla anterior con un resultado que indique actualización
+                                                Navigator.pop(context,
+                                                    true); // Pasamos 'true' como resultado para indicar que se realizó una eliminación
+                                              }
+                                            } catch (e) {
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                        'Error deleting submission: $e'),
+                                                    backgroundColor: Colors.red,
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          },
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.red,
+                                          ),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -217,8 +309,9 @@ class SubmissionDetailScreen extends StatelessWidget {
             // Form answers - ESTA ES LA ÚNICA SECCIÓN DE RESPUESTAS
             const SizedBox(height: 16),
             ..._processAnswers(submission.answers
-                .where((answer) => answer.questionType.toLowerCase() != 'signature')
-                .toList())
+                    .where((answer) =>
+                        answer.questionType.toLowerCase() != 'signature')
+                    .toList())
                 .map((processedAnswer) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -238,19 +331,22 @@ class SubmissionDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    if (processedAnswer.questionType.toLowerCase() == 'checkbox' &&
+                    if (processedAnswer.questionType.toLowerCase() ==
+                            'checkbox' &&
                         processedAnswer.answer.contains(','))
-                    // Para respuestas tipo checkbox con múltiples opciones
+                      // Para respuestas tipo checkbox con múltiples opciones
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: processedAnswer.answer.split(',').map((option) {
+                        children:
+                            processedAnswer.answer.split(',').map((option) {
                           final trimmedOption = option.trim();
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 6),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.check_circle, size: 18, color: Colors.blue),
+                                const Icon(Icons.check_circle,
+                                    size: 18, color: Colors.blue),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -264,7 +360,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                         }).toList(),
                       )
                     else
-                    // Para respuestas no-checkbox o checkbox con una sola opción
+                      // Para respuestas no-checkbox o checkbox con una sola opción
                       Text(
                         processedAnswer.answer,
                         style: const TextStyle(fontSize: 16),
@@ -277,8 +373,10 @@ class SubmissionDetailScreen extends StatelessWidget {
             // Usar método construido para generar widgets en función de las condiciones
             ...(() {
               // Primero comprobamos si hay firmas o adjuntos
-              final signatures = submission.attachments.where((a) => a.isSignature).toList();
-              final regularAttachments = submission.attachments.where((a) => !a.isSignature).toList();
+              final signatures =
+                  submission.attachments.where((a) => a.isSignature).toList();
+              final regularAttachments =
+                  submission.attachments.where((a) => !a.isSignature).toList();
               final hasSignatures = signatures.isNotEmpty;
               final hasRegularAttachments = regularAttachments.isNotEmpty;
 
@@ -309,7 +407,8 @@ class SubmissionDetailScreen extends StatelessWidget {
 
                 // Obtener todas las preguntas tipo signature
                 final signatureQuestions = submission.answers
-                    .where((answer) => answer.questionType.toLowerCase() == 'signature')
+                    .where((answer) =>
+                        answer.questionType.toLowerCase() == 'signature')
                     .toList();
 
                 // Añadir cada firma a la lista de widgets
@@ -335,12 +434,15 @@ class SubmissionDetailScreen extends StatelessWidget {
                       signatureFileName = signature.filePath.split('\\').last;
                       if (signatureFileName.contains('_')) {
                         // Obtener la parte principal del nombre (antes de los timestamp)
-                        signatureFileName = signatureFileName.split('_').first + "_" + signatureFileName.split('_')[1];
+                        signatureFileName = signatureFileName.split('_').first +
+                            "_" +
+                            signatureFileName.split('_')[1];
                       }
                     }
 
                     // Verificar si los nombres de archivo coinciden
-                    if (!answerFileName.isEmpty && !signatureFileName.isEmpty &&
+                    if (!answerFileName.isEmpty &&
+                        !signatureFileName.isEmpty &&
                         signatureFileName.contains(answerFileName)) {
                       questionName = question.question;
                       break;
@@ -348,9 +450,11 @@ class SubmissionDetailScreen extends StatelessWidget {
                   }
 
                   // Determinar el texto a mostrar para el autor de la firma
-                  final String signatureAuthorText = signature.signatureAuthor != null && signature.signatureAuthor!.isNotEmpty
-                      ? signature.signatureAuthor!
-                      : questionName;
+                  final String signatureAuthorText =
+                      signature.signatureAuthor != null &&
+                              signature.signatureAuthor!.isNotEmpty
+                          ? signature.signatureAuthor!
+                          : questionName;
 
                   // Añadir tarjeta de firma con la imagen precargada
                   attachmentWidgets.add(Card(
@@ -376,7 +480,8 @@ class SubmissionDetailScreen extends StatelessWidget {
                         ),
 
                         // Mostrar el cargo/posición si está disponible
-                        if (signature.signaturePosition != null && signature.signaturePosition!.isNotEmpty)
+                        if (signature.signaturePosition != null &&
+                            signature.signaturePosition!.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Text(
@@ -391,56 +496,64 @@ class SubmissionDetailScreen extends StatelessWidget {
 
                         // Imagen de la firma
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           width: double.infinity,
                           child: signature.id != null
                               ? FutureBuilder<Uint8List>(
-                            future: _loadSignatureImage(context, signature.id!),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return Container(
-                                  height: 100,
-                                  alignment: Alignment.center,
-                                  child: const CircularProgressIndicator(),
-                                );
-                              } else if (snapshot.hasError) {
-                                return Container(
-                                  height: 100,
-                                  alignment: Alignment.center,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.error_outline, color: Colors.red, size: 32),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Could not load signature',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              } else if (snapshot.hasData) {
-                                return Container(
-                                  constraints: BoxConstraints(maxHeight: 150),
-                                  child: Image.memory(
-                                    snapshot.data!,
-                                    fit: BoxFit.contain,
-                                  ),
-                                );
-                              } else {
-                                return Container(
-                                  height: 100,
-                                  alignment: Alignment.center,
-                                  child: Text('No signature data available'),
-                                );
-                              }
-                            },
-                          )
+                                  future: _loadSignatureImage(
+                                      context, signature.id!),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return Container(
+                                        height: 100,
+                                        alignment: Alignment.center,
+                                        child:
+                                            const CircularProgressIndicator(),
+                                      );
+                                    } else if (snapshot.hasError) {
+                                      return Container(
+                                        height: 100,
+                                        alignment: Alignment.center,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.error_outline,
+                                                color: Colors.red, size: 32),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'Could not load signature',
+                                              style:
+                                                  TextStyle(color: Colors.red),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    } else if (snapshot.hasData) {
+                                      return Container(
+                                        constraints:
+                                            BoxConstraints(maxHeight: 150),
+                                        child: Image.memory(
+                                          snapshot.data!,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      );
+                                    } else {
+                                      return Container(
+                                        height: 100,
+                                        alignment: Alignment.center,
+                                        child:
+                                            Text('No signature data available'),
+                                      );
+                                    }
+                                  },
+                                )
                               : Container(
-                            height: 100,
-                            alignment: Alignment.center,
-                            child: Text('Signature ID missing'),
-                          ),
+                                  height: 100,
+                                  alignment: Alignment.center,
+                                  child: Text('Signature ID missing'),
+                                ),
                         ),
 
                         // Botón para ver en pantalla completa
@@ -458,13 +571,17 @@ class SubmissionDetailScreen extends StatelessWidget {
                                         .openAttachment(context, signature.id!);
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Signature ID is missing')),
+                                      const SnackBar(
+                                          content:
+                                              Text('Signature ID is missing')),
                                     );
                                   }
                                 } catch (e) {
                                   print('Error opening signature: $e');
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Error opening signature: $e')),
+                                    SnackBar(
+                                        content: Text(
+                                            'Error opening signature: $e')),
                                   );
                                 }
                               },
@@ -512,7 +629,8 @@ class SubmissionDetailScreen extends StatelessWidget {
                     ),
                     margin: const EdgeInsets.symmetric(vertical: 8),
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       leading: Icon(
                         _getIconForFileType(attachment.filePath),
                         color: _getColorForFileType(attachment.filePath),
@@ -540,13 +658,15 @@ class SubmissionDetailScreen extends StatelessWidget {
                                 .openAttachment(context, attachment.id!);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Attachment ID is missing')),
+                              const SnackBar(
+                                  content: Text('Attachment ID is missing')),
                             );
                           }
                         } catch (e) {
                           print('Error opening attachment: $e');
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error opening attachment: $e')),
+                            SnackBar(
+                                content: Text('Error opening attachment: $e')),
                           );
                         }
                       },
@@ -648,7 +768,8 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
       setState(() => isLoading = true);
 
       // This call now returns one FormSubmissionView per submission
-      final data = await _submissionService.getFormSubmissions(widget.formId, context);
+      final data =
+          await _submissionService.getFormSubmissions(widget.formId, context);
 
       submissions = data;
       filteredSubmissions = data;
@@ -834,8 +955,9 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
                                 final submission = filteredSubmissions[index];
                                 return _CustomExpansionCard(
                                   submission: submission,
-                                  onCardTap: () {
-                                    Navigator.push(
+                                  onCardTap: () async {
+                                    // Navegar a la pantalla de detalles y esperar un resultado
+                                    final result = await Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => SubmissionDetailScreen(
@@ -845,6 +967,13 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
                                         ),
                                       ),
                                     );
+
+                                    // Si result es true, significa que se eliminó un submission
+                                    // y debemos actualizar la lista
+                                    if (result == true) {
+                                      // Recargar los submissions
+                                      _loadSubmissions();
+                                    }
                                   },
                                 );
                               },

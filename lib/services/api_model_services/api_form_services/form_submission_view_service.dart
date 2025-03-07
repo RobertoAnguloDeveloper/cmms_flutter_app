@@ -103,6 +103,61 @@ class FormSubmissionViewService {
     }
   }
 
+  /// Deletes a form submission
+  /// Route: DELETE /forms/{submissionId}
+  Future<bool> deleteFormSubmission(
+    BuildContext context,
+    int submissionId,
+  ) async {
+    try {
+      print(
+          '[deleteFormSubmission] Attempting to delete submission: $submissionId');
+
+      final response = await _dio.delete<Map<String, dynamic>>(
+        '/api/form-submissions/$submissionId',
+        options: Options(
+          responseType: ResponseType.json,
+        ),
+      );
+
+      print('[deleteFormSubmission] Response => ${response.statusCode}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        // Successful deletion
+        print(
+            '[deleteFormSubmission] Successfully deleted submission: $submissionId');
+        return true;
+      } else if (response.statusCode == 401) {
+        if (context.mounted) {
+          await ApiResponseHandler.handleExpiredToken(
+              context, response.data as Map<String, dynamic>);
+        }
+        throw Exception('Session expired');
+      } else if (response.statusCode == 404) {
+        print('[deleteFormSubmission] Submission not found: $submissionId');
+        throw Exception('Submission not found');
+      } else if (response.statusCode == 401) {
+        if (context != null && context.mounted) {
+          await ApiResponseHandler.handleExpiredToken(
+              context, response.data as Map<String, dynamic>);
+        }
+        throw Exception('Session expired');
+      } else {
+        print(
+            '[deleteFormSubmission] Failed to delete submission. Status: ${response.statusCode}');
+        throw Exception(
+          'Failed to delete submission. Status: ${response.statusCode}',
+        );
+      }
+    } on DioException catch (e) {
+      print('[deleteFormSubmission] DioException: ${e.message}');
+      throw Exception('Network error: ${e.message}');
+    } catch (e) {
+      print('[deleteFormSubmission] Error deleting submission: $e');
+      throw Exception('Failed to delete submission: $e');
+    }
+  }
+
   /// Opens an attachment for viewing
   Future<void> openAttachment(BuildContext context, int attachmentId) async {
     await _attachmentService.openAttachment(context, attachmentId);
@@ -115,7 +170,8 @@ class FormSubmissionViewService {
   /// Gets form submissions for a specific form
   /// Route: GET /api/answers-submitted?form_id=$formId
   /// Returns a list of FormSubmissionView with grouped answers
-  Future<List<FormSubmissionView>> getFormSubmissions(int formId, [BuildContext? context]) async {
+  Future<List<FormSubmissionView>> getFormSubmissions(int formId,
+      [BuildContext? context]) async {
     try {
       // First get the list of submissions from answers endpoint to identify unique submissions
       final response = await _dio.get<Map<String, dynamic>>(
@@ -152,7 +208,8 @@ class FormSubmissionViewService {
               '/api/form-submissions/$submissionId',
             );
 
-            if (detailResponse.statusCode == 200 && detailResponse.data != null) {
+            if (detailResponse.statusCode == 200 &&
+                detailResponse.data != null) {
               final submissionData = detailResponse.data!;
 
               // Extract basic submission info
@@ -172,16 +229,17 @@ class FormSubmissionViewService {
 
               // Extract answers in the correct order
               final List<dynamic> answersData = submissionData['answers'] ?? [];
-              final List<AnswerView> answers = answersData.map((answerJson) =>
-                  AnswerView(
-                    question: answerJson['question'] ?? '',
-                    questionType: answerJson['question_type'] ?? '',
-                    answer: answerJson['answer'] ?? '',
-                  )
-              ).toList();
+              final List<AnswerView> answers = answersData
+                  .map((answerJson) => AnswerView(
+                        question: answerJson['question'] ?? '',
+                        questionType: answerJson['question_type'] ?? '',
+                        answer: answerJson['answer'] ?? '',
+                      ))
+                  .toList();
 
               // Extract attachments
-              final List<dynamic> attachmentsList = submissionData['attachments'] ?? [];
+              final List<dynamic> attachmentsList =
+                  submissionData['attachments'] ?? [];
               final List<Attachment> attachments = attachmentsList
                   .map((attachmentJson) => Attachment.fromJson(attachmentJson))
                   .toList();
@@ -197,12 +255,13 @@ class FormSubmissionViewService {
               );
 
               submissionsList.add(submissionView);
-              print('Processed submission $submissionId with ${answers.length} answers and ${attachments.length} attachments');
-            } else if (detailResponse.statusCode == 401 && context != null && context.mounted) {
+              print(
+                  'Processed submission $submissionId with ${answers.length} answers and ${attachments.length} attachments');
+            } else if (detailResponse.statusCode == 401 &&
+                context != null &&
+                context.mounted) {
               await ApiResponseHandler.handleExpiredToken(
-                  context,
-                  detailResponse.data as Map<String, dynamic>
-              );
+                  context, detailResponse.data as Map<String, dynamic>);
               throw Exception('Session expired');
             }
           } catch (e) {
@@ -217,9 +276,7 @@ class FormSubmissionViewService {
       } else if (response.statusCode == 401) {
         if (context != null && context.mounted) {
           await ApiResponseHandler.handleExpiredToken(
-              context,
-              response.data as Map<String, dynamic>
-          );
+              context, response.data as Map<String, dynamic>);
         }
         throw Exception('Session expired');
       } else {
@@ -256,9 +313,7 @@ class FormSubmissionViewService {
       } else if (response.statusCode == 401) {
         if (context.mounted) {
           await ApiResponseHandler.handleExpiredToken(
-              context,
-              response.data as Map<String, dynamic>
-          );
+              context, response.data as Map<String, dynamic>);
         }
         throw Exception('Session expired');
       } else {
@@ -277,27 +332,27 @@ class FormSubmissionViewService {
 
   /// 3) Gets submissions from alternative endpoint
   /// Route: GET /api/form-submissions/all
-  Future<List<dynamic>> getAllSubmissionsAlternative(BuildContext context) async {
+  Future<List<dynamic>> getAllSubmissionsAlternative(
+      BuildContext context) async {
     try {
       final response = await _dio.get<List<dynamic>>(
         '/api/form-submissions/all',
       );
 
-      print('[getAllSubmissionsAlternative] Response => ${response.statusCode}');
+      print(
+          '[getAllSubmissionsAlternative] Response => ${response.statusCode}');
 
       if (response.statusCode == 200 && response.data != null) {
         return response.data!;
       } else if (response.statusCode == 404) {
-        throw Exception(
-            'Endpoint /api/form-submissions/all not found (404). '
-                'Check if this endpoint exists on your backend.'
-        );
+        throw Exception('Endpoint /api/form-submissions/all not found (404). '
+            'Check if this endpoint exists on your backend.');
       } else if (response.statusCode == 401) {
         if (context.mounted) {
-          await ApiResponseHandler.handleExpiredToken(
-              context,
-              {'message': 'Session expired'} // Crear un mapa básico si la respuesta no es un map
-          );
+          await ApiResponseHandler.handleExpiredToken(context, {
+            'message': 'Session expired'
+          } // Crear un mapa básico si la respuesta no es un map
+              );
         }
         throw Exception('Session expired');
       } else {
@@ -315,9 +370,9 @@ class FormSubmissionViewService {
   /// 4) Gets detailed information for a specific submission
   /// Route: GET /api/form-submissions/$submissionId/details
   Future<Map<String, dynamic>> getSubmissionDetails(
-      BuildContext context,
-      int submissionId,
-      ) async {
+    BuildContext context,
+    int submissionId,
+  ) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/api/form-submissions/$submissionId/details',
@@ -330,19 +385,15 @@ class FormSubmissionViewService {
       } else if (response.statusCode == 401) {
         if (context.mounted) {
           await ApiResponseHandler.handleExpiredToken(
-              context,
-              response.data as Map<String, dynamic>
-          );
+              context, response.data as Map<String, dynamic>);
         }
         throw Exception('Session expired');
       } else if (response.statusCode == 404) {
         throw Exception(
-            'Endpoint not found (404). Check the route on your backend.'
-        );
+            'Endpoint not found (404). Check the route on your backend.');
       } else {
         throw Exception(
-            'Failed to load submission details: ${response.statusCode}'
-        );
+            'Failed to load submission details: ${response.statusCode}');
       }
     } on DioException catch (e) {
       print('DioException: ${e.message}');
