@@ -333,35 +333,41 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
   }
 
   Widget _buildDateTimeInput() {
-    // Obtener el formato de hora desde el valor actual guardado
+    // Determine the initial time format preference
     bool _use24HourFormat = true;
 
-    // Si el valor actual es un mapa y tiene la propiedad format24h, usarla
-    if (widget.currentValue is Map && widget.currentValue.containsKey('format24h')) {
-      _use24HourFormat = widget.currentValue['format24h'] ?? true;
+    // Check if the current value indicates a 12-hour format
+    if (widget.currentValue is String && (widget.currentValue.contains('AM') || widget.currentValue.contains('PM'))) {
+      _use24HourFormat = false;
     }
 
-    // Función para formatear la fecha según la preferencia del usuario
-    String formatDateTime(dynamic dateTimeValue) {
+    // Function to convert time between 24-hour and 12-hour formats
+    DateTime convertTime(String currentDateTime, bool to24HourFormat) {
       try {
-        String dateTimeString;
-        if (dateTimeValue is Map && dateTimeValue.containsKey('value')) {
-          dateTimeString = dateTimeValue['value'];
-        } else {
-          dateTimeString = dateTimeValue.toString();
-        }
+        // Parse the current datetime string
+        final DateFormat inputFormat = _use24HourFormat
+            ? DateFormat('dd/MM/yyyy HH:mm:ss')
+            : DateFormat('dd/MM/yyyy hh:mm:ss a');
 
-        final DateTime dateTime = DateTime.parse(dateTimeString);
-        final String dateFormatted = DateFormat('dd/MM/yyyy').format(dateTime);
-        final String timeFormatted = _use24HourFormat
-            ? DateFormat('HH:mm:ss').format(dateTime)
-            : DateFormat('hh:mm:ss a').format(dateTime);
+        final DateTime parsedDateTime = inputFormat.parse(currentDateTime);
 
-        return '$dateFormatted $timeFormatted';
+        return parsedDateTime;
       } catch (e) {
-        print('Error formatting datetime: $e');
-        return 'Select date and time';
+        print('Error converting time: $e');
+        return DateTime.now();
       }
+    }
+
+    // Function to format the datetime based on user's preference
+    String formatDateTime(DateTime dateTime, bool use24HourFormat) {
+      final String dateFormatted = DateFormat('dd/MM/yyyy').format(dateTime);
+
+      // Format time based on user's preference
+      final String timeFormatted = use24HourFormat
+          ? DateFormat('HH:mm:ss').format(dateTime)
+          : DateFormat('hh:mm:ss a').format(dateTime);
+
+      return '$dateFormatted $timeFormatted';
     }
 
     return StatefulBuilder(
@@ -369,67 +375,53 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Selector de formato de hora
+              // Time format selector
               Row(
                 children: [
                   const Text('Time Format:', style: TextStyle(fontSize: 14)),
                   const SizedBox(width: 16),
-                  // Radio button para formato 12 horas
+                  // 12-hour radio button
                   Row(
                     children: [
                       Radio<bool>(
                         value: false,
                         groupValue: _use24HourFormat,
                         onChanged: (value) {
+                          if (widget.currentValue != null) {
+                            // Convert the existing time to 12-hour format
+                            final DateTime convertedDateTime = convertTime(widget.currentValue, false);
+                            final String formattedDateTime = formatDateTime(convertedDateTime, false);
+
+                            widget.onAnswerChanged(formattedDateTime);
+                          }
+
                           setState(() {
                             _use24HourFormat = false;
                           });
-
-                          // Si ya hay un valor seleccionado, actualizarlo con el nuevo formato
-                          if (widget.currentValue != null) {
-                            dynamic currentValue;
-                            if (widget.currentValue is Map && widget.currentValue.containsKey('value')) {
-                              currentValue = widget.currentValue['value'];
-                            } else {
-                              currentValue = widget.currentValue.toString();
-                            }
-
-                            widget.onAnswerChanged({
-                              'value': currentValue,
-                              'format24h': false,
-                            });
-                          }
                         },
                       ),
                       const Text('12 hours'),
                     ],
                   ),
                   const SizedBox(width: 16),
-                  // Radio button para formato 24 horas
+                  // 24-hour radio button
                   Row(
                     children: [
                       Radio<bool>(
                         value: true,
                         groupValue: _use24HourFormat,
                         onChanged: (value) {
+                          if (widget.currentValue != null) {
+                            // Convert the existing time to 24-hour format
+                            final DateTime convertedDateTime = convertTime(widget.currentValue, true);
+                            final String formattedDateTime = formatDateTime(convertedDateTime, true);
+
+                            widget.onAnswerChanged(formattedDateTime);
+                          }
+
                           setState(() {
                             _use24HourFormat = true;
                           });
-
-                          // Si ya hay un valor seleccionado, actualizarlo con el nuevo formato
-                          if (widget.currentValue != null) {
-                            dynamic currentValue;
-                            if (widget.currentValue is Map && widget.currentValue.containsKey('value')) {
-                              currentValue = widget.currentValue['value'];
-                            } else {
-                              currentValue = widget.currentValue.toString();
-                            }
-
-                            widget.onAnswerChanged({
-                              'value': currentValue,
-                              'format24h': true,
-                            });
-                          }
                         },
                       ),
                       const Text('24 hours'),
@@ -439,18 +431,18 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
               ),
               const SizedBox(height: 12),
 
-              // Campo de selección de fecha y hora
+              // Date and time selection field
               InkWell(
                 onTap: () async {
-                  // Determinar la fecha inicial
+                  // Determine initial date
                   DateTime initialDate;
                   try {
                     if (widget.currentValue != null) {
-                      if (widget.currentValue is Map && widget.currentValue.containsKey('value')) {
-                        initialDate = DateTime.parse(widget.currentValue['value']);
-                      } else {
-                        initialDate = DateTime.parse(widget.currentValue.toString());
-                      }
+                      final DateFormat inputFormat = _use24HourFormat
+                          ? DateFormat('dd/MM/yyyy HH:mm:ss')
+                          : DateFormat('dd/MM/yyyy hh:mm:ss a');
+
+                      initialDate = inputFormat.parse(widget.currentValue);
                     } else {
                       initialDate = DateTime.now();
                     }
@@ -459,7 +451,7 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
                     initialDate = DateTime.now();
                   }
 
-                  // Primero, seleccionar la fecha
+                  // Select date
                   final DateTime? pickedDate = await showDatePicker(
                     context: context,
                     initialDate: initialDate,
@@ -468,35 +460,35 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
                   );
 
                   if (pickedDate != null && context.mounted) {
-                    // Determinar la hora inicial
+                    // Determine initial time
                     TimeOfDay initialTime;
                     try {
-                      if (widget.currentValue != null) {
-                        if (widget.currentValue is Map && widget.currentValue.containsKey('value')) {
-                          initialTime = TimeOfDay.fromDateTime(DateTime.parse(widget.currentValue['value']));
-                        } else {
-                          initialTime = TimeOfDay.fromDateTime(DateTime.parse(widget.currentValue.toString()));
-                        }
-                      } else {
-                        initialTime = TimeOfDay.now();
-                      }
+                      final DateFormat inputFormat = _use24HourFormat
+                          ? DateFormat('dd/MM/yyyy HH:mm:ss')
+                          : DateFormat('dd/MM/yyyy hh:mm:ss a');
+
+                      final DateTime parsedDateTime = widget.currentValue != null
+                          ? inputFormat.parse(widget.currentValue)
+                          : DateTime.now();
+
+                      initialTime = TimeOfDay.fromDateTime(parsedDateTime);
                     } catch (e) {
                       print('Error parsing time: $e');
                       initialTime = TimeOfDay.now();
                     }
 
-                    // Configurar el selector de hora según la preferencia persistente
+                    // Configure time picker based on persistent preference
                     final mediaQuery = MediaQuery.of(context);
                     final newMediaQuery = mediaQuery.copyWith(
                         alwaysUse24HourFormat: _use24HourFormat
                     );
 
-                    // Después, seleccionar la hora
+                    // Select time
                     final TimeOfDay? pickedTime = await showTimePicker(
                       context: context,
                       initialTime: initialTime,
                       builder: (context, child) {
-                        // Aplicar el formato seleccionado al selector de hora
+                        // Apply selected format to time picker
                         return MediaQuery(
                           data: newMediaQuery,
                           child: Theme(
@@ -512,7 +504,7 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
                       },
                     );
 
-                    // Si tanto la fecha como la hora fueron seleccionadas
+                    // If both date and time are selected
                     if (pickedTime != null) {
                       final DateTime combinedDateTime = DateTime(
                         pickedDate.year,
@@ -520,16 +512,15 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
                         pickedDate.day,
                         pickedTime.hour,
                         pickedTime.minute,
-                        0, // Añadimos segundos
+                        0, // Add seconds
                       );
 
-                      // IMPORTANTE: Guardamos el formato junto con el valor
-                      widget.onAnswerChanged({
-                        'value': combinedDateTime.toIso8601String(),
-                        'format24h': _use24HourFormat, // Usar el valor actual que el usuario ha seleccionado
-                      });
+                      // Format and save the datetime string directly
+                      final formattedDateTime = formatDateTime(combinedDateTime, _use24HourFormat);
 
-                      // Actualizar el estado del widget para reflejar el nuevo formato
+                      widget.onAnswerChanged(formattedDateTime);
+
+                      // Update the widget state to reflect the new format
                       setState(() {});
                     }
                   }
@@ -543,9 +534,7 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
                     fillColor: Colors.white,
                   ),
                   child: Text(
-                    widget.currentValue != null
-                        ? formatDateTime(widget.currentValue)
-                        : 'Select date and time',
+                    widget.currentValue ?? 'Select date and time',
                     style: TextStyle(
                       color: widget.currentValue != null ? Colors.black : Colors.grey[600],
                     ),
