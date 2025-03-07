@@ -333,59 +333,228 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
   }
 
   Widget _buildDateTimeInput() {
-    return InkWell(
-      onTap: () async {
-        // Primero, seleccionar la fecha
-        final DateTime? pickedDate = await showDatePicker(
-          context: context,
-          initialDate: widget.currentValue != null
-              ? DateTime.parse(widget.currentValue)
-              : DateTime.now(),
-          firstDate: DateTime(1900),
-          lastDate: DateTime(2100),
-        );
+    // Obtener el formato de hora desde el valor actual guardado
+    bool _use24HourFormat = true;
 
-        if (pickedDate != null) {
-          // Después, seleccionar la hora
-          final TimeOfDay? pickedTime = await showTimePicker(
-            context: context,
-            initialTime: widget.currentValue != null
-                ? TimeOfDay.fromDateTime(DateTime.parse(widget.currentValue))
-                : TimeOfDay.now(),
-          );
+    // Si el valor actual es un mapa y tiene la propiedad format24h, usarla
+    if (widget.currentValue is Map && widget.currentValue.containsKey('format24h')) {
+      _use24HourFormat = widget.currentValue['format24h'] ?? true;
+    }
 
-          // Si tanto la fecha como la hora fueron seleccionadas
-          if (pickedTime != null) {
-            final DateTime combinedDateTime = DateTime(
-              pickedDate.year,
-              pickedDate.month,
-              pickedDate.day,
-              pickedTime.hour,
-              pickedTime.minute,
-            );
-
-            // Formatear como ISO 8601 para almacenar
-            widget.onAnswerChanged(combinedDateTime.toIso8601String());
-          }
+    // Función para formatear la fecha según la preferencia del usuario
+    String formatDateTime(dynamic dateTimeValue) {
+      try {
+        String dateTimeString;
+        if (dateTimeValue is Map && dateTimeValue.containsKey('value')) {
+          dateTimeString = dateTimeValue['value'];
+        } else {
+          dateTimeString = dateTimeValue.toString();
         }
-      },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(),
-          suffixIcon: const Icon(Icons.event_available), // Icono diferente para datetime
-          hintText: 'Select date and time',
-          filled: true,
-          fillColor: Colors.white,
-        ),
-        child: Text(
-          widget.currentValue != null
-              ? DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(widget.currentValue))
-              : 'Select date and time',
-          style: TextStyle(
-            color: widget.currentValue != null ? Colors.black : Colors.grey[600],
-          ),
-        ),
-      ),
+
+        final DateTime dateTime = DateTime.parse(dateTimeString);
+        final String dateFormatted = DateFormat('dd/MM/yyyy').format(dateTime);
+        final String timeFormatted = _use24HourFormat
+            ? DateFormat('HH:mm:ss').format(dateTime)
+            : DateFormat('hh:mm:ss a').format(dateTime);
+
+        return '$dateFormatted $timeFormatted';
+      } catch (e) {
+        print('Error formatting datetime: $e');
+        return 'Select date and time';
+      }
+    }
+
+    return StatefulBuilder(
+        builder: (context, setState) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Selector de formato de hora
+              Row(
+                children: [
+                  const Text('Time Format:', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 16),
+                  // Radio button para formato 12 horas
+                  Row(
+                    children: [
+                      Radio<bool>(
+                        value: false,
+                        groupValue: _use24HourFormat,
+                        onChanged: (value) {
+                          setState(() {
+                            _use24HourFormat = false;
+                          });
+
+                          // Si ya hay un valor seleccionado, actualizarlo con el nuevo formato
+                          if (widget.currentValue != null) {
+                            dynamic currentValue;
+                            if (widget.currentValue is Map && widget.currentValue.containsKey('value')) {
+                              currentValue = widget.currentValue['value'];
+                            } else {
+                              currentValue = widget.currentValue.toString();
+                            }
+
+                            widget.onAnswerChanged({
+                              'value': currentValue,
+                              'format24h': false,
+                            });
+                          }
+                        },
+                      ),
+                      const Text('12 hours'),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  // Radio button para formato 24 horas
+                  Row(
+                    children: [
+                      Radio<bool>(
+                        value: true,
+                        groupValue: _use24HourFormat,
+                        onChanged: (value) {
+                          setState(() {
+                            _use24HourFormat = true;
+                          });
+
+                          // Si ya hay un valor seleccionado, actualizarlo con el nuevo formato
+                          if (widget.currentValue != null) {
+                            dynamic currentValue;
+                            if (widget.currentValue is Map && widget.currentValue.containsKey('value')) {
+                              currentValue = widget.currentValue['value'];
+                            } else {
+                              currentValue = widget.currentValue.toString();
+                            }
+
+                            widget.onAnswerChanged({
+                              'value': currentValue,
+                              'format24h': true,
+                            });
+                          }
+                        },
+                      ),
+                      const Text('24 hours'),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Campo de selección de fecha y hora
+              InkWell(
+                onTap: () async {
+                  // Determinar la fecha inicial
+                  DateTime initialDate;
+                  try {
+                    if (widget.currentValue != null) {
+                      if (widget.currentValue is Map && widget.currentValue.containsKey('value')) {
+                        initialDate = DateTime.parse(widget.currentValue['value']);
+                      } else {
+                        initialDate = DateTime.parse(widget.currentValue.toString());
+                      }
+                    } else {
+                      initialDate = DateTime.now();
+                    }
+                  } catch (e) {
+                    print('Error parsing date: $e');
+                    initialDate = DateTime.now();
+                  }
+
+                  // Primero, seleccionar la fecha
+                  final DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: initialDate,
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime(2100),
+                  );
+
+                  if (pickedDate != null && context.mounted) {
+                    // Determinar la hora inicial
+                    TimeOfDay initialTime;
+                    try {
+                      if (widget.currentValue != null) {
+                        if (widget.currentValue is Map && widget.currentValue.containsKey('value')) {
+                          initialTime = TimeOfDay.fromDateTime(DateTime.parse(widget.currentValue['value']));
+                        } else {
+                          initialTime = TimeOfDay.fromDateTime(DateTime.parse(widget.currentValue.toString()));
+                        }
+                      } else {
+                        initialTime = TimeOfDay.now();
+                      }
+                    } catch (e) {
+                      print('Error parsing time: $e');
+                      initialTime = TimeOfDay.now();
+                    }
+
+                    // Configurar el selector de hora según la preferencia persistente
+                    final mediaQuery = MediaQuery.of(context);
+                    final newMediaQuery = mediaQuery.copyWith(
+                        alwaysUse24HourFormat: _use24HourFormat
+                    );
+
+                    // Después, seleccionar la hora
+                    final TimeOfDay? pickedTime = await showTimePicker(
+                      context: context,
+                      initialTime: initialTime,
+                      builder: (context, child) {
+                        // Aplicar el formato seleccionado al selector de hora
+                        return MediaQuery(
+                          data: newMediaQuery,
+                          child: Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Colors.blue,
+                                onPrimary: Colors.white,
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                      },
+                    );
+
+                    // Si tanto la fecha como la hora fueron seleccionadas
+                    if (pickedTime != null) {
+                      final DateTime combinedDateTime = DateTime(
+                        pickedDate.year,
+                        pickedDate.month,
+                        pickedDate.day,
+                        pickedTime.hour,
+                        pickedTime.minute,
+                        0, // Añadimos segundos
+                      );
+
+                      // IMPORTANTE: Guardamos el formato junto con el valor
+                      widget.onAnswerChanged({
+                        'value': combinedDateTime.toIso8601String(),
+                        'format24h': _use24HourFormat, // Usar el valor actual que el usuario ha seleccionado
+                      });
+
+                      // Actualizar el estado del widget para reflejar el nuevo formato
+                      setState(() {});
+                    }
+                  }
+                },
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    suffixIcon: const Icon(Icons.event_available),
+                    hintText: 'Select date and time',
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  child: Text(
+                    widget.currentValue != null
+                        ? formatDateTime(widget.currentValue)
+                        : 'Select date and time',
+                    style: TextStyle(
+                      color: widget.currentValue != null ? Colors.black : Colors.grey[600],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
     );
   }
 
