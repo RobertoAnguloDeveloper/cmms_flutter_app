@@ -1090,6 +1090,7 @@ class _CustomExpansionCard extends StatefulWidget {
   final FormSubmissionView submission;
   final VoidCallback onCardTap;
 
+
   const _CustomExpansionCard({
     Key? key,
     required this.submission,
