@@ -29,6 +29,8 @@ class _QuestionCreationData {
   TextEditingController questionTextController;
   int? selectedQuestionTypeId;
   bool isRequired;
+  List<String> options = [];
+  final GlobalKey<QuestionCreationCardState> key = GlobalKey<QuestionCreationCardState>();
 
   _QuestionCreationData({
     required this.questionTextController,
@@ -214,6 +216,11 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
       // Create each question and assign it to the form
       for (var data in _questionCreations) {
+        // Get the latest options from the component state if available
+        if (data.key.currentState != null) {
+          data.options = data.key.currentState!.getCurrentOptions();
+        }
+
         String questionText = data.questionTextController.text;
         // Mark it with '~' if required
         if (data.isRequired && !questionText.endsWith("~")) {
@@ -247,6 +254,30 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         final formQuestionId = assignedQuestion['form_question']['id'] as int?;
         if (formQuestionId == null) {
           throw Exception("The assigned question did not return a valid form_question_id.");
+        }
+
+        // Now create any options/answers for this question
+        if (data.options.isNotEmpty) {
+          for (String optionText in data.options) {
+            if (optionText.trim().isEmpty) continue;
+
+            // First create the answer
+            final answerData = {'value': optionText};
+            final createdAnswer = await _answerApiService.createAnswer(
+              context,
+              answerData,
+            );
+
+            // Then assign it to the question
+            if (createdAnswer['status'] == 200 || createdAnswer['status'] == 201) {
+              final int answerId = createdAnswer['answer']['id'];
+              await _answerApiService.assignAnswerToQuestion(
+                context,
+                formQuestionId,
+                answerId,
+              );
+            }
+          }
         }
       }
 
@@ -285,6 +316,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   Widget _buildQuestionCreationCard(int index) {
     final data = _questionCreations[index];
     return QuestionCreationCard(
+      key: data.key,
       questionTextController: data.questionTextController,
       selectedQuestionTypeId: data.selectedQuestionTypeId,
       isRequired: data.isRequired,
@@ -320,7 +352,11 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         });
         _setUnsavedChanges(true);
       },
-      setUnsavedChanges: _setUnsavedChanges, // Pass the setUnsavedChanges function
+      setUnsavedChanges: _setUnsavedChanges,
+      onOptionsChanged: (options) {
+        // Store the options in our data object
+        data.options = options;
+      },
     );
   }
 

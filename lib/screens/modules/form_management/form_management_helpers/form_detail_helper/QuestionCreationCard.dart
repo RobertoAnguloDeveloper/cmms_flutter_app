@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../ResponseOptionsManager.dart';
 
-class QuestionCreationCard extends StatelessWidget {
+class QuestionCreationCard extends StatefulWidget {
   final TextEditingController questionTextController;
   final int? selectedQuestionTypeId;
   final bool isRequired;
@@ -12,7 +12,8 @@ class QuestionCreationCard extends StatelessWidget {
   final ValueChanged<bool> onRequiredChanged;
   final bool showValidationError;
   final int questionId;
-  final Function(bool) setUnsavedChanges; // Add this parameter
+  final Function(bool) setUnsavedChanges;
+  final Function(List<String>)? onOptionsChanged;
 
   const QuestionCreationCard({
     Key? key,
@@ -25,9 +26,17 @@ class QuestionCreationCard extends StatelessWidget {
     required this.onTypeChanged,
     required this.onRequiredChanged,
     required this.questionId,
-    required this.setUnsavedChanges, // Make it required
+    required this.setUnsavedChanges,
+    this.onOptionsChanged,
     this.showValidationError = false,
   }) : super(key: key);
+
+  @override
+  QuestionCreationCardState createState() => QuestionCreationCardState();
+}
+
+class QuestionCreationCardState extends State<QuestionCreationCard> {
+  List<String> _currentOptions = [];
 
   @override
   Widget build(BuildContext context) {
@@ -37,10 +46,10 @@ class QuestionCreationCard extends StatelessWidget {
         ? mediaQuery.size.width * 0.4
         : mediaQuery.size.width * 0.25;
 
-    final bool requiresOptions = selectedQuestionTypeId != null &&
-        questionTypes
+    final bool requiresOptions = widget.selectedQuestionTypeId != null &&
+        widget.questionTypes
             .firstWhere(
-              (type) => type['id'] == selectedQuestionTypeId,
+              (type) => type['id'] == widget.selectedQuestionTypeId,
           orElse: () => {'type': ''},
         )['type']
             .toString()
@@ -67,13 +76,13 @@ class QuestionCreationCard extends StatelessWidget {
                     Expanded(
                       flex: 2,
                       child: TextField(
-                        controller: questionTextController,
+                        controller: widget.questionTextController,
                         decoration: InputDecoration(
                           hintText: 'Question title',
                           border: UnderlineInputBorder(),
                           hintStyle: const TextStyle(fontSize: 16),
-                          errorText: showValidationError &&
-                              questionTextController.text.isEmpty
+                          errorText: widget.showValidationError &&
+                              widget.questionTextController.text.isEmpty
                               ? 'Question text is required'
                               : null,
                         ),
@@ -83,10 +92,10 @@ class QuestionCreationCard extends StatelessWidget {
                     const SizedBox(width: 16),
                     Container(
                       width: dropdownWidth,
-                      child: isLoadingQuestionTypes
+                      child: widget.isLoadingQuestionTypes
                           ? const Center(child: CircularProgressIndicator())
                           : DropdownButtonFormField<int>(
-                        value: selectedQuestionTypeId,
+                        value: widget.selectedQuestionTypeId,
                         isDense: true,
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -101,13 +110,13 @@ class QuestionCreationCard extends StatelessWidget {
                           ),
                           contentPadding:
                           const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          errorText: showValidationError && selectedQuestionTypeId == null
+                          errorText: widget.showValidationError && widget.selectedQuestionTypeId == null
                               ? 'Question type is required'
                               : null,
                         ),
                         dropdownColor: Colors.white,
                         hint: const Text('Type'),
-                        items: questionTypes.map((type) {
+                        items: widget.questionTypes.map((type) {
                           final String questionTypeString =
                           (type['type'] ?? '').toString().toLowerCase();
 
@@ -155,7 +164,7 @@ class QuestionCreationCard extends StatelessWidget {
                             ),
                           );
                         }).toList(),
-                        onChanged: onTypeChanged,
+                        onChanged: widget.onTypeChanged,
                       ),
                     ),
                   ],
@@ -164,21 +173,29 @@ class QuestionCreationCard extends StatelessWidget {
                 if (requiresOptions) ...[
                   const SizedBox(height: 16),
                   ResponseOptionsManager(
-                    options: const [],
+                    options: _currentOptions,
                     onOptionsChanged: (updatedOptions) {
-                      print('Options updated: $updatedOptions');
+                      setState(() {
+                        _currentOptions = updatedOptions;
+                      });
+
+                      // Notify parent about options change
+                      if (widget.onOptionsChanged != null) {
+                        widget.onOptionsChanged!(updatedOptions);
+                      }
+
                       // Notify parent form of changes
-                      setUnsavedChanges(true);
+                      widget.setUnsavedChanges(true);
                     },
-                    questionType: questionTypes
+                    questionType: widget.questionTypes
                         .firstWhere(
-                          (type) => type['id'] == selectedQuestionTypeId,
+                          (type) => type['id'] == widget.selectedQuestionTypeId,
                       orElse: () => {'type': ''},
                     )['type']
                         .toString(),
                     // Use positive temporary ID for new questions to avoid API issues
-                    formQuestionId: questionId < 0 ? 0 : questionId,
-                    setUnsavedChanges: setUnsavedChanges, // Pass through the setUnsavedChanges function
+                    formQuestionId: widget.questionId < 0 ? 0 : widget.questionId,
+                    setUnsavedChanges: widget.setUnsavedChanges,
                   ),
                 ],
               ],
@@ -187,5 +204,10 @@ class QuestionCreationCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Method to get current options - can be called by parent
+  List<String> getCurrentOptions() {
+    return _currentOptions;
   }
 }

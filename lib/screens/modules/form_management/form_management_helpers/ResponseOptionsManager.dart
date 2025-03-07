@@ -116,12 +116,19 @@ class ResponseOptionsManagerState extends State<ResponseOptionsManager> {
           if (createdAnswer['status'] == 200 || createdAnswer['status'] == 201) {
             final int answerId = createdAnswer['answer']['id'];
             try {
-              await _answerApiService.assignAnswerToQuestion(
-                context,
-                widget.formQuestionId,
-                answerId,
-              );
-              successfulAssignments++;
+              // Important change: Only assign if formQuestionId is positive
+              // This prevents assigning to temporary questions
+              if (widget.formQuestionId > 0) {
+                await _answerApiService.assignAnswerToQuestion(
+                  context,
+                  widget.formQuestionId,
+                  answerId,
+                );
+                successfulAssignments++;
+              } else {
+                // For new questions, just count as successful without API call
+                successfulAssignments++;
+              }
             } catch (e) {
               print('Failed to assign answer: $e');
             }
