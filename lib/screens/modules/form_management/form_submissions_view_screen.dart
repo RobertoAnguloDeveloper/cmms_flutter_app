@@ -195,92 +195,84 @@ class SubmissionDetailScreen extends StatelessWidget {
                                 );
                               },
                             ),
-                            // Botón de eliminar
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                size: 28,
-                                color: Colors.red,
-                              ),
-                              tooltip: 'Delete Submission',
-                              onPressed: () {
-                                // Mostrar diálogo de confirmación para eliminar
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      title: const Text('Delete Submission'),
-                                      content: const Text(
-                                        'Are you sure you want to delete this submission? This action cannot be undone.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context),
-                                          child: const Text('Cancel'),
+                            // Botón de eliminar - solo visible para superusuarios
+                            if (sessionData.containsKey('role') &&
+                                sessionData['role'] != null &&
+                                sessionData['role']['is_super_user'] == true)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 28,
+                                  color: Colors.red,
+                                ),
+                                tooltip: 'Delete Submission',
+                                onPressed: () {
+                                  // Mostrar diálogo de confirmación para eliminar
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return AlertDialog(
+                                        title: const Text('Delete Submission'),
+                                        content: const Text(
+                                          'Are you sure you want to delete this submission? This action cannot be undone.',
                                         ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            Navigator.pop(
-                                                context); // Cerrar diálogo de confirmación
-
-                                            // Mostrar indicador de carga
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                    'Deleting submission...'),
-                                                duration: Duration(seconds: 2),
-                                              ),
-                                            );
-
-                                            try {
-                                              // Usar el nuevo método para eliminar la presentación
-                                              final FormSubmissionViewService
-                                                  service =
-                                                  FormSubmissionViewService();
-                                              final bool success = await service
-                                                  .deleteFormSubmission(context,
-                                                      submission.submissionId);
-
-                                              if (success && context.mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                        'Submission deleted successfully'),
-                                                    backgroundColor:
-                                                        Colors.green,
-                                                  ),
-                                                );
-                                                // Volver a la pantalla anterior con un resultado que indique actualización
-                                                Navigator.pop(context,
-                                                    true); // Pasamos 'true' como resultado para indicar que se realizó una eliminación
-                                              }
-                                            } catch (e) {
-                                              if (context.mounted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                        'Error deleting submission: $e'),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            }
-                                          },
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: Colors.red,
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('Cancel'),
                                           ),
-                                          child: const Text('Delete'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
-                            ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              Navigator.pop(context); // Cerrar diálogo de confirmación
+
+                                              // Mostrar indicador de carga
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Deleting submission...'),
+                                                  duration: Duration(seconds: 2),
+                                                ),
+                                              );
+
+                                              try {
+                                                // Usar el nuevo método para eliminar la presentación
+                                                final FormSubmissionViewService service = FormSubmissionViewService();
+                                                final bool success = await service.deleteFormSubmission(
+                                                    context,
+                                                    submission.submissionId
+                                                );
+
+                                                if (success && context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('Submission deleted successfully'),
+                                                      backgroundColor: Colors.green,
+                                                    ),
+                                                  );
+                                                  // Volver a la pantalla anterior con un resultado que indique actualización
+                                                  Navigator.pop(context, true); // Pasamos 'true' como resultado para indicar que se realizó una eliminación
+                                                }
+                                              } catch (e) {
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text('Error deleting submission: $e'),
+                                                      backgroundColor: Colors.red,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: Colors.red,
+                                            ),
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
                           ],
                         ),
                       ],
