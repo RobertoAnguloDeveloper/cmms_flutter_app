@@ -1,4 +1,3 @@
-import 'package:cmms_app/screens/modules/form_management/form_management_helpers/form_detail_helper/QuestionCreationCard.dart';
 import 'package:flutter/material.dart';
 import '../../../../services/api_model_services/UserApiService.dart';
 import '../../../../services/api_model_services/api_form_services/AnswerApiService.dart';
@@ -9,7 +8,8 @@ import 'form_detail_helper/QuestionsListWidget.dart';
 import 'form_dialogs/ExportFormDialog.dart';
 import 'form_dialogs/FormDialogs.dart';
 import 'form_question_management/QuestionSelectionDialog.dart';
-import 'QuestionCreationManager.dart'; // Import the QuestionCreationManager
+import 'QuestionCreationManager.dart';
+import 'form_detail_helper/QuestionCreationCard.dart';
 
 class FormDetailHelper extends StatefulWidget {
   final Map<String, dynamic> form;
@@ -42,6 +42,8 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   final AnswerApiService _answerApiService = AnswerApiService();
   final QuestionApiService _formQuestionApiService = QuestionApiService();
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey<QuestionsListWidgetState> _questionsListWidgetKey =
+      GlobalKey<QuestionsListWidgetState>();
 
   bool isLoading = true;
   bool isDeleting = false;
@@ -82,7 +84,8 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
     });
 
     try {
-      final details = await _formApiService.fetchFormById(context, widget.form['id']);
+      final details =
+          await _formApiService.fetchFormById(context, widget.form['id']);
       if (mounted) {
         setState(() {
           formDetails = details;
@@ -171,6 +174,19 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
       _isValidating = true;
     });
 
+    // First, save all answer options for existing questions
+    bool optionsSaved = await _questionsListWidgetKey.currentState?.saveAllAnswerOptions() ?? true;
+
+    if (!optionsSaved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to save some answer options'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     // Validate each newly added question
     for (int i = 0; i < _questionCreations.length; i++) {
       _questionCreationValidStates[i] = _validateQuestionCreation(i);
@@ -219,12 +235,19 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
           throw Exception("The created question did not return a valid ID.");
         }
 
-        await _formQuestionApiService.assignQuestionToForm(
+        // Assign question to form
+        final assignedQuestion = await _formQuestionApiService.assignQuestionToForm(
           context,
           formId,
           newQuestionId,
           order++,
         );
+
+        // Get the form_question_id from the assigned question
+        final formQuestionId = assignedQuestion['form_question']['id'] as int?;
+        if (formQuestionId == null) {
+          throw Exception("The assigned question did not return a valid form_question_id.");
+        }
       }
 
       // Show success message
@@ -297,6 +320,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         });
         _setUnsavedChanges(true);
       },
+      setUnsavedChanges: _setUnsavedChanges, // Pass the setUnsavedChanges function
     );
   }
 
@@ -311,10 +335,10 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   @override
   Widget build(BuildContext context) {
     final formTitle =
-    (formDetails?['title'] ?? widget.form['title'] ?? 'Untitled Form')
-        .toString();
+        (formDetails?['title'] ?? widget.form['title'] ?? 'Untitled Form')
+            .toString();
     final formDescription =
-    (formDetails?['description'] ?? 'No description').toString();
+        (formDetails?['description'] ?? 'No description').toString();
 
     return Scaffold(
       appBar: AppBar(
@@ -336,121 +360,124 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                   child: isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(
-                      left: 16.0,
-                      right: 16.0,
-                      top: 8.0,
-                      bottom: 100.0,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Card(
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Container(
-                              width:
-                              MediaQuery.of(context).size.width * 0.9,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: const Border(
-                                  top: BorderSide(
-                                    color: Color.fromARGB(255, 1, 116, 209),
-                                    width: 8.0,
+                          controller: _scrollController,
+                          padding: const EdgeInsets.only(
+                            left: 16.0,
+                            right: 16.0,
+                            top: 8.0,
+                            bottom: 100.0,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Center(
+                                child: Card(
+                                  elevation: 1,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
-                                ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(24.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  child: Container(
+                                    width:
+                                        MediaQuery.of(context).size.width * 0.9,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: const Border(
+                                        top: BorderSide(
+                                          color:
+                                              Color.fromARGB(255, 1, 116, 209),
+                                          width: 8.0,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Stack(
                                       children: [
-                                        Text(
-                                          formTitle,
-                                          style: const TextStyle(
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.w400,
+                                        Padding(
+                                          padding: const EdgeInsets.all(24.0),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                formTitle,
+                                                style: const TextStyle(
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.w400,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                formDescription,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          formDescription,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
+                                        Positioned(
+                                          top: 16,
+                                          right: 16,
+                                          child: IconButton(
+                                            icon: const Icon(Icons.edit),
+                                            color: Colors.grey[700],
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder:
+                                                    (BuildContext context) =>
+                                                        FormUpdateDialog(
+                                                  form: formDetails ??
+                                                      widget.form,
+                                                  refreshForms:
+                                                      _fetchFormDetails,
+                                                ),
+                                              );
+                                            },
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  Positioned(
-                                    top: 16,
-                                    right: 16,
-                                    child: IconButton(
-                                      icon: const Icon(Icons.edit),
-                                      color: Colors.grey[700],
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder:
-                                              (BuildContext context) =>
-                                              FormUpdateDialog(
-                                                form: formDetails ??
-                                                    widget.form,
-                                                refreshForms:
-                                                _fetchFormDetails,
-                                              ),
-                                        );
-                                      },
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Existing questions
+                              if ((formDetails?['questions'] as List? ?? [])
+                                  .isEmpty)
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Text(
+                                      'No questions available',
+                                      style: TextStyle(
+                                          fontSize: 16, color: Colors.grey),
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
+                                )
+                              else
+                                QuestionsListWidget(
+                                  key: _questionsListWidgetKey,
+                                  questions: formDetails?['questions'] as List? ?? [],
+                                  deleteFormQuestion: _deleteFormQuestion,
+                                  showEditAnswerDialog: _showEditAnswerDialog,
+                                  deleteAnswer: _deleteAnswer,
+                                  shouldShowAnswerSelection: _shouldShowAnswerSelection,
+                                  fetchFormDetails: _fetchFormDetails,
+                                  formId: widget.form['id'],
+                                  setUnsavedChanges: _setUnsavedChanges, // Pass the function here
+                                ),
+
+                              // Render the new question creation cards (if any)
+                              for (int i = 0;
+                                  i < _questionCreations.length;
+                                  i++)
+                                _buildQuestionCreationCard(i),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-
-                        // Existing questions
-                        if ((formDetails?['questions'] as List? ?? [])
-                            .isEmpty)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Text(
-                                'No questions available',
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.grey),
-                              ),
-                            ),
-                          )
-                        else
-                          QuestionsListWidget(
-                            questions:
-                            formDetails?['questions'] as List? ?? [],
-                            deleteFormQuestion: _deleteFormQuestion,
-                            showEditAnswerDialog: _showEditAnswerDialog,
-                            deleteAnswer: _deleteAnswer,
-                            shouldShowAnswerSelection:
-                            _shouldShowAnswerSelection,
-                            fetchFormDetails: _fetchFormDetails,
-                            formId: widget.form['id'],
-                          ),
-
-                        // Render the new question creation cards (if any)
-                        for (int i = 0; i < _questionCreations.length; i++)
-                          _buildQuestionCreationCard(i),
-                      ],
-                    ),
-                  ),
                 ),
                 Container(
                   width: 80,
@@ -464,7 +491,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                           _addQuestionCreationCard();
                         },
                         backgroundColor:
-                        const Color.fromARGB(255, 34, 118, 186),
+                            const Color.fromARGB(255, 34, 118, 186),
                         child: const Icon(
                           Icons.add,
                           size: 36,
@@ -472,7 +499,6 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       FloatingActionButton(
                         heroTag: 'assign_question',
                         onPressed: () {
@@ -480,9 +506,9 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                             context: context,
                             builder: (BuildContext context) =>
                                 QuestionSelectionDialog(
-                                  refreshQuestions: _fetchFormDetails,
-                                  formId: widget.form['id'],
-                                ),
+                              refreshQuestions: _fetchFormDetails,
+                              formId: widget.form['id'],
+                            ),
                           );
                         },
                         backgroundColor: Colors.white,
@@ -492,25 +518,24 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       if (orientation == Orientation.portrait)
                         FloatingActionButton(
                           heroTag: 'menu_button',
                           onPressed: isAnimating
                               ? null
                               : () {
-                            setState(() {
-                              isAnimating = true;
-                              showMenuButtons = !showMenuButtons;
-                            });
+                                  setState(() {
+                                    isAnimating = true;
+                                    showMenuButtons = !showMenuButtons;
+                                  });
 
-                            Future.delayed(
-                                const Duration(milliseconds: 300), () {
-                              setState(() {
-                                isAnimating = false;
-                              });
-                            });
-                          },
+                                  Future.delayed(
+                                      const Duration(milliseconds: 300), () {
+                                    setState(() {
+                                      isAnimating = false;
+                                    });
+                                  });
+                                },
                           backgroundColor: Colors.white,
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -535,7 +560,8 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                             ],
                           ),
                         ),
-                      if (showMenuButtons || orientation == Orientation.landscape)
+                      if (showMenuButtons ||
+                          orientation == Orientation.landscape)
                         Column(
                           children: [
                             const SizedBox(height: 8),
@@ -553,7 +579,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                               heroTag: 'export_form',
                               onPressed: _showExportDialog,
                               backgroundColor:
-                              const Color.fromARGB(255, 74, 180, 246),
+                                  const Color.fromARGB(255, 74, 180, 246),
                               child: const Icon(
                                 Icons.ios_share_rounded,
                                 color: Colors.white,
@@ -619,7 +645,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   void _deleteFormQuestion(BuildContext context, int formQuestionId) async {
     try {
       final bool? shouldDelete =
-      await FormDialogs.showDeleteQuestionDialog(context);
+          await FormDialogs.showDeleteQuestionDialog(context);
 
       if (shouldDelete != true) return;
       if (!mounted) return;

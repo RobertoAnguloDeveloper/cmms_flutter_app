@@ -11,7 +11,8 @@ class QuestionCreationCard extends StatelessWidget {
   final ValueChanged<int?> onTypeChanged;
   final ValueChanged<bool> onRequiredChanged;
   final bool showValidationError;
-  final int questionId; // Added questionId parameter
+  final int questionId;
+  final Function(bool) setUnsavedChanges; // Add this parameter
 
   const QuestionCreationCard({
     Key? key,
@@ -23,7 +24,8 @@ class QuestionCreationCard extends StatelessWidget {
     required this.onCancel,
     required this.onTypeChanged,
     required this.onRequiredChanged,
-    required this.questionId, // Ensure it's required
+    required this.questionId,
+    required this.setUnsavedChanges, // Make it required
     this.showValidationError = false,
   }) : super(key: key);
 
@@ -165,6 +167,8 @@ class QuestionCreationCard extends StatelessWidget {
                     options: const [],
                     onOptionsChanged: (updatedOptions) {
                       print('Options updated: $updatedOptions');
+                      // Notify parent form of changes
+                      setUnsavedChanges(true);
                     },
                     questionType: questionTypes
                         .firstWhere(
@@ -174,6 +178,7 @@ class QuestionCreationCard extends StatelessWidget {
                         .toString(),
                     // Use positive temporary ID for new questions to avoid API issues
                     formQuestionId: questionId < 0 ? 0 : questionId,
+                    setUnsavedChanges: setUnsavedChanges, // Pass through the setUnsavedChanges function
                   ),
                 ],
               ],

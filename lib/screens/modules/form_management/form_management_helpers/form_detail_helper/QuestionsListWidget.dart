@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
-
-// Your other imports
 import '../../answer_form_management/AnswerSelectionDialog.dart';
 import '../ResponseOptionsManager.dart';
 import 'DynamicInputField.dart';
 import 'AnswerItemWidget.dart';
 import 'PossibleAnswersWidget.dart';
 import 'GoogleFormsQuestionControls.dart';
-import '../ResponseOptionsManager.dart';
-
-
 
 class QuestionsListWidget extends StatefulWidget {
   final List<dynamic> questions;
@@ -19,6 +14,7 @@ class QuestionsListWidget extends StatefulWidget {
   final bool Function(String) shouldShowAnswerSelection;
   final VoidCallback fetchFormDetails;
   final int formId;
+  final Function(bool) setUnsavedChanges; // Add this parameter
 
   const QuestionsListWidget({
     Key? key,
@@ -29,40 +25,71 @@ class QuestionsListWidget extends StatefulWidget {
     required this.shouldShowAnswerSelection,
     required this.fetchFormDetails,
     required this.formId,
+    required this.setUnsavedChanges, // Make it required
   }) : super(key: key);
 
   @override
-  _QuestionsListWidgetState createState() => _QuestionsListWidgetState();
+  QuestionsListWidgetState createState() => QuestionsListWidgetState();
 }
 
-class _QuestionsListWidgetState extends State<QuestionsListWidget> {
-  /// Example fields for handling validation.
-  /// If you have existing validation logic, adapt accordingly.
+class QuestionsListWidgetState extends State<QuestionsListWidget> {
   bool _validatingForm = false;
-  Map<int, bool> _questionValidityMap = {};
+  final Map<int, bool> _questionValidityMap = {};
+  final Map<int, bool> _localRequiredState = {};
+  final Map<int, GlobalKey<ResponseOptionsManagerState>> _optionsManagerKeys = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeLocalState();
+  }
+
+  @override
+  void didUpdateWidget(QuestionsListWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.questions != widget.questions) {
+      _initializeLocalState();
+    }
+  }
+
+  void _initializeLocalState() {
+    _localRequiredState.clear();
+    for (var question in widget.questions) {
+      final int questionId = question['id'];
+      final bool isRequired = question['is_required'] ?? false;
+      final bool isRequiredByTilde = (question['text']?.toString() ?? '').endsWith('~');
+      _localRequiredState[questionId] = isRequired || isRequiredByTilde;
+    }
+  }
+
+  // Helper method to get or create a key for a specific question
+  GlobalKey<ResponseOptionsManagerState> _getOptionsManagerKey(int questionId) {
+    if (!_optionsManagerKeys.containsKey(questionId)) {
+      _optionsManagerKeys[questionId] = GlobalKey<ResponseOptionsManagerState>();
+    }
+    return _optionsManagerKeys[questionId]!;
+  }
+
+  // Method to save all answer options when the main Save button is clicked
+  Future<bool> saveAllAnswerOptions() async {
+    bool allSuccessful = true;
+
+    for (var key in _optionsManagerKeys.values) {
+      if (key.currentState != null) {
+        bool success = await key.currentState!.saveOptions();
+        if (!success) {
+          allSuccessful = false;
+        }
+      }
+    }
+
+    return allSuccessful;
+  }
 
   @override
   Widget build(BuildContext context) {
     if (widget.questions.isEmpty) {
-      return Center(
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Center(
-            child: Text(
-              'No questions available',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        ),
-      );
+      return _buildEmptyState();
     }
 
     return Center(
@@ -72,30 +99,50 @@ class _QuestionsListWidgetState extends State<QuestionsListWidget> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: widget.questions.length,
-          itemBuilder: (context, index) {
-            final question = widget.questions[index];
-            return _buildQuestionCard(question);
-          },
+          itemBuilder: (context, index) => _buildQuestionCard(widget.questions[index]),
         ),
       ),
     );
   }
 
-  /// Builds a single question card with the “Google Forms”–style controls.
+  Widget _buildEmptyState() {
+    return Center(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: Text(
+            'No questions available',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 16,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuestionCard(Map<String, dynamic> question) {
     final int questionId = question['id'];
-    // If the question is required from backend or if it ends with '~'
-    final bool isRequired = question['is_required'] ?? false;
-    final bool isRequiredByTilde = (question['text']?.toString() ?? '').endsWith('~');
-    final bool questionIsRequired = isRequired || isRequiredByTilde;
+    final int formQuestionId = question['form_question_id'];
+
+    // Get required state from local state if available
+    final bool questionIsRequired = _localRequiredState[questionId] ??
+        ((question['is_required'] ?? false) ||
+            (question['text']?.toString() ?? '').endsWith('~'));
 
     // Display question text without the trailing '~'
     String displayText = question['text'] ?? 'No question text';
-    if (isRequiredByTilde && displayText.endsWith('~')) {
+    if (displayText.endsWith('~')) {
       displayText = displayText.substring(0, displayText.length - 1);
     }
 
-    // Determine if this question is considered invalid (e.g., required but not answered)
+    // Validation state
     final bool isInvalid = _validatingForm &&
         _questionValidityMap.containsKey(questionId) &&
         !_questionValidityMap[questionId]!;
@@ -113,7 +160,7 @@ class _QuestionsListWidgetState extends State<QuestionsListWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Optional colored bar at the top (like your original code).
+          // Colored top bar
           Container(
             height: 9,
             decoration: const BoxDecoration(
@@ -130,59 +177,8 @@ class _QuestionsListWidgetState extends State<QuestionsListWidget> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Row for question text + "Add answers" icon if needed
-                Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              displayText,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          if (questionIsRequired)
-                            const Text(
-                              ' *',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    // If you still want the "Add answers" icon as from original code:
-                    if (widget.shouldShowAnswerSelection(
-                      question['type']?.toString().toLowerCase() ?? '',
-                    ))
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline),
-                        tooltip: 'Add answers',
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (BuildContext context) {
-                              return AnswerSelectionDialog(
-                                refreshAnswers: widget.fetchFormDetails,
-                                formQuestionId: question['form_question_id'],
-                                questionText: question['text'],
-                                formId: widget.formId,
-                                questionId: question['id'],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                  ],
-                ),
+                _buildQuestionHeader(question, displayText, questionIsRequired),
 
-                // Show an error message if the question is invalid
                 if (isInvalid)
                   const Padding(
                     padding: EdgeInsets.only(top: 4, bottom: 8),
@@ -193,116 +189,160 @@ class _QuestionsListWidgetState extends State<QuestionsListWidget> {
                   ),
 
                 const SizedBox(height: 8),
-
-                // The main content of the question (dynamic field or possible answers)
                 _buildAnswerField(question),
               ],
             ),
           ),
 
-          // Google Forms–style controls (Required toggle, Duplicate, Delete)
+          // Controls
           GoogleFormsQuestionControls(
             isRequired: questionIsRequired,
-            onRequiredChanged: (value) {
-              // Toggling “Required” adds/removes trailing '~'
-              final updatedText = value
-                  ? displayText + '~'
-                  : (displayText.endsWith('~')
-                  ? displayText.substring(0, displayText.length - 1)
-                  : displayText);
-
-              _updateQuestionText(questionId, updatedText, value);
-            },
-            onDuplicate: () {
-              _duplicateQuestion(question);
-            },
-            onDelete: () =>
-                widget.deleteFormQuestion(context, question['form_question_id']),
+            onRequiredChanged: (value) => _handleRequiredToggle(questionId, value),
+            onDuplicate: () => _duplicateQuestion(question),
+            onDelete: () => widget.deleteFormQuestion(context, formQuestionId),
           ),
         ],
       ),
     );
   }
 
-  /// Builds the main area displaying how answers or fields are rendered.
-  Widget _buildAnswerField(Map<String, dynamic> question) {
+  Widget _buildQuestionHeader(Map<String, dynamic> question, String displayText, bool questionIsRequired) {
     final String questionType = question['type']?.toString().toLowerCase() ?? '';
 
-    // If it's a textual/datetime type, show dynamic input
+    return Row(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  displayText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (questionIsRequired)
+                const Text(
+                  ' *',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (widget.shouldShowAnswerSelection(questionType))
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Add answers',
+            onPressed: () => _showAnswerSelectionDialog(question),
+          ),
+      ],
+    );
+  }
+
+  void _showAnswerSelectionDialog(Map<String, dynamic> question) {
+    showDialog(
+      context: context,
+      builder: (context) => AnswerSelectionDialog(
+        refreshAnswers: widget.fetchFormDetails,
+        formQuestionId: question['form_question_id'],
+        questionText: question['text'],
+        formId: widget.formId,
+        questionId: question['id'],
+      ),
+    );
+  }
+
+  Widget _buildAnswerField(Map<String, dynamic> question) {
+    final String questionType = question['type']?.toString().toLowerCase() ?? '';
+    final int formQuestionId = question['form_question_id'];
+
+    // Text, date, datetime, user types
     if (['date', 'datetime', 'text', 'user'].contains(questionType)) {
       return DynamicInputField(questionType: questionType);
     }
-    // Otherwise, if it has possible_answers, show them
+
+    // If has existing answers
     else if (question['possible_answers']?.isNotEmpty ?? false) {
       return PossibleAnswersWidget(
         question: question,
         questionType: questionType,
-        buildAnswerItem: (answer, questionType) => AnswerItemWidget(
+        buildAnswerItem: (answer, type) => AnswerItemWidget(
           answer: answer,
-          questionType: questionType,
+          questionType: type,
           onEdit: () => widget.showEditAnswerDialog(
             answer['value'],
-            {
-              'answer': answer,
-              'remarks': answer['remarks'],
-            },
+            {'answer': answer, 'remarks': answer['remarks']},
           ),
           onDelete: () => widget.deleteAnswer(answer['form_answer_id']),
         ),
       );
     }
-    // If the question type is multiple_choice, checkbox, or dropdown, use ResponseOptionsManager
-    else if (['multiple_choice', 'checkbox', 'dropdown'].contains(questionType.toLowerCase())) {
+
+    // Options-based question types
+    else if (['multiple_choice', 'checkbox', 'dropdown'].contains(questionType)) {
       return ResponseOptionsManager(
+        key: _getOptionsManagerKey(formQuestionId),
         options: question['possible_answers']?.map<String>((a) => a['value'].toString())?.toList() ?? [],
-        onOptionsChanged: (updatedOptions) {
-          // Local state updates if needed
+        onOptionsChanged: (_) {
+          // We'll handle saving through saveAllAnswerOptions
         },
         questionType: questionType,
-        formQuestionId: question['form_question_id'], // Pass the form_question_id
+        formQuestionId: formQuestionId,
+        setUnsavedChanges: widget.setUnsavedChanges, // Pass through the setUnsavedChanges function
       );
     }
 
-    // If none of the above, return an empty container
     return Container();
   }
 
-  /// Example placeholder for updating question text/“required” state in your backend.
+  void _handleRequiredToggle(int questionId, bool value) {
+    setState(() {
+      _localRequiredState[questionId] = value;
+    });
+
+    // Notify parent about unsaved changes
+    widget.setUnsavedChanges(true);
+  }
+
+  void saveAllChanges() {
+    for (var question in widget.questions) {
+      final int questionId = question['id'];
+
+      // Only process if we have a state for this question
+      if (_localRequiredState.containsKey(questionId)) {
+        final bool isRequired = _localRequiredState[questionId]!;
+
+        // Get text without tilde
+        String displayText = question['text'] ?? 'No question text';
+        if (displayText.endsWith('~')) {
+          displayText = displayText.substring(0, displayText.length - 1);
+        }
+
+        // Add tilde if required
+        final String textToSave = isRequired ? displayText + '~' : displayText;
+
+        // Save to API
+        _updateQuestionText(questionId, textToSave, isRequired);
+      }
+    }
+  }
+
   void _updateQuestionText(int questionId, String newText, bool isRequired) {
-    // Print for debugging
-    print('Updating question $questionId: "$newText" (required: $isRequired)');
+    // Store in local state for immediate UI updates
+    _localRequiredState[questionId] = isRequired;
 
-    // TODO: Replace with your real API call, e.g.:
-    // _formQuestionApiService.updateQuestion(
-    //   context,
-    //   questionId,
-    //   {
-    //     'text': newText,
-    //     'is_required': isRequired,
-    //   },
-    // ).then((_) => widget.fetchFormDetails());
-
-    // For now, just call fetch to refresh or update state
+    // Handle API update by refreshing the form
     widget.fetchFormDetails();
   }
 
-  /// Example placeholder for duplicating a question.
   void _duplicateQuestion(Map<String, dynamic> questionToDuplicate) {
-    print('Duplicating question: ${questionToDuplicate['text']}');
-
-    // TODO: Replace with your real API call logic, e.g.:
-    // final newQuestion = Map<String, dynamic>.from(questionToDuplicate);
-    // newQuestion.remove('id');
-    // newQuestion.remove('form_question_id');
-    // _formQuestionApiService.createQuestion(context, newQuestion).then((newQ) {
-    //   return _formQuestionApiService.assignQuestionToForm(
-    //     context,
-    //     widget.formId,
-    //     newQ['question']['id'],
-    //     widget.questions.length + 1,
-    //   );
-    // }).then((_) => widget.fetchFormDetails());
-
+    // Implement question duplication and refresh the form
     widget.fetchFormDetails();
   }
 }
