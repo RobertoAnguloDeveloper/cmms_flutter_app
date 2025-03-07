@@ -65,7 +65,6 @@ class AttachmentService {
       responseType: ResponseType.bytes,
     ));
 
-    // Add retry interceptor for better reliability
     _dio.interceptors.add(
       RetryInterceptor(
         dio: _dio,
@@ -79,11 +78,9 @@ class AttachmentService {
       ),
     );
 
-    // Add authorization interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Add authorization header to every request
           final token = await SessionManager.getToken();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -102,7 +99,7 @@ class AttachmentService {
     if (kDebugMode) {
       _dio.interceptors.add(LogInterceptor(
         requestBody: true,
-        responseBody: false, // Don't log binary responses
+        responseBody: false,
         error: true,
         requestHeader: true,
         responseHeader: true,
@@ -110,30 +107,37 @@ class AttachmentService {
     }
   }
 
-  // Create single attachment
   Future<Map<String, dynamic>> createAttachment(
-    BuildContext context,
-    int formSubmissionId,
-    File file,
-    bool isSignature,
-  ) async {
+      BuildContext context,
+      int formSubmissionId,
+      File file,
+      bool isSignature, {
+        String? signatureAuthor,
+        String? signaturePosition,
+      }) async {
     try {
-      // Validate file
       final validationError = _validateFile(file);
       if (validationError != null) {
-        throw Exception(validationError);
+        throw AttachmentException(validationError);
       }
 
       String? token = await SessionManager.getToken();
       var uri = Uri.parse('${_http.baseUrl}/api/attachments');
 
-      // Create multipart request
       var request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token'
         ..fields['form_submission_id'] = formSubmissionId.toString()
         ..fields['is_signature'] = isSignature.toString();
 
-      // Add file with content type
+      if (isSignature) {
+        if (signatureAuthor != null && signatureAuthor.isNotEmpty) {
+          request.fields['signature_author'] = signatureAuthor;
+        }
+        if (signaturePosition != null && signaturePosition.isNotEmpty) {
+          request.fields['signature_position'] = signaturePosition;
+        }
+      }
+
       final mimeType = _getMimeType(file.path);
       final stream = http.ByteStream(file.openRead());
       final length = await file.length();
@@ -170,12 +174,11 @@ class AttachmentService {
     }
   }
 
-  // Bulk create attachments
   Future<Map<String, dynamic>> bulkCreateAttachments(
-    BuildContext context,
-    int formSubmissionId,
-    List<Map<String, dynamic>> filesData,
-  ) async {
+      BuildContext context,
+      int formSubmissionId,
+      List<Map<String, dynamic>> filesData,
+      ) async {
     try {
       String? token = await SessionManager.getToken();
       var uri = Uri.parse('${_http.baseUrl}/api/attachments/bulk');
@@ -188,6 +191,8 @@ class AttachmentService {
         var fileData = filesData[i];
         File file = fileData['file'];
         bool isSignature = fileData['is_signature'] ?? false;
+        String? signatureAuthor = fileData['signature_author'];
+        String? signaturePosition = fileData['signature_position'];
 
         final validationError = _validateFile(file);
         if (validationError != null) {
@@ -208,6 +213,15 @@ class AttachmentService {
           ),
         );
         request.fields['is_signature$i'] = isSignature.toString();
+
+        if (isSignature) {
+          if (signatureAuthor != null && signatureAuthor.isNotEmpty) {
+            request.fields['signature_author$i'] = signatureAuthor;
+          }
+          if (signaturePosition != null && signaturePosition.isNotEmpty) {
+            request.fields['signature_position$i'] = signaturePosition;
+          }
+        }
       }
 
       final streamedResponse = await request.send();
@@ -236,34 +250,41 @@ class AttachmentService {
   Future<Map<String, dynamic>> uploadSignature(
       BuildContext context,
       int formSubmissionId,
-      File file,
-      ) async {
+      File file, {
+        String? signatureAuthor,
+        String? signaturePosition,
+      }) async {
     return createAttachment(
       context,
       formSubmissionId,
       file,
-      true, // Set isSignature to true
+      true,
+      signatureAuthor: signatureAuthor,
+      signaturePosition: signaturePosition,
     );
   }
 
   Future<Map<String, dynamic>> uploadSignatureAttachment(
       BuildContext context,
       int formSubmissionId,
-      File file,
-      ) async {
+      File file, {
+        String? signatureAuthor,
+        String? signaturePosition,
+      }) async {
     return createAttachment(
       context,
       formSubmissionId,
       file,
-      true, // isSignature set to true
+      true,
+      signatureAuthor: signatureAuthor,
+      signaturePosition: signaturePosition,
     );
   }
 
-  // Fetch attachments with filters
   Future<Map<String, dynamic>> fetchAttachments(
-    BuildContext context, {
-    Map<String, dynamic>? filters,
-  }) async {
+      BuildContext context, {
+        Map<String, dynamic>? filters,
+      }) async {
     try {
       String? token = await SessionManager.getToken();
 
@@ -271,7 +292,7 @@ class AttachmentService {
       if (filters != null && filters.isNotEmpty) {
         uri = uri.replace(
             queryParameters:
-                filters.map((key, value) => MapEntry(key, value.toString())));
+            filters.map((key, value) => MapEntry(key, value.toString())));
       }
 
       final response = await http.get(
@@ -300,11 +321,10 @@ class AttachmentService {
     }
   }
 
-  // Get attachments for a submission
   Future<List<Attachment>> getSubmissionAttachments(
-    BuildContext context,
-    int submissionId,
-  ) async {
+      BuildContext context,
+      int submissionId,
+      ) async {
     try {
       final response = await _dio.get<dynamic>(
         '/api/attachments/submission/$submissionId',
@@ -338,14 +358,9 @@ class AttachmentService {
     }
   }
 
-  /// Opens an attachment using a more robust download strategy specifically for emulator testing
-  /// Downloads attachment with special handling for emulator connections
-  /// Downloads attachment with storage permission handling
-  /// Downloads attachment using HTTP range requests for more reliable downloads in emulators
   Future<void> openAttachment(BuildContext context, int attachmentId) async {
     print('🔍 Attempting to open attachment with range requests: $attachmentId');
 
-    // Mostrar el diálogo de carga inmediatamente
     if (context.mounted) {
       showDialog(
         context: context,
@@ -372,11 +387,9 @@ class AttachmentService {
         throw Exception('Authentication token is null. Please log in again.');
       }
 
-      // Construir la URL del adjunto
       final attachmentUrl = '${_http.baseUrl}/api/attachments/$attachmentId';
       print('🌐 Attachment URL: $attachmentUrl');
 
-      // Realizar una solicitud HEAD para verificar la autorización
       final response = await http.head(
         Uri.parse(attachmentUrl),
         headers: {
@@ -384,19 +397,16 @@ class AttachmentService {
         },
       );
 
-      // Manejar token expirado
       if (response.statusCode == 401) {
         final responseData = json.decode(response.body);
         await ApiResponseHandler.handleExpiredToken(context, responseData);
-        return; // Salir de la función para evitar continuar con un token inválido
+        return;
       }
 
-      // Cerrar el diálogo de carga
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
 
-      // Mostrar opciones de descarga al usuario
       if (context.mounted) {
         showDialog(
           context: context,
@@ -428,7 +438,6 @@ class AttachmentService {
         );
       }
     } catch (e) {
-      // Cerrar diálogo de carga si está abierto
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -445,14 +454,12 @@ class AttachmentService {
     }
   }
 
-  /// Downloads file using HTTP range requests in small chunks
   Future<void> _downloadWithRangeRequests(
-    BuildContext context,
-    int attachmentId,
-    String url,
-    String token,
-  ) async {
-    // Show download progress dialog
+      BuildContext context,
+      int attachmentId,
+      String url,
+      String token,
+      ) async {
     double progress = 0.0;
     late BuildContext dialogContext;
 
@@ -477,11 +484,9 @@ class AttachmentService {
       );
     }
 
-    // Function to update progress dialog
     void updateProgress(double newProgress) {
       progress = newProgress;
       if (context.mounted) {
-        // Force rebuild of progress dialog
         Navigator.of(context).pop();
         showDialog(
           context: context,
@@ -505,21 +510,16 @@ class AttachmentService {
     }
 
     try {
-      // Get app's private documents directory
       final directory = await getApplicationDocumentsDirectory();
-
-      // Generate unique filename with timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final tempFilename = 'attachment_${attachmentId}_$timestamp.download';
       final tempFilePath = '${directory.path}/$tempFilename';
 
       print('📁 Will save to: $tempFilePath');
 
-      // Create a temporary file to write the chunks
       final outputFile = File(tempFilePath);
       final raf = await outputFile.open(mode: FileMode.write);
 
-      // First, make a HEAD request to get file size and content type
       final headResponse = await http.head(
         Uri.parse(url),
         headers: {'Authorization': 'Bearer $token'},
@@ -536,15 +536,13 @@ class AttachmentService {
           fileSize = int.tryParse(contentLengthStr) ?? 0;
         }
 
-        // Try to get filename from content-disposition
         final contentDisposition =
             headResponse.headers['content-disposition'] ?? '';
         final filenameMatch =
-            RegExp(r'filename=([^;]*)').firstMatch(contentDisposition);
+        RegExp(r'filename=([^;]*)').firstMatch(contentDisposition);
         if (filenameMatch != null && filenameMatch.group(1) != null) {
           finalFilename = filenameMatch.group(1)!.trim();
         } else {
-          // Add extension based on content type
           final extension = _getExtensionFromMime(contentType);
           finalFilename = 'attachment_${attachmentId}_$timestamp.$extension';
         }
@@ -555,32 +553,24 @@ class AttachmentService {
       print(
           '📄 Content type: $contentType, Size: $fileSize, Filename: $finalFilename');
 
-      // If the server doesn't support HEAD or didn't return a size, use a default
       if (fileSize <= 0) {
-        fileSize = 1024 * 1024; // Assume 1MB as fallback
+        fileSize = 1024 * 1024;
       }
 
-      // Define chunk size (16KB is reliable for emulators)
-      const chunkSize = 16 * 1024; // 16KB chunks
-
-      // Track overall progress
+      const chunkSize = 16 * 1024;
       int totalBytesDownloaded = 0;
       int currentPosition = 0;
       int retryCount = 0;
       const maxRetries = 5;
 
-      // Download in chunks
       while (currentPosition < fileSize && retryCount < maxRetries) {
         try {
-          // Calculate end position for this chunk
           final endPosition = currentPosition + chunkSize - 1;
-          // Don't request beyond the file size
           final adjustedEndPosition =
-              endPosition < fileSize ? endPosition : fileSize - 1;
+          endPosition < fileSize ? endPosition : fileSize - 1;
 
           print('🔄 Downloading range: $currentPosition-$adjustedEndPosition');
 
-          // Make a range request for this chunk
           final response = await http.get(
             Uri.parse(url),
             headers: {
@@ -589,73 +579,55 @@ class AttachmentService {
             },
           );
 
-          // Check if we got the expected response
           if (response.statusCode == 206 || response.statusCode == 200) {
-            // 206 Partial Content or 200 OK
             final chunkData = response.bodyBytes;
 
-            // Write chunk to file at the correct position
             await raf.setPosition(currentPosition);
             await raf.writeFrom(chunkData);
 
-            // Update progress
             final bytesDownloaded = chunkData.length;
             totalBytesDownloaded += bytesDownloaded;
             currentPosition += bytesDownloaded;
 
-            // Calculate and update progress
             final downloadProgress =
-                fileSize > 0 ? totalBytesDownloaded / fileSize : 0.0;
+            fileSize > 0 ? totalBytesDownloaded / fileSize : 0.0;
             print(
                 '📊 Progress: ${(downloadProgress * 100).toStringAsFixed(0)}%, Downloaded: $totalBytesDownloaded/$fileSize bytes');
 
-            // Update UI progress
             updateProgress(downloadProgress);
 
-            // Reset retry counter on success
             retryCount = 0;
           } else {
             print('⚠️ Range request failed: ${response.statusCode}');
             retryCount++;
-            await Future.delayed(Duration(
-                milliseconds: 500 * retryCount)); // Exponential backoff
+            await Future.delayed(Duration(milliseconds: 500 * retryCount));
           }
         } catch (e) {
           print('⚠️ Error downloading chunk: $e');
           retryCount++;
-          await Future.delayed(
-              Duration(milliseconds: 500 * retryCount)); // Exponential backoff
+          await Future.delayed(Duration(milliseconds: 500 * retryCount));
         }
       }
 
-      // Close the file
       await raf.close();
 
-      // Check if we downloaded the complete file
       if (totalBytesDownloaded >= fileSize * 0.9) {
-        // Consider it successful if we got at least 90%
         print('✅ Download completed: $totalBytesDownloaded/$fileSize bytes');
 
-        // Rename the file to add proper extension
         final finalFilePath = '${directory.path}/$finalFilename';
         await outputFile.rename(finalFilePath);
 
-        // Close progress dialog
         if (context.mounted) {
           Navigator.of(context, rootNavigator: true).pop();
         }
 
-        // Show success dialog
         if (context.mounted) {
           _showSuccessDialog(context, finalFilePath, contentType);
         }
       } else {
-        // If we didn't download enough, consider it failed
         print('❌ Download incomplete: $totalBytesDownloaded/$fileSize bytes');
-        // Delete the incomplete file
         await outputFile.delete();
 
-        // Close progress dialog
         if (context.mounted) {
           Navigator.of(context, rootNavigator: true).pop();
         }
@@ -663,7 +635,6 @@ class AttachmentService {
         throw Exception('Download incomplete after $maxRetries retries');
       }
     } catch (e) {
-      // Close progress dialog if open
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -681,7 +652,6 @@ class AttachmentService {
     }
   }
 
-// Show success dialog with options to open the file
   void _showSuccessDialog(
       BuildContext context, String filePath, String contentType) {
     showDialog(
@@ -694,7 +664,6 @@ class AttachmentService {
           children: [
             const Text('The file has been downloaded successfully.'),
             const SizedBox(height: 10),
-            // Show file type icon based on content type
             Center(
               child: Icon(
                 _getIconForMimeType(contentType),
@@ -729,7 +698,6 @@ class AttachmentService {
     );
   }
 
-// Open file with error handling
   Future<void> _openFile(BuildContext context, String filePath) async {
     try {
       final result = await OpenFile.open(filePath);
@@ -754,9 +722,6 @@ class AttachmentService {
     }
   }
 
-// Helper method to get icon for MIME type
-
-// Helper method to get color for MIME type
   Color _getColorForMimeType(String mimeType) {
     if (mimeType.contains('image/')) {
       return Colors.blue;
@@ -775,14 +740,12 @@ class AttachmentService {
     }
   }
 
-  /// Downloads file to app's private directory (no special permissions needed)
   Future<void> _downloadToAppDirectory(
-    BuildContext context,
-    int attachmentId,
-    String url,
-    String token,
-  ) async {
-    // Show progress dialog
+      BuildContext context,
+      int attachmentId,
+      String url,
+      String token,
+      ) async {
     if (context.mounted) {
       showDialog(
         context: context,
@@ -795,23 +758,17 @@ class AttachmentService {
     }
 
     try {
-      // Get app's private documents directory (no permissions needed)
       final directory = await getApplicationDocumentsDirectory();
-
-      // Generate unique filename with timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = 'attachment_${attachmentId}_$timestamp.bin';
       final file = File('${directory.path}/$filename');
 
       print('📁 Will save to app directory: ${file.path}');
 
-      // Create a buffer to store the downloaded data
       final bytes = <int>[];
       bool downloadComplete = false;
 
-      // Function to try downloading with different methods
       Future<void> tryDownload() async {
-        // Method 1: Use HttpClient with chunked transfer
         try {
           final httpClient = HttpClient();
           httpClient.connectionTimeout = const Duration(seconds: 30);
@@ -822,29 +779,24 @@ class AttachmentService {
           final response = await request.close();
 
           if (response.statusCode == 200) {
-            // Get content type from headers
             final contentType = response.headers.value('content-type') ??
                 'application/octet-stream';
             final contentDisposition =
                 response.headers.value('content-disposition') ?? '';
 
-            // Try to extract filename from content-disposition if available
             String filenameWithExt = filename;
             final filenameMatch =
-                RegExp(r'filename=([^;]*)').firstMatch(contentDisposition);
+            RegExp(r'filename=([^;]*)').firstMatch(contentDisposition);
             if (filenameMatch != null && filenameMatch.group(1) != null) {
               filenameWithExt = filenameMatch.group(1)!.trim();
             } else {
-              // Determine extension from content type
               final extension = _getExtensionFromMime(contentType);
               filenameWithExt =
-                  'attachment_${attachmentId}_$timestamp.$extension';
+              'attachment_${attachmentId}_$timestamp.$extension';
             }
 
-            // Update file path with proper extension
             final fileWithExt = File('${directory.path}/$filenameWithExt');
 
-            // Collect data in chunks
             final output = fileWithExt.openWrite();
             int totalBytes = 0;
 
@@ -857,15 +809,12 @@ class AttachmentService {
             await output.close();
             print('✅ File saved to: ${fileWithExt.path}');
 
-            // File successfully downloaded
             downloadComplete = true;
 
-            // Close progress dialog
             if (context.mounted) {
               Navigator.of(context, rootNavigator: true).pop();
             }
 
-            // Show success dialog
             if (context.mounted) {
               _showSuccessDialog(context, fileWithExt.path, contentType);
             }
@@ -876,10 +825,8 @@ class AttachmentService {
           httpClient.close();
         } catch (e) {
           print('❌ Method 1 download error: $e');
-          // Will try next method if this fails
         }
 
-        // If first method failed, try Method 2: http package with basic auth
         if (!downloadComplete) {
           try {
             print('🔄 Trying alternate download method');
@@ -892,26 +839,21 @@ class AttachmentService {
             );
 
             if (response.statusCode == 200) {
-              // Get content type from headers
               final contentType = response.headers['content-type'] ??
                   'application/octet-stream';
 
-              // Determine extension from content type
               final extension = _getExtensionFromMime(contentType);
               final fileWithExt = File(
                   '${directory.path}/attachment_${attachmentId}_$timestamp.$extension');
 
-              // Write file synchronously to avoid streaming issues
               await fileWithExt.writeAsBytes(response.bodyBytes);
               print(
                   '✅ File saved via alternate method to: ${fileWithExt.path}');
 
-              // Close progress dialog
               if (context.mounted) {
                 Navigator.of(context, rootNavigator: true).pop();
               }
 
-              // Show success dialog
               if (context.mounted) {
                 _showSuccessDialog(context, fileWithExt.path, contentType);
               }
@@ -927,12 +869,9 @@ class AttachmentService {
         }
       }
 
-      // Try the download
       await tryDownload();
 
-      // If all download methods failed
       if (!downloadComplete) {
-        // Close progress dialog if still open
         if (context.mounted) {
           Navigator.of(context, rootNavigator: true).pop();
         }
@@ -940,7 +879,6 @@ class AttachmentService {
         throw Exception('All download methods failed.');
       }
     } catch (e) {
-      // Close progress dialog if still open
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -957,29 +895,22 @@ class AttachmentService {
     }
   }
 
-// Helper method to get color for MIME type
-
-  /// Downloads file using platform-specific external download manager
   Future<void> _downloadWithExternalMethod(
       BuildContext context,
       int attachmentId,
       String url,
-      String token, // Now non-nullable since we check before calling
+      String token,
       String filename,
       String contentType) async {
     try {
       if (Platform.isAndroid) {
-        // On Android, we'll use the DownloadManager
-        // First, we need to get a directory that's accessible by the DownloadManager
         final directory = await getExternalStorageDirectory();
         if (directory == null) {
           throw Exception('Could not access external storage');
         }
 
-        // Create a file in the external storage
         final file = File('${directory.path}/$filename');
 
-        // Show progress dialog
         if (context.mounted) {
           showDialog(
             context: context,
@@ -991,31 +922,24 @@ class AttachmentService {
           );
         }
 
-        // Use a technique that makes multiple short requests instead of one long one
         final httpClient = HttpClient();
         httpClient.connectionTimeout = const Duration(seconds: 30);
 
-        // Create request
         final request = await httpClient.getUrl(Uri.parse(url));
         request.headers.add('Authorization', 'Bearer $token');
 
-        // Get response
         final response = await request.close();
 
         if (response.statusCode == 200) {
-          // Open file for writing
           final fileOutput = file.openWrite();
 
-          // Set up buffer size and tracking variables
-          const bufferSize = 64 * 1024; // 64KB chunks
+          const bufferSize = 64 * 1024;
           var bytesReceived = 0;
 
-          // Loop to read data in small chunks
           try {
             await for (var data in response.transform(
               StreamTransformer<List<int>, List<int>>.fromHandlers(
                 handleData: (data, sink) {
-                  // Process data in smaller chunks
                   int offset = 0;
                   while (offset < data.length) {
                     final end = offset + bufferSize < data.length
@@ -1027,22 +951,18 @@ class AttachmentService {
                 },
               ),
             )) {
-              // Add chunk to file
               fileOutput.add(data);
               bytesReceived += data.length;
               print('📊 Received: $bytesReceived bytes');
             }
 
-            // Close file handle
             await fileOutput.close();
             print('✅ File successfully written to ${file.path}');
 
-            // Close progress dialog
             if (context.mounted) {
               Navigator.of(context, rootNavigator: true).pop();
             }
 
-            // Show success dialog
             if (context.mounted) {
               showDialog(
                 context: context,
@@ -1078,12 +998,10 @@ class AttachmentService {
             print('❌ Error during file write: $e');
             await fileOutput.close();
 
-            // Close progress dialog
             if (context.mounted) {
               Navigator.of(context, rootNavigator: true).pop();
             }
 
-            // Show error
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -1094,7 +1012,6 @@ class AttachmentService {
             }
           }
         } else {
-          // Close progress dialog
           if (context.mounted) {
             Navigator.of(context, rootNavigator: true).pop();
           }
@@ -1104,8 +1021,6 @@ class AttachmentService {
 
         httpClient.close();
       } else {
-        // For iOS, macOS, etc.
-        // Try more basic approach
         final response = await http.get(
           Uri.parse(url),
           headers: {
@@ -1116,11 +1031,9 @@ class AttachmentService {
         if (response.statusCode == 200) {
           final bytes = response.bodyBytes;
 
-          // Get documents directory
           final directory = await getApplicationDocumentsDirectory();
           final file = File('${directory.path}/$filename');
 
-          // Write file
           await file.writeAsBytes(bytes);
 
           if (context.mounted) {
@@ -1152,51 +1065,41 @@ class AttachmentService {
     }
   }
 
-// Make sure to add this import
   Future<Directory?> getExternalStorageDirectory() async {
     if (Platform.isAndroid) {
       try {
-        // First try with Download directory
         final downloadsDir = Directory('/storage/emulated/0/Download');
         if (await downloadsDir.exists()) {
           return downloadsDir;
         }
 
-        // Fallback to app's external files directory
         return await getApplicationDocumentsDirectory();
       } catch (e) {
         print('Error getting external storage directory: $e');
       }
     }
 
-    // Default to app's documents directory for iOS and other platforms
     return await getApplicationDocumentsDirectory();
   }
 
-// Helper method to save file directly without attempting to preview
   Future<bool> _directlySaveFile(BuildContext context, Uint8List bytes,
       String contentType, int attachmentId) async {
     try {
-      // For emulator testing, use a more reliable directory
       final directory = await getApplicationDocumentsDirectory();
 
-      // Determine file extension
       String extension = _getExtensionFromMime(contentType);
 
-      // Create unique filename with timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'attachment_${attachmentId}_$timestamp.$extension';
       final filePath = '${directory.path}/$fileName';
 
       print('📄 Saving file to: $filePath');
 
-      // Write file
       final file = File(filePath);
       await file.writeAsBytes(bytes, flush: true);
 
       print('✅ File saved: $filePath');
 
-      // Show success dialog with file path
       if (context.mounted) {
         showDialog(
           context: context,
@@ -1219,7 +1122,7 @@ class AttachmentService {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                               content:
-                                  Text('Cannot open file: ${result.message}')),
+                              Text('Cannot open file: ${result.message}')),
                         );
                       }
                     });
@@ -1253,7 +1156,6 @@ class AttachmentService {
     }
   }
 
-// Show dialog when save fails
   void _showSaveFailedDialog(BuildContext context, Uint8List bytes,
       String contentType, int attachmentId) {
     showDialog(
@@ -1279,24 +1181,19 @@ class AttachmentService {
     );
   }
 
-// Try alternative save method for stubborn files
   Future<void> _tryAlternativeSave(BuildContext context, Uint8List bytes,
       String contentType, int attachmentId) async {
     try {
-      // For testing in emulator, use temp directory as it's more reliable
       final directory = await getTemporaryDirectory();
 
-      // Determine file extension
       String extension = _getExtensionFromMime(contentType);
 
-      // Create unique filename with timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'attachment_${attachmentId}_$timestamp.$extension';
       final filePath = '${directory.path}/$fileName';
 
       print('📄 Trying alternative save to: $filePath');
 
-      // Write file using different method
       final file = File(filePath);
       final raf = await file.open(mode: FileMode.write);
       await raf.writeFrom(bytes);
@@ -1446,11 +1343,10 @@ class AttachmentService {
     );
   }
 
-  // Delete attachment
   Future<Map<String, dynamic>> deleteAttachment(
-    BuildContext context,
-    int attachmentId,
-  ) async {
+      BuildContext context,
+      int attachmentId,
+      ) async {
     try {
       String? token = await SessionManager.getToken();
 
@@ -1463,7 +1359,6 @@ class AttachmentService {
       );
 
       if (response.statusCode == 200) {
-        // Clear from cache if exists
         await _cache.removeFile('attachment_$attachmentId');
         return response.data as Map<String, dynamic>;
       } else if (response.statusCode == 401) {
@@ -1486,9 +1381,6 @@ class AttachmentService {
     }
   }
 
-  // Private helper methods
-
-  // Validate file
   String? _validateFile(File file) {
     try {
       final size = file.lengthSync();
@@ -1497,7 +1389,7 @@ class AttachmentService {
       }
 
       final extension =
-          path.extension(file.path).toLowerCase().replaceAll('.', '');
+      path.extension(file.path).toLowerCase().replaceAll('.', '');
       if (!allowedExtensions.contains(extension)) {
         return 'File type not allowed. Allowed types: ${allowedExtensions.join(", ")}';
       }
@@ -1508,7 +1400,6 @@ class AttachmentService {
     }
   }
 
-  // Get MIME type from file extension
   String _getMimeType(String filepath) {
     final ext = path.extension(filepath).toLowerCase();
     switch (ext) {
@@ -1536,7 +1427,6 @@ class AttachmentService {
     }
   }
 
-  // Get file extension from MIME type
   String _getExtensionFromMime(String mimeType) {
     switch (mimeType) {
       case 'image/jpeg':
@@ -1547,7 +1437,7 @@ class AttachmentService {
         return 'pdf';
       case 'application/msword':
       case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-      case 'application/docx': // Maneja el caso del servidor
+      case 'application/docx':
         return 'docx';
       case 'application/vnd.ms-excel':
       case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
@@ -1558,7 +1448,6 @@ class AttachmentService {
     }
   }
 
-  // Show file viewer based on content type
   void _showFileViewer(BuildContext context, Uint8List bytes,
       String contentType, int attachmentId) {
     print('🖼️ Showing File Viewer');
@@ -1592,12 +1481,11 @@ class AttachmentService {
                       ),
                     ],
                   ),
-                  // Wrap PhotoView with error handling
                   Expanded(
                     child: PhotoView(
                       imageProvider: MemoryImage(bytes),
                       backgroundDecoration:
-                          const BoxDecoration(color: Colors.white),
+                      const BoxDecoration(color: Colors.white),
                       loadingBuilder: (context, event) => const Center(
                         child: CircularProgressIndicator(),
                       ),
@@ -1630,7 +1518,6 @@ class AttachmentService {
           },
         );
       } else {
-        // Existing non-image file handling
         showDialog(
           context: context,
           builder: (context) {
@@ -1677,23 +1564,18 @@ class AttachmentService {
     }
   }
 
-  // Save attachment to device
   void _saveAttachment(BuildContext context, Uint8List bytes,
       String contentType, int attachmentId) async {
     try {
       if (kIsWeb) {
-        // Web-specific download
         _downloadFileWeb(bytes, _getExtensionFromMime(contentType));
         return;
       }
 
-      // Mobile/Desktop platform file saving
       final directory = await getApplicationDocumentsDirectory();
 
-      // Determine the correct extension based on content type
       String extension = _getExtensionFromMime(contentType);
 
-      // If content type is text/plain, use .txt instead of .bin
       if (contentType.contains('text/plain')) {
         extension = 'txt';
       }
@@ -1715,10 +1597,8 @@ class AttachmentService {
         print('✅ File saved successfully');
 
         if (context.mounted) {
-          // Automatically try to open the file
           final result = await OpenFile.open(filePath);
 
-          // Check the result of opening the file
           switch (result.type) {
             case ResultType.done:
               print('File opened successfully');
@@ -1728,17 +1608,6 @@ class AttachmentService {
                 SnackBar(
                   content: const Text(
                       'File downloaded, but no app found to open it.'),
-                  //action: SnackBarAction(
-                  //  label: 'Save',
-                  //  onPressed: () {
-                  //    // Provide option to just save the file
-                  //    ScaffoldMessenger.of(context).showSnackBar(
-                  //      SnackBar(
-                  //        content: Text('File saved to $filePath'),
-                  //      ),
-                  //    );
-                  //  },
-                  //),
                 ),
               );
               break;
@@ -1789,7 +1658,6 @@ class AttachmentService {
     }
   }
 
-  // For web, you'll need to add the universal_html package
   void _downloadFileWeb(Uint8List bytes, String extension) {
     if (!kIsWeb) return;
 
@@ -1809,7 +1677,6 @@ class AttachmentService {
     }
   }
 
-  // Helper method to get icon for MIME type
   IconData _getIconForMimeType(String mimeType) {
     if (mimeType.contains('image/')) {
       return Icons.image;
@@ -1826,9 +1693,6 @@ class AttachmentService {
     }
   }
 
-  // Helper method to get color for MIME type
-
-  // Handle Dio errors and convert to AttachmentException
   AttachmentException _handleDioError(DioException e) {
     String errorMessage;
     int? statusCode = e.response?.statusCode;

@@ -224,58 +224,6 @@ class FormApiService {
   }
 
 
-/*
-    // EXPORT FORM AS PDF
-  Future<void> exportFormAsPDF(
-    BuildContext context,
-    int formId, {
-    required int signatureCount,
-    required Map<String, String> signatureDetails,
-  }) async {
-    try {
-      String? token = await SessionManager.getToken();
-
-      // Construir los parámetros del endpoint
-      final queryParams = {
-        'format': 'pdf',
-        'signature_count': signatureCount.toString(),
-        ...signatureDetails, // Agregar los detalles de las firmas dinámicamente
-        'signature_space_before': '1',
-        'signature_space_between': '8',
-        'signature_space_date': '1',
-        'signature_space_after': '0',
-      };
-
-      // Crear la URL con los parámetros
-      final queryString = Uri(queryParameters: queryParams).query;
-      final url = '${Http().baseUrl}/api/export/form/$formId?$queryString';
-
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        // Aquí podrías manejar la descarga del PDF, dependiendo de cómo desees implementarlo
-        print('PDF exported successfully.');
-      } else if (response.statusCode == 401) {
-        final responseData = json.decode(response.body);
-        await ApiResponseHandler.handleExpiredToken(context, responseData);
-      } else {
-        final responseData = json.decode(response.body);
-        throw Exception(
-          'Error exporting form as PDF: ${responseData['message'] ?? response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Exception while exporting form as PDF: $e');
-    }
-  }*/
-
-
   Future<void> exportFormAsPDF(
       BuildContext context,
       int formId, {

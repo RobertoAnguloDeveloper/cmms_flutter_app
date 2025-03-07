@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -32,15 +33,43 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
     super.dispose();
   }
 
+  bool get isRequired => widget.question['is_required'] ?? true; // Default to true
+
   @override
   Widget build(BuildContext context) {
     final questionType = widget.question['type']?.toString().toLowerCase() ?? '';
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!isRequired)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text(
+              'Optional',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        _buildInputByType(questionType),
+      ],
+    );
+  }
+
+  Widget _buildInputByType(String questionType) {
     switch (questionType) {
       case 'checkbox':
         return _buildCheckboxInput();
       case 'multiple_choice':
-      case 'multiple_choices': // Add this case
+      case 'multiple_choices':
         return _buildMultipleChoiceInput();
       case 'radio':
         return _buildMultipleChoiceInput();
@@ -114,13 +143,19 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
       },
       child: InputDecorator(
         decoration: InputDecoration(
-          border: OutlineInputBorder(),
-          suffixIcon: Icon(Icons.calendar_today),
+          border: const OutlineInputBorder(),
+          suffixIcon: const Icon(Icons.calendar_today),
+          hintText: 'Select date',
+          filled: true,
+          fillColor: Colors.white,
         ),
         child: Text(
           widget.currentValue != null
               ? DateFormat('dd/MM/yyyy').format(DateTime.parse(widget.currentValue))
               : 'Select date',
+          style: TextStyle(
+            color: widget.currentValue != null ? Colors.black : Colors.grey[600],
+          ),
         ),
       ),
     );
@@ -133,7 +168,7 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
         border: Border.all(color: Colors.grey),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Center(
+      child: const Center(
         child: Text('Signature pad will be implemented here'),
       ),
     );
@@ -144,8 +179,8 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
       onPressed: () {
         // Implement file upload logic
       },
-      icon: Icon(Icons.upload_file),
-      label: Text('Upload File'),
+      icon: const Icon(Icons.upload_file),
+      label: const Text('Upload File'),
     );
   }
 
@@ -165,9 +200,11 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
   Widget _buildTextInput() {
     return TextField(
       controller: _textController,
-      decoration: InputDecoration(
+      decoration: const InputDecoration(
         border: OutlineInputBorder(),
         hintText: 'Enter your answer',
+        filled: true,
+        fillColor: Colors.white,
       ),
       onChanged: widget.onAnswerChanged,
       maxLines: widget.question['type'] == 'paragraph' ? 3 : 1,

@@ -1,3 +1,4 @@
+// lib/screens/modules/form_management/form_detail_helper/QuestionCreationCard.dart
 import 'package:flutter/material.dart';
 
 class QuestionCreationCard extends StatelessWidget {
@@ -9,6 +10,7 @@ class QuestionCreationCard extends StatelessWidget {
   final VoidCallback onCancel;
   final ValueChanged<int?> onTypeChanged;
   final ValueChanged<bool> onRequiredChanged;
+  final bool showValidationError;
 
   const QuestionCreationCard({
     Key? key,
@@ -20,6 +22,7 @@ class QuestionCreationCard extends StatelessWidget {
     required this.onCancel,
     required this.onTypeChanged,
     required this.onRequiredChanged,
+    this.showValidationError = false,
   }) : super(key: key);
 
   @override
@@ -27,8 +30,8 @@ class QuestionCreationCard extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
     final isPortrait = mediaQuery.orientation == Orientation.portrait;
     final dropdownWidth = isPortrait
-        ? mediaQuery.size.width * 0.4 // Más ancho en portrait
-        : mediaQuery.size.width * 0.25; // Más compacto en landscape
+        ? mediaQuery.size.width * 0.4
+        : mediaQuery.size.width * 0.25;
 
     return Card(
       elevation: 2,
@@ -44,128 +47,151 @@ class QuestionCreationCard extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                // Campo de texto para la pregunta
+                // Question text field
                 Expanded(
                   flex: 2,
                   child: TextField(
                     controller: questionTextController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Question title',
                       border: UnderlineInputBorder(),
                       hintStyle: TextStyle(fontSize: 16),
+                      errorText: showValidationError && questionTextController.text.isEmpty
+                          ? 'Question text is required'
+                          : null,
                     ),
                     style: const TextStyle(fontSize: 16),
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Selector de tipo de pregunta con tamaño dinámico
+                // Question type dropdown
                 Container(
                   width: dropdownWidth,
                   child: isLoadingQuestionTypes
                       ? const Center(
-                          child: CircularProgressIndicator(),
-                        )
+                    child: CircularProgressIndicator(),
+                  )
                       : DropdownButtonFormField<int>(
-                          value: selectedQuestionTypeId,
-                          isDense: true, // Reduce el espacio vertical
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.grey),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: Colors.grey),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                          dropdownColor: Colors.white,
-                          hint: const Text('Type'),
-                          items: questionTypes.map((type) {
-                            final String questionTypeString =
-                                (type['type'] ?? '').toString().toLowerCase();
+                    value: selectedQuestionTypeId,
+                    isDense: true,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      errorText: showValidationError && selectedQuestionTypeId == null
+                          ? 'Question type is required'
+                          : null,
+                    ),
+                    dropdownColor: Colors.white,
+                    hint: const Text('Type'),
+                    items: questionTypes.map((type) {
+                      final String questionTypeString =
+                      (type['type'] ?? '').toString().toLowerCase();
 
-                            IconData icon;
-                            switch (questionTypeString) {
-                              case 'multiple_choices':
-                                icon = Icons.radio_button_checked;
-                                break;
-                              case 'checkbox':
-                                icon = Icons.check_box;
-                                break;
-                              case 'date':
-                                icon = Icons.calendar_today;
-                                break;
-                              case 'datetime':
-                                icon = Icons.access_time;
-                                break;
-                              case 'text':
-                                icon = Icons.short_text;
-                                break;
-                              case 'user':
-                                icon = Icons.person;
-                                break;
-                              case 'signature':
-                                icon = Icons.draw;
-                                break;
-                              default:
-                                icon = Icons.question_answer;
-                            }
+                      IconData icon;
+                      switch (questionTypeString) {
+                        case 'multiple_choices':
+                          icon = Icons.radio_button_checked;
+                          break;
+                        case 'checkbox':
+                          icon = Icons.check_box;
+                          break;
+                        case 'date':
+                          icon = Icons.calendar_today;
+                          break;
+                        case 'datetime':
+                          icon = Icons.access_time;
+                          break;
+                        case 'text':
+                          icon = Icons.short_text;
+                          break;
+                        case 'user':
+                          icon = Icons.person;
+                          break;
+                        case 'signature':
+                          icon = Icons.draw;
+                          break;
+                        default:
+                          icon = Icons.question_answer;
+                      }
 
-                            return DropdownMenuItem<int>(
-                              value: type['id'] as int?,
-                              child: Row(
-                                children: [
-                                  Icon(icon, size: 20, color: Colors.grey[700]),
-                                  const SizedBox(width: 8),
-                                  // Ajuste para textos largos
-                                  Flexible(
-                                    child: Text(
-                                      (type['type'] ?? '').toString(),
-                                      overflow: TextOverflow
-                                          .ellipsis, // Muestra "..." si el texto es muy largo
-                                      softWrap:
-                                          false, // No permite que el texto envuelva a la siguiente línea
-                                    ),
-                                  ),
-                                ],
+                      return DropdownMenuItem<int>(
+                        value: type['id'] as int?,
+                        child: Row(
+                          children: [
+                            Icon(icon, size: 20, color: Colors.grey[700]),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                (type['type'] ?? '').toString(),
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
                               ),
-                            );
-                          }).toList(),
-                          onChanged: onTypeChanged,
+                            ),
+                          ],
                         ),
+                      );
+                    }).toList(),
+                    onChanged: onTypeChanged,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          // Barra inferior con switch y botón cancelar
+          // Bottom bar with required toggle and cancel button
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(8)),
+              const BorderRadius.vertical(bottom: Radius.circular(8)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Obligatorio
-                Row(
-                    // children: [
-                    //   const Text('Required'),
-                    //   Switch(
-                    //     value: isRequired,
-                    //     onChanged: onRequiredChanged,
-                    //     activeColor: const Color.fromARGB(255, 9, 68, 196),
-                    //   ),
-                    // ],
+                // Required toggle with label indicating current state
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isRequired ? 'Required' : 'Optional',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isRequired ? Colors.black : Colors.grey[600],
+                          ),
+                        ),
+                        Switch(
+                          value: isRequired,
+                          onChanged: onRequiredChanged,
+                          activeColor: const Color.fromARGB(255, 9, 68, 196),
+                        ),
+                      ],
                     ),
+                    if (isRequired)
+                      Text(
+                        '~ will be added to required questions',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                  ],
+                ),
                 IconButton(
                   onPressed: onCancel,
                   icon: const Icon(Icons.delete_outlined,

@@ -105,7 +105,9 @@ class _DrawerMenuState extends State<DrawerMenu> {
             // DRAWER MENU USER PERMISSIONS MANAGER
             // //2-OPTION User Management - Visible if 'view_all_users'
             if (_isSuperUser &&
+
                 (widget.permissionSet?.hasPermission('view_users') ?? false))
+
               PermissionMenuItem(
                 title: 'Users Management',
                 icon: FontAwesomeIcons.userGroup,
@@ -187,6 +189,7 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
+
             PermissionMenuItem(
               title: 'Form Submission',
               icon: FontAwesomeIcons.clipboardList,
@@ -217,6 +220,7 @@ class _DrawerMenuState extends State<DrawerMenu> {
                 );
               },
             ),
+
             PermissionMenuItem(
               title: 'Drafts',
               icon: FontAwesomeIcons.save,
@@ -236,12 +240,14 @@ class _DrawerMenuState extends State<DrawerMenu> {
             PermissionMenuItem(
               title: 'View Form',
               icon: FontAwesomeIcons.clipboardList,
+
               hasPermission:
                   () =>
               (widget.permissionSet?.hasPermission(
                 'view_form_submissions',
               ) ??
                   false),
+
               onTap: () {
                 if (widget.sessionData != null &&
                     widget.permissionSet != null) {
