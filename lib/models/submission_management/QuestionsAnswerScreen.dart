@@ -165,6 +165,9 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           isAnswered = answer != null && answer.toString().isNotEmpty;
         } else if (questionType == 'signature') {
           isAnswered = signatureFiles.containsKey(questionId.toString());
+        } else if (questionType == 'user') {
+          // Para preguntas de tipo usuario, comprobamos que el ID del usuario sea válido (mayor que 0)
+          isAnswered = answer != null && answer is int && answer > 0;
         }
       }
 
@@ -654,6 +657,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     return DynamicQuestionInput(
       question: question,
       currentValue: answers[questionId],
+      sessionData: widget.sessionData,
       onAnswerChanged: (value) {
         setState(() {
           if (value == null || (value is String && value.isEmpty)) {
@@ -686,7 +690,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 ),
                 icon: const Icon(Icons.attach_file, color: Colors.white),
                 label: const Text(
-                  'Attach Filesssss',
+                  'Attach Files',
                   style: TextStyle(color: Colors.white),
                 ),
               ),
