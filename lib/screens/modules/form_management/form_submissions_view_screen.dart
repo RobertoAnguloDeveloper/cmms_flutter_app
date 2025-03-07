@@ -73,24 +73,38 @@ class SubmissionDetailScreen extends StatelessWidget {
   }
 
   List<AnswerView> _processAnswers(List<AnswerView> answers) {
-    // Mapa para agrupar respuestas por pregunta
+    // En lugar de agrupar solo por nombre de pregunta, debemos asegurarnos de que
+    // las preguntas con el mismo nombre pero diferentes ID se mantengan separadas
+
+    // Creamos un mapa donde las claves serán pregunta+tipo+índice para mantener las respuestas únicas
     final Map<String, AnswerView> groupedAnswers = {};
 
+    // Mapa auxiliar para llevar un registro de cuántas respuestas hay para cada pregunta
+    final Map<String, int> questionCountMap = {};
+
     for (var answer in answers) {
-      final key = answer.question;
+      final questionKey = answer.question;
       final isCheckbox = answer.questionType.toLowerCase() == 'checkbox';
 
-      if (isCheckbox && groupedAnswers.containsKey(key)) {
+      // Incrementar el contador para esta pregunta
+      questionCountMap[questionKey] = (questionCountMap[questionKey] ?? 0) + 1;
+
+      // Crear una clave compuesta que incluye el nombre de la pregunta y un contador
+      final uniqueKey = isCheckbox
+          ? questionKey  // Para checkbox seguimos agrupando
+          : "${questionKey}_${questionCountMap[questionKey]}";
+
+      if (isCheckbox && groupedAnswers.containsKey(questionKey)) {
         // Si ya existe esta pregunta y es checkbox, agregamos la respuesta actual a la existente
-        final existingAnswer = groupedAnswers[key]!;
-        groupedAnswers[key] = AnswerView(
+        final existingAnswer = groupedAnswers[questionKey]!;
+        groupedAnswers[questionKey] = AnswerView(
           question: existingAnswer.question,
           questionType: existingAnswer.questionType,
           answer: existingAnswer.answer + ', ' + answer.answer,
         );
       } else {
         // Si no existe esta pregunta o no es checkbox, la agregamos normalmente
-        groupedAnswers[key] = answer;
+        groupedAnswers[uniqueKey] = answer;
       }
     }
 

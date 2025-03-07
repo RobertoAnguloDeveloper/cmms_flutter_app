@@ -183,6 +183,26 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
     // Ordenar usuarios por nombre para facilitar la búsqueda
     _users.sort((a, b) => (a['full_name'] ?? '').compareTo(b['full_name'] ?? ''));
 
+    // Encontrar el usuario seleccionado actualmente
+    int selectedUserId = 0;
+
+    // Si el valor actual es un entero, asumimos que es el ID del usuario
+    if (widget.currentValue != null) {
+      if (widget.currentValue is int) {
+        selectedUserId = widget.currentValue;
+      } else if (widget.currentValue is Map) {
+        // Si es un mapa con información del usuario, obtenemos el ID
+        selectedUserId = widget.currentValue['id'] ?? 0;
+      } else {
+        // Intentar parsear como entero
+        try {
+          selectedUserId = int.parse(widget.currentValue.toString());
+        } catch (e) {
+          print('Error parsing user ID: $e');
+        }
+      }
+    }
+
     return InputDecorator(
       decoration: InputDecoration(
         border: const OutlineInputBorder(),
@@ -194,10 +214,34 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
           isExpanded: true,
-          value: widget.currentValue,
+          value: selectedUserId != 0 ? selectedUserId : null,
           hint: const Text('Select user'),
           onChanged: (int? newValue) {
-            widget.onAnswerChanged(newValue);
+            if (newValue != null) {
+              // Encontrar el usuario completo en la lista
+              Map<String, dynamic>? selectedUser;
+              for (var user in _users) {
+                if (user['id'] == newValue) {
+                  selectedUser = Map<String, dynamic>.from(user);
+                  break;
+                }
+              }
+
+              // Si se ha implementado la opción para guardar el objeto usuario completo:
+              if (selectedUser != null) {
+                // Guardar tanto el ID como la información del usuario
+                widget.onAnswerChanged({
+                  'id': newValue,
+                  'userInfo': selectedUser,
+                  'displayName': selectedUser['full_name'] ?? selectedUser['username'] ?? 'User $newValue'
+                });
+              } else {
+                // Si por alguna razón no se encuentra, solo guardamos el ID
+                widget.onAnswerChanged(newValue);
+              }
+            } else {
+              widget.onAnswerChanged(null);
+            }
           },
           items: _users.map<DropdownMenuItem<int>>((user) {
             return DropdownMenuItem<int>(

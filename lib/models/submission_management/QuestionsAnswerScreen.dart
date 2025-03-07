@@ -15,6 +15,7 @@ import '../../../services/api_model_services/api_form_services/FormApiService.da
 import '../../../services/api_model_services/api_form_services/form_submission_service.dart';
 import '../../screens/modules/form_submission/Components/CustomSignaturePad.dart';
 import '../../screens/modules/form_submission/Components/DynamicQuestionInput.dart';
+import '../../services/api_model_services/UserApiService.dart';
 
 class QuestionsAnswerScreen extends StatefulWidget {
   final int formId;
@@ -88,6 +89,74 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       setState(() {
         _cameraErrorDetected = true;
       });
+    }
+  }
+
+  // Añadir este método a la clase _QuestionsAnswerScreenState
+
+// Caché de nombres de usuarios para mejorar el rendimiento
+  Map<int, String> _userNamesCache = {};
+
+// Método para obtener el nombre completo de un usuario por su ID
+  Future<String> _getUserNameById(dynamic userId) async {
+    if (userId == null) return 'Unknown User';
+
+    // Convertir a entero si es posible
+    int id;
+    try {
+      id = int.parse(userId.toString());
+    } catch (e) {
+      print('Error parsing user ID: $e');
+      return 'Invalid User ID';
+    }
+
+    // Verificar primero en la caché
+    if (_userNamesCache.containsKey(id)) {
+      return _userNamesCache[id]!;
+    }
+
+    try {
+      // Importar el servicio de usuario si aún no está disponible
+      final userApiService = UserApiService();
+
+      // Opción 1: Si tenemos acceso a una lista de todos los usuarios
+      List<dynamic> users = [];
+
+      // Verificar si el usuario actual es superusuario
+      bool isSuperUser = widget.sessionData['role']?['is_super_user'] ?? false;
+
+      if (isSuperUser) {
+        // Si es superusuario, obtener todos los usuarios
+        users = await userApiService.fetchAllUsers(context);
+      } else {
+        // Si no es superusuario, obtener solo los usuarios de su entorno
+        int environmentId = widget.sessionData['environment_id'] ?? 0;
+        if (environmentId > 0) {
+          users = await userApiService.fetchUsersByEnvironment(context, environmentId);
+        } else {
+          users = await userApiService.fetchUsers(context);
+        }
+      }
+
+      // Buscar el usuario por ID
+      for (var user in users) {
+        if (user['id'] == id) {
+          String fullName = user['full_name'] ?? user['username'] ?? 'User $id';
+
+          // Guardar en caché para futuras consultas
+          _userNamesCache[id] = fullName;
+
+          return fullName;
+        }
+      }
+
+      // Si no se encuentra, podríamos hacer una solicitud específica a la API
+      // (depende de la API disponible)
+
+      return 'User $id'; // Fallback si no se encuentra
+    } catch (e) {
+      print('Error fetching user data: $e');
+      return 'User $id';
     }
   }
 
@@ -166,8 +235,22 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         } else if (questionType == 'signature') {
           isAnswered = signatureFiles.containsKey(questionId.toString());
         } else if (questionType == 'user') {
-          // Para preguntas de tipo usuario, comprobamos que el ID del usuario sea válido (mayor que 0)
-          isAnswered = answer != null && answer is int && answer > 0;
+          // Para preguntas de tipo usuario, necesitamos verificar correctamente
+          if (answer is Map) {
+            // Si es un objeto, verificamos el ID del usuario
+            isAnswered = answer['id'] != null && answer['id'] is int && answer['id'] > 0;
+          } else if (answer is int) {
+            // Si es solo un ID, verificamos que sea válido
+            isAnswered = answer > 0;
+          } else {
+            // Intentar extraer un ID válido
+            try {
+              int userId = int.parse(answer.toString());
+              isAnswered = userId > 0;
+            } catch (e) {
+              isAnswered = false;
+            }
+          }
         }
       }
 
@@ -377,7 +460,14 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       // Format answers for submission
       List<Map<String, dynamic>> formattedSubmissions = [];
 
-      answers.forEach((questionId, answerValue) {
+      // Modificar la parte relevante del método _submitAnswers
+// Específicamente en la sección donde se manejan los formattedSubmissions
+
+// Dentro del método _submitAnswers
+      for (final entry in answers.entries) {
+        final questionId = entry.key;
+        final answerValue = entry.value;
+
         Map<String, dynamic>? question = questions.firstWhere(
               (q) => q['id'] == questionId,
           orElse: () => null,
@@ -385,7 +475,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
         if (question == null) {
           print('Warning: No question found for ID $questionId');
-          return;
+          continue; // Usar continue en lugar de return para seguir con el siguiente elemento
         }
 
         final questionType = question['type']?.toString().toLowerCase() ?? 'text';
@@ -418,7 +508,37 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               });
             }
           }
-        } else {
+        }
+        // Manejo especial para preguntas de tipo usuario
+        else if (questionType == 'user') {
+          // Aquí está el cambio - para preguntas de tipo "user", usamos DynamicQuestionInput
+          // que tiene la información del usuario completo
+
+          // Busca el usuario en la lista de usuarios cargada en DynamicQuestionInput
+          // (Usamos un controlador o servicio para obtener el nombre del usuario)
+          String userName = ''; // Valor predeterminado
+
+          // Si el campo userInfo está disponible en answerValue
+          if (answerValue is Map && answerValue['userInfo'] != null) {
+            // Si guardamos la información completa del usuario
+            Map<String, dynamic> userInfo = answerValue['userInfo'];
+            userName = userInfo['full_name'] ?? userInfo['username'] ?? answerValue.toString();
+          } else {
+            // Si solo tenemos el ID, intentamos encontrar el nombre en session data
+            // o usar un servicio para obtenerlo de la API
+
+            // Llamamos a un método que nos ayude a obtener el nombre del usuario por su ID
+            userName = await _getUserNameById(answerValue);
+          }
+
+          formattedSubmissions.add({
+            'question_text': questionText,
+            'question_type_text': questionType,
+            'answer_text': userName,
+            'user_id': answerValue.toString() // Guardamos también el ID para referencia
+          });
+        }
+        else {
           // Handle simple fields
           formattedSubmissions.add({
             'question_text': questionText,
@@ -426,7 +546,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
             'answer_text': answerValue?.toString() ?? ''
           });
         }
-      });
+      }
 
       if (formattedSubmissions.isEmpty) {
         throw Exception('No answers to submit');
@@ -653,17 +773,32 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       );
     }
 
+    // User field - procesar el currentValue de manera especial
+    dynamic currentValue = answers[questionId];
+    if (questionType == 'user' && currentValue is Map) {
+      // Si ya tenemos un objeto con información del usuario, extraer solo el ID
+      // para pasarlo al componente DynamicQuestionInput
+      currentValue = currentValue['id'];
+    }
+
     // Other question types
     return DynamicQuestionInput(
       question: question,
-      currentValue: answers[questionId],
+      currentValue: currentValue,
       sessionData: widget.sessionData,
       onAnswerChanged: (value) {
         setState(() {
           if (value == null || (value is String && value.isEmpty)) {
             answers.remove(questionId);
           } else {
-            answers[questionId] = value;
+            // Para preguntas de tipo 'user', podemos recibir un objeto con información del usuario
+            if (questionType == 'user' && value is Map) {
+              // Guardar el objeto completo (que incluye el ID y la información del usuario)
+              answers[questionId] = value;
+            } else {
+              // Para otros tipos de preguntas, guardar el valor directamente
+              answers[questionId] = value;
+            }
           }
           // Validate form on every answer change
           _validateFormSubmission();
