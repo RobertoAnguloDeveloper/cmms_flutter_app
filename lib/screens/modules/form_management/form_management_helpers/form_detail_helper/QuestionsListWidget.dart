@@ -234,7 +234,7 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
           Container(
             height: 9,
             decoration: const BoxDecoration(
-              color: Color.fromARGB(255, 1, 116, 209),
+              color: Colors.white,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
