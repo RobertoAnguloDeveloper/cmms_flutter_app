@@ -91,7 +91,7 @@ class SubmissionDetailScreen extends StatelessWidget {
 
       // Crear una clave compuesta que incluye el nombre de la pregunta y un contador
       final uniqueKey = isCheckbox
-          ? questionKey  // Para checkbox seguimos agrupando
+          ? questionKey // Para checkbox seguimos agrupando
           : "${questionKey}_${questionCountMap[questionKey]}";
 
       if (isCheckbox && groupedAnswers.containsKey(questionKey)) {
@@ -136,7 +136,21 @@ class SubmissionDetailScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Navigate back to FormSubmissionsViewScreen with pushReplacement
+            // and recreate it to force refresh of the submissions list
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FormSubmissionsViewScreen(
+                  formId: submission.submissionId,
+                  formTitle: submission.formTitle,
+                  permissionSet: permissionSet,
+                  sessionData: sessionData,
+                ),
+              ),
+            );
+          },
         ),
         title: Text(
           submission.formTitle,
@@ -232,57 +246,50 @@ class SubmissionDetailScreen extends StatelessWidget {
                                         ),
                                         actions: [
                                           TextButton(
-                                            onPressed: () => Navigator.pop(context),
+                                            onPressed: () =>
+                                                Navigator.pop(context),
                                             child: const Text('Cancel'),
                                           ),
-                                          // En SubmissionDetailScreen, modifica el botón de eliminar
                                           TextButton(
                                             onPressed: () async {
-                                              // Cerramos el diálogo de confirmación
-                                              Navigator.pop(context);
+                                              Navigator.pop(context); // Close confirmation dialog
+
+                                              // Show loading indicator
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Deleting submission...'),
+                                                  duration: Duration(seconds: 2),
+                                                ),
+                                              );
 
                                               try {
-                                                // Mostramos un indicador de carga
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('Deleting submission...'),
-                                                    duration: Duration(seconds: 2),
-                                                  ),
-                                                );
-
-                                                // Eliminamos el submission
+                                                // Use the service to delete the submission
                                                 final FormSubmissionViewService service = FormSubmissionViewService();
                                                 final bool success = await service.deleteFormSubmission(
                                                     context,
                                                     submission.submissionId
                                                 );
 
-                                                if (context.mounted) {
-                                                  // Informamos al usuario del resultado
+                                                if (success && context.mounted) {
                                                   ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(success
-                                                          ? 'Submission deleted successfully'
-                                                          : 'Failed to delete submission'),
-                                                      backgroundColor: success ? Colors.green : Colors.red,
+                                                    const SnackBar(
+                                                      content: Text('Submission deleted successfully'),
+                                                      backgroundColor: Colors.green,
                                                     ),
                                                   );
 
-                                                  // Simplemente regresamos a la pantalla anterior sin pasar valores
-                                                  Navigator.of(context).pop();
+                                                  // Pop ALL the way back to the submissions list screen
+                                                  // This assumes the submissions list is directly below in the navigation stack
+                                                  Navigator.of(context).pop(true);
                                                 }
                                               } catch (e) {
                                                 if (context.mounted) {
-                                                  // Mostramos el error
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     SnackBar(
                                                       content: Text('Error deleting submission: $e'),
                                                       backgroundColor: Colors.red,
                                                     ),
                                                   );
-
-                                                  // Regresamos a la pantalla anterior
-                                                  Navigator.of(context).pop();
                                                 }
                                               }
                                             },
@@ -744,7 +751,8 @@ class FormSubmissionsViewScreen extends StatefulWidget {
 // Actualización en la clase _FormSubmissionsViewScreenState
 
 class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
-  final FormSubmissionViewService _submissionService = FormSubmissionViewService();
+  final FormSubmissionViewService _submissionService =
+  FormSubmissionViewService();
 
   List<FormSubmissionView> submissions = [];
   List<FormSubmissionView> filteredSubmissions = [];
@@ -787,7 +795,9 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
     // Filtrar por usuario si hay uno seleccionado
     if (_selectedUser != null && _selectedUser!.isNotEmpty) {
       result = result
-          .where((s) => s.submittedBy.toLowerCase().contains(_selectedUser!.toLowerCase()))
+          .where((s) => s.submittedBy
+          .toLowerCase()
+          .contains(_selectedUser!.toLowerCase()))
           .toList();
     }
 
@@ -857,7 +867,8 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
       setState(() => isLoading = true);
 
       // This call now returns one FormSubmissionView per submission
-      final data = await _submissionService.getFormSubmissions(widget.formId, context);
+      final data =
+      await _submissionService.getFormSubmissions(widget.formId, context);
 
       submissions = data;
       filteredSubmissions = data;
@@ -873,7 +884,6 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -914,7 +924,8 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.transparent), // Sin borde
+                        border: Border.all(
+                            color: Colors.transparent), // Sin borde
                         borderRadius: BorderRadius.circular(12),
                         color: Colors.white,
                         boxShadow: [
@@ -1005,7 +1016,8 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade100,
                             borderRadius: BorderRadius.circular(16),
@@ -1057,17 +1069,17 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
                     ],
                   ),
                 )
-                    : ListView.builder(
+                    : // Inside the ListView.builder in FormSubmissionsViewScreen
+                ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: filteredSubmissions.length,
                   itemBuilder: (context, index) {
                     final submission = filteredSubmissions[index];
                     return _CustomExpansionCard(
                       submission: submission,
-                      // En FormSubmissionsViewScreen, modificamos el método onCardTap
                       onCardTap: () async {
-                        // Navegar a la pantalla de detalles
-                        await Navigator.push(
+                        // Navigate to detail screen and wait for result
+                        final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => SubmissionDetailScreen(
@@ -1078,8 +1090,10 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
                           ),
                         );
 
-                        // Cuando regresamos, siempre actualizamos la lista sin importar el resultado
-                        _loadSubmissions();
+                        // If result is true (submission was deleted), reload the submissions list
+                        if (result == true) {
+                          _loadSubmissions();
+                        }
                       },
                     );
                   },
@@ -1096,7 +1110,6 @@ class _FormSubmissionsViewScreenState extends State<FormSubmissionsViewScreen> {
 class _CustomExpansionCard extends StatefulWidget {
   final FormSubmissionView submission;
   final VoidCallback onCardTap;
-
 
   const _CustomExpansionCard({
     Key? key,
