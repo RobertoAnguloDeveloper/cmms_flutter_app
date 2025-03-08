@@ -816,7 +816,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
   // Check if answer selection should be shown
   bool _shouldShowAnswerSelection(String questionType) {
-    return !['date', 'datetime', 'text', 'user']
+    return !['date', 'datetime', 'text', 'user', 'signature']
         .contains(questionType.toLowerCase());
   }
 
