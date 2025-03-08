@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../../services/api_model_services/api_form_services/AnswerApiService.dart';
+import '../../../../../services/api_model_services/api_form_services/QuestionApiService.dart';
 import '../../answer_form_management/AnswerSelectionDialog.dart';
 import '../ResponseOptionsManager.dart';
 import 'DynamicInputField.dart';
@@ -37,6 +39,8 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
   final Map<int, bool> _questionValidityMap = {};
   final Map<int, bool> _localRequiredState = {};
   final Map<int, GlobalKey<ResponseOptionsManagerState>> _optionsManagerKeys = {};
+
+  final AnswerApiService _answerApiService = AnswerApiService();
 
   @override
   void initState() {
@@ -84,6 +88,68 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
     }
 
     return allSuccessful;
+  }
+
+  Future<bool> saveQuestionWithAnswers(Map<String, dynamic> questionData, List<String> options) async {
+    try {
+      // 1. First create the question
+      final questionResponse = await QuestionApiService().createQuestion(
+        context,
+        {
+          'text': questionData['text'],
+          'question_type_id': questionData['question_type_id'],
+          'remarks': questionData['remarks'] ?? '',
+        },
+      );
+
+      if (questionResponse['status'] != 200 && questionResponse['status'] != 201) {
+        return false;
+      }
+
+      final int questionId = questionResponse['question']['id'];
+
+      // 2. Create form question mapping
+      final formQuestionResponse = await QuestionApiService().assignQuestionToForm(
+        context,
+        widget.formId,
+        questionId,
+        questionData['order_number'] ?? 1,
+      );
+
+      if (formQuestionResponse['status'] != 200 && formQuestionResponse['status'] != 201) {
+        return false;
+      }
+
+      final int formQuestionId = formQuestionResponse['form_question']['id'];
+
+      // 3. Create answers for the question if it has options
+      if (options.isNotEmpty) {
+        for (String option in options) {
+          // Create the answer
+          final answerData = {'value': option};
+          final answerResponse = await _answerApiService.createAnswer(
+            context,
+            answerData,
+          );
+
+          if (answerResponse['status'] == 200 || answerResponse['status'] == 201) {
+            final int answerId = answerResponse['answer']['id'];
+
+            // Assign answer to question
+            await _answerApiService.assignAnswerToQuestion(
+              context,
+              formQuestionId,
+              answerId,
+            );
+          }
+        }
+      }
+
+      return true;
+    } catch (e) {
+      print('Error in saveQuestionWithAnswers: $e');
+      return false;
+    }
   }
 
   @override
@@ -310,27 +376,29 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
     widget.setUnsavedChanges(true);
   }
 
-  void saveAllChanges() {
+  Future<void> saveAllChanges() async {
+    // First save updated question metadata (required, etc.)
     for (var question in widget.questions) {
       final int questionId = question['id'];
 
-      // Only process if we have a state for this question
       if (_localRequiredState.containsKey(questionId)) {
         final bool isRequired = _localRequiredState[questionId]!;
 
-        // Get text without tilde
         String displayText = question['text'] ?? 'No question text';
         if (displayText.endsWith('~')) {
           displayText = displayText.substring(0, displayText.length - 1);
         }
 
-        // Add tilde if required
         final String textToSave = isRequired ? displayText + '~' : displayText;
-
-        // Save to API
         _updateQuestionText(questionId, textToSave, isRequired);
       }
     }
+
+    // Then save options for all questions
+    await saveAllAnswerOptions();
+
+    // Finally, refresh the form to reflect all changes
+    widget.fetchFormDetails();
   }
 
   void _updateQuestionText(int questionId, String newText, bool isRequired) {
