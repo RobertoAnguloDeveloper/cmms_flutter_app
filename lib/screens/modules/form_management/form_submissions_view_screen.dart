@@ -410,6 +410,8 @@ class SubmissionDetailScreen extends StatelessWidget {
               // Sección de Signatures mejorada
               // Sección de Signatures mejorada con imágenes precargadas
               // Sección de Signatures mejorada con los nuevos campos
+
+              /*
               if (hasSignatures) {
                 attachmentWidgets.add(const SizedBox(height: 24));
                 attachmentWidgets.add(const Text(
@@ -608,6 +610,214 @@ class SubmissionDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ));
+                }
+              }*/
+
+
+              if (hasSignatures) {
+                attachmentWidgets.add(const SizedBox(height: 24));
+                attachmentWidgets.add(const Text(
+                  'Signatures:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ));
+                attachmentWidgets.add(const SizedBox(height: 8));
+
+                // Obtener todas las preguntas tipo signature
+                final signatureQuestions = submission.answers
+                    .where((answer) =>
+                answer.questionType.toLowerCase() == 'signature')
+                    .toList();
+
+                // Añadir cada firma a la lista de widgets
+                for (var signature in signatures) {
+                  // Buscar la pregunta correspondiente para esta firma específica
+                  String questionName = 'Electronic Signature';
+
+                  // Buscar coincidencia basada en los nombres de archivos
+                  for (var question in signatureQuestions) {
+                    // Extraer el nombre base del archivo de la respuesta de la pregunta
+                    String answerFileName = "";
+                    if (question.answer.contains('/')) {
+                      // Si la respuesta contiene una ruta, extraer el nombre del archivo
+                      answerFileName = question.answer.split('/').last;
+                      if (answerFileName.contains('.')) {
+                        answerFileName = answerFileName.split('.').first;
+                      }
+                    }
+
+                    // Extraer el nombre base del archivo de la firma
+                    String signatureFileName = "";
+                    if (signature.filePath.contains('\\')) {
+                      signatureFileName = signature.filePath.split('\\').last;
+                      if (signatureFileName.contains('_')) {
+                        // Obtener la parte principal del nombre (antes de los timestamp)
+                        signatureFileName = signatureFileName.split('_').first +
+                            "_" +
+                            signatureFileName.split('_')[1];
+                      }
+                    }
+
+                    // Verificar si los nombres de archivo coinciden
+                    if (!answerFileName.isEmpty &&
+                        !signatureFileName.isEmpty &&
+                        signatureFileName.contains(answerFileName)) {
+                      questionName = question.question;
+                      break;
+                    }
+                  }
+
+                  // Determinar el texto a mostrar para el autor de la firma
+                  final String signatureAuthorText =
+                  signature.signatureAuthor != null &&
+                      signature.signatureAuthor!.isNotEmpty
+                      ? signature.signatureAuthor!
+                      : questionName;
+
+                  // AGREGAR ESTA VERIFICACIÓN: Solo mostrar firmas que NO sean "Electronic Signature"
+                  if (signatureAuthorText != "Electronic Signature") {
+                    // Añadir tarjeta de firma con la imagen precargada
+                    attachmentWidgets.add(Card(
+                      color: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Encabezado con título
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            child: Text(
+                              'Signature by: $signatureAuthorText',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+
+                          // Mostrar el cargo/posición si está disponible
+                          if (signature.signaturePosition != null &&
+                              signature.signaturePosition!.isNotEmpty)
+                            Padding(
+                              padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                signature.signaturePosition!,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+
+                          // Imagen de la firma
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            width: double.infinity,
+                            child: signature.id != null
+                                ? FutureBuilder<Uint8List>(
+                              future: _loadSignatureImage(
+                                  context, signature.id!),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return Container(
+                                    height: 100,
+                                    alignment: Alignment.center,
+                                    child:
+                                    const CircularProgressIndicator(),
+                                  );
+                                } else if (snapshot.hasError) {
+                                  return Container(
+                                    height: 100,
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.error_outline,
+                                            color: Colors.red, size: 32),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Could not load signature',
+                                          style:
+                                          TextStyle(color: Colors.red),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                } else if (snapshot.hasData) {
+                                  return Container(
+                                    constraints:
+                                    BoxConstraints(maxHeight: 150),
+                                    child: Image.memory(
+                                      snapshot.data!,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  );
+                                } else {
+                                  return Container(
+                                    height: 100,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                        'No signature data available'),
+                                  );
+                                }
+                              },
+                            )
+                                : Container(
+                              height: 100,
+                              alignment: Alignment.center,
+                              child: Text('Signature ID missing'),
+                            ),
+                          ),
+
+                          // Botón para ver en pantalla completa
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.fullscreen),
+                                label: const Text('View Full Size'),
+                                onPressed: () async {
+                                  try {
+                                    if (signature.id != null) {
+                                      await FormSubmissionViewService()
+                                          .openAttachment(
+                                          context, signature.id!);
+                                    } else {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Signature ID is missing')),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    print('Error opening signature: $e');
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content: Text(
+                                              'Error opening signature: $e')),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ));
+                  }
                 }
               }
 
