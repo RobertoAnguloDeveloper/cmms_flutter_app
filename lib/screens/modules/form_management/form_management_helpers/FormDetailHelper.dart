@@ -222,17 +222,23 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         }
 
         String questionText = data.questionTextController.text;
-        // Mark it with '~' if required
+
+        // Only add the '~' if it's required and doesn't already have it
         if (data.isRequired && !questionText.endsWith("~")) {
           questionText = "$questionText~";
+        }
+        // Remove the '~' if it's no longer required but still has it
+        else if (!data.isRequired && questionText.endsWith("~")) {
+          questionText = questionText.substring(0, questionText.length - 1);
         }
 
         final questionData = {
           'text': questionText,
           'question_type_id': data.selectedQuestionTypeId,
-          'is_required': data.isRequired,
-          'form_id': formId,
+          'is_required': data.isRequired,  // Make sure this gets passed to the API
         };
+
+        print('Creating question with data: $questionData'); // Debug output
 
         final createdQuestion =
         await _formQuestionApiService.createQuestion(context, questionData);
@@ -279,6 +285,11 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
             }
           }
         }
+      }
+
+      // After successful save, update any existing questions' required state too
+      if (_questionsListWidgetKey.currentState != null) {
+        await _questionsListWidgetKey.currentState!.saveAllChanges();
       }
 
       // Show success message

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../../../../../services/api_model_services/api_form_services/AnswerApiService.dart';
 import '../../../../../services/api_model_services/api_form_services/QuestionApiService.dart';
@@ -60,9 +62,11 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
     _localRequiredState.clear();
     for (var question in widget.questions) {
       final int questionId = question['id'];
-      final bool isRequired = question['is_required'] ?? false;
-      final bool isRequiredByTilde = (question['text']?.toString() ?? '').endsWith('~');
-      _localRequiredState[questionId] = isRequired || isRequiredByTilde;
+      final String text = question['text']?.toString() ?? '';
+      final bool isRequired = text.endsWith('~') || (question['is_required'] == true);
+
+      _localRequiredState[questionId] = isRequired;
+      print('Initialized question $questionId with required=$isRequired'); // Debug output
     }
   }
 
@@ -368,45 +372,121 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
   }
 
   void _handleRequiredToggle(int questionId, bool value) {
+    if (!mounted) return;
+
     setState(() {
       _localRequiredState[questionId] = value;
     });
 
     // Notify parent about unsaved changes
     widget.setUnsavedChanges(true);
+
+    print('Question $questionId required state set to: $value'); // Debug output
   }
 
   Future<void> saveAllChanges() async {
-    // First save updated question metadata (required, etc.)
+    // Create a list to track all update operations
+    List<Future<void>> updateOperations = [];
+
+    print('Starting saveAllChanges with ${widget.questions.length} questions');
+
+    // Process each question that has a changed required state
     for (var question in widget.questions) {
       final int questionId = question['id'];
 
+      // Only process if we have a state for this question
       if (_localRequiredState.containsKey(questionId)) {
         final bool isRequired = _localRequiredState[questionId]!;
 
+        // Get original text without tilde
         String displayText = question['text'] ?? 'No question text';
         if (displayText.endsWith('~')) {
           displayText = displayText.substring(0, displayText.length - 1);
         }
 
+        // Add tilde if required, remove if not
         final String textToSave = isRequired ? displayText + '~' : displayText;
-        _updateQuestionText(questionId, textToSave, isRequired);
+
+        print('Queueing update for question $questionId: Required=$isRequired, Text="$textToSave"');
+
+        // Add update operation to our list
+        updateOperations.add(_updateQuestionText(questionId, textToSave, isRequired));
       }
     }
 
-    // Then save options for all questions
-    await saveAllAnswerOptions();
+    print('Processing ${updateOperations.length} update operations');
 
-    // Finally, refresh the form to reflect all changes
-    widget.fetchFormDetails();
+    // Wait for all updates to complete
+    if (updateOperations.isNotEmpty) {
+      try {
+        await Future.wait(updateOperations);
+        print('All question updates completed successfully');
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Questions updated successfully'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+      } catch (e) {
+        print('Error during batch updates: $e');
+        // Error message is displayed in the individual update methods
+      }
+
+      // Refresh the form to show changes
+      widget.fetchFormDetails();
+    } else {
+      print('No updates needed');
+    }
   }
 
-  void _updateQuestionText(int questionId, String newText, bool isRequired) {
-    // Store in local state for immediate UI updates
-    _localRequiredState[questionId] = isRequired;
+  Future<void> _updateQuestionText(int questionId, String newText, bool isRequired) async {
+    try {
+      // Use QuestionApiService to update the question
+      final questionService = QuestionApiService();
 
-    // Handle API update by refreshing the form
-    widget.fetchFormDetails();
+      // Log the request data for debugging
+      print('Updating question $questionId with text: "$newText" and isRequired: $isRequired');
+
+      // Based on the API request format shown, we only need to send the text
+      // The API seems to be updating just the fields provided, not requiring all fields
+      var updateData = {
+        'text': newText,
+      };
+
+      // Log the actual payload being sent
+      print('API request payload: ${json.encode(updateData)}');
+
+      var result = await questionService.updateQuestion(
+        context,
+        questionId,
+        updateData,
+      );
+
+      // Log the response
+      print('Update response: $result');
+
+      // Update successful, store in local state for immediate UI updates
+      if (mounted) {
+        setState(() {
+          _localRequiredState[questionId] = isRequired;
+        });
+      }
+    } catch (e) {
+      print('Error updating question $questionId: $e');
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update question: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _duplicateQuestion(Map<String, dynamic> questionToDuplicate) {

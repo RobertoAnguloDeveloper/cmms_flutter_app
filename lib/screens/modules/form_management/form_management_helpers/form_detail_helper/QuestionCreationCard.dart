@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../ResponseOptionsManager.dart';
+import 'GoogleFormsQuestionControls.dart';
 
 class QuestionCreationCard extends StatefulWidget {
   final TextEditingController questionTextController;
@@ -200,6 +201,15 @@ class QuestionCreationCardState extends State<QuestionCreationCard> {
                 ],
               ],
             ),
+          ),
+
+          // Add the GoogleFormsQuestionControls with the required toggle
+          GoogleFormsQuestionControls(
+            isRequired: widget.isRequired,
+            onRequiredChanged: widget.onRequiredChanged,
+            onDuplicate: () {}, // Not implementing duplication for new questions
+            onDelete: widget.onCancel,
+            showDivider: true,
           ),
         ],
       ),
