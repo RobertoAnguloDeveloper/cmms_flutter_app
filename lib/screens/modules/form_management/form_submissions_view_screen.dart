@@ -254,23 +254,17 @@ class SubmissionDetailScreen extends StatelessWidget {
                                             onPressed: () async {
                                               Navigator.pop(context); // Close confirmation dialog
 
-                                              // Show loading indicator
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Deleting submission...'),
-                                                  duration: Duration(seconds: 2),
-                                                ),
-                                              );
+
 
                                               try {
                                                 // Use the service to delete the submission
                                                 final FormSubmissionViewService service = FormSubmissionViewService();
-                                                final bool success = await service.deleteFormSubmission(
+                                                await service.deleteFormSubmission(
                                                     context,
                                                     submission.submissionId
                                                 );
 
-                                                if (success && context.mounted) {
+                                                if (context.mounted) {
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(
                                                       content: Text('Submission deleted successfully'),
@@ -297,7 +291,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                                               foregroundColor: Colors.red,
                                             ),
                                             child: const Text('Delete'),
-                                          ),
+                                          )
                                         ],
                                       );
                                     },

@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:dio_smart_retry/dio_smart_retry.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 // Import models
 import '../../../models/form_submission/answer_view.dart';
@@ -105,47 +106,45 @@ class FormSubmissionViewService {
 
   /// Deletes a form submission
   /// Route: DELETE /forms/{submissionId}
-  Future<bool> deleteFormSubmission(
+  Future<void> deleteFormSubmission(
       BuildContext context,
       int submissionId,
       ) async {
     try {
       print('[deleteFormSubmission] Attempting to delete submission: $submissionId');
 
-      final response = await _dio.delete<Map<String, dynamic>>(
-        '/api/form-submissions/$submissionId',
-        options: Options(
-          responseType: ResponseType.json,
-        ),
+      String? token = await SessionManager.getToken();
+      final url = Uri.parse('${_http.baseUrl}/api/form-submissions/$submissionId');
+
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
 
       print('[deleteFormSubmission] Response => ${response.statusCode}');
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        // Successful deletion
         print('[deleteFormSubmission] Successfully deleted submission: $submissionId');
-        return true;
       } else if (response.statusCode == 401) {
-        if (context.mounted) {
-          await ApiResponseHandler.handleExpiredToken(
-              context, response.data as Map<String, dynamic>);
-        }
+        final responseData = json.decode(response.body);
+        await ApiResponseHandler.handleExpiredToken(context, responseData);
         throw Exception('Session expired');
       } else if (response.statusCode == 404) {
         print('[deleteFormSubmission] Submission not found: $submissionId');
         throw Exception('Submission not found');
       } else {
+        final responseData = json.decode(response.body);
         print('[deleteFormSubmission] Failed to delete submission. Status: ${response.statusCode}');
         throw Exception(
-          'Failed to delete submission. Status: ${response.statusCode}',
+          'Failed to delete submission: ${responseData['message'] ?? response.statusCode}',
         );
       }
-    } on DioException catch (e) {
-      print('[deleteFormSubmission] DioException: ${e.message}');
-      throw Exception('Network error: ${e.message}');
     } catch (e) {
       print('[deleteFormSubmission] Error deleting submission: $e');
-      throw Exception('Failed to delete submission: $e');
+      throw Exception('Exception while deleting submission: $e');
     }
   }
 
