@@ -353,7 +353,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   Widget build(BuildContext context) {
     String appBarTitle = showQuestions
         ? (selectedForm != null ? selectedForm!['title'] : 'Fill Form')
-        : 'Available Forms';
+        : 'fAvailable Forms';
 
     return Scaffold(
       appBar: AppBar(
