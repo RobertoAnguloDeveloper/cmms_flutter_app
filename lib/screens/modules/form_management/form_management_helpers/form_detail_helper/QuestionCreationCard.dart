@@ -515,13 +515,13 @@ class QuestionCreationCardState extends State<QuestionCreationCard> {
                   ],
                 ),
 
-                // Delete button on right side
+               /* // Delete button on right side
                 IconButton(
                   icon: Icon(Icons.delete_outline, color: Colors.grey[700], size: 20),
                   splashRadius: 20,
                   tooltip: 'Delete',
                   onPressed: widget.onCancel,
-                ),
+                ),*/
               ],
             ),
           ),

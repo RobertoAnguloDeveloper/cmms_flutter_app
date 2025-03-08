@@ -197,6 +197,8 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
     );
   }
 
+
+  /*
   Widget _buildQuestionCard(Map<String, dynamic> question) {
     final int questionId = question['id'];
     final int formQuestionId = question['form_question_id'];
@@ -274,7 +276,198 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
         ],
       ),
     );
+  }*/
+
+
+/*
+  Widget _buildQuestionCard(Map<String, dynamic> question) {
+    final int questionId = question['id'];
+    final int formQuestionId = question['form_question_id'];
+
+    // Get required state from local state if available
+    final bool questionIsRequired = _localRequiredState[questionId] ??
+        ((question['is_required'] ?? false) ||
+            (question['text']?.toString() ?? '').endsWith('~'));
+
+    // Display question text without the trailing '~'
+    String displayText = question['text'] ?? 'No question text';
+    if (displayText.endsWith('~')) {
+      displayText = displayText.substring(0, displayText.length - 1);
+    }
+
+    // Validation state
+    final bool isInvalid = _validatingForm &&
+        _questionValidityMap.containsKey(questionId) &&
+        !_questionValidityMap[questionId]!;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 2,
+      color: isInvalid ? Colors.red[50] : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isInvalid
+            ? const BorderSide(color: Colors.red, width: 1.0)
+            : BorderSide.none,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top bar with close button
+          Container(
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Always visible X button to delete the question
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20, color: Colors.red),
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
+                  onPressed: () => widget.deleteFormQuestion(context, formQuestionId),
+                  tooltip: 'Delete question',
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildQuestionHeader(question, displayText, questionIsRequired),
+
+                if (isInvalid)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      'This question is required',
+                      style: TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+
+                const SizedBox(height: 8),
+                _buildAnswerField(question),
+              ],
+            ),
+          ),
+
+          // Controls
+          GoogleFormsQuestionControls(
+            isRequired: questionIsRequired,
+            onRequiredChanged: (value) => _handleRequiredToggle(questionId, value),
+            onDuplicate: () => _duplicateQuestion(question),
+            onDelete: () => widget.deleteFormQuestion(context, formQuestionId),
+          ),
+        ],
+      ),
+    );
+  }*/
+
+
+  Widget _buildQuestionCard(Map<String, dynamic> question) {
+    final int questionId = question['id'];
+    final int formQuestionId = question['form_question_id'];
+
+    // Get required state from local state if available
+    final bool questionIsRequired = _localRequiredState[questionId] ??
+        ((question['is_required'] ?? false) ||
+            (question['text']?.toString() ?? '').endsWith('~'));
+
+    // Display question text without the trailing '~'
+    String displayText = question['text'] ?? 'No question text';
+    if (displayText.endsWith('~')) {
+      displayText = displayText.substring(0, displayText.length - 1);
+    }
+
+    // Validation state
+    final bool isInvalid = _validatingForm &&
+        _questionValidityMap.containsKey(questionId) &&
+        !_questionValidityMap[questionId]!;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 2,
+      color: isInvalid ? Colors.red[50] : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isInvalid
+            ? const BorderSide(color: Colors.red, width: 1.0)
+            : BorderSide.none,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top bar with delete button
+          Container(
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Always visible trash can icon for deletion
+                /*IconButton(
+                  icon: const Icon(Icons.delete_outline,
+                      size: 20, color: Colors.red),
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
+                  onPressed: () => widget.deleteFormQuestion(context, formQuestionId),
+                  tooltip: 'Delete question',
+                ),*/
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildQuestionHeader(question, displayText, questionIsRequired),
+
+                if (isInvalid)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      'This question is required',
+                      style: TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+
+                const SizedBox(height: 8),
+                _buildAnswerField(question),
+              ],
+            ),
+          ),
+
+          // Controls
+          GoogleFormsQuestionControls(
+            isRequired: questionIsRequired,
+            onRequiredChanged: (value) => _handleRequiredToggle(questionId, value),
+            onDuplicate: () => _duplicateQuestion(question),
+            onDelete: () => widget.deleteFormQuestion(context, formQuestionId),
+          ),
+        ],
+      ),
+    );
   }
+
+
+
 
   Widget _buildQuestionHeader(Map<String, dynamic> question, String displayText, bool questionIsRequired) {
     final String questionType = question['type']?.toString().toLowerCase() ?? '';
