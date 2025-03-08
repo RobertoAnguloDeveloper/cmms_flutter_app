@@ -6,6 +6,7 @@ class PermissionMenuItem extends StatelessWidget {
   final bool Function()? hasPermission; 
   final bool Function()? condition;    
   final VoidCallback onTap;
+  final double indent;
 
   const PermissionMenuItem({
     Key? key,
@@ -14,6 +15,7 @@ class PermissionMenuItem extends StatelessWidget {
     this.hasPermission,
     this.condition,
     required this.onTap,
+    this.indent = 0.0,
   }) : super(key: key);
 
   @override

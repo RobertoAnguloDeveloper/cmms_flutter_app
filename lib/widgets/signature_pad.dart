@@ -131,7 +131,7 @@ class SignaturePadState extends State<SignaturePad> {
               ),
               ElevatedButton.icon(
                 onPressed: _strokes.isEmpty ? null : captureAndSaveSignature,
-                icon: const Icon(Icons.save),
+                icon: const Icon(Icons.save, color: Colors.white), // Color blanco explícito para el icono
                 label: const Text('Save Signature'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,

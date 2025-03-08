@@ -1,0 +1,2 @@
+C:/Users/VINCENT/Documents/PROYECTOS/CMMS/NUEVO FRONT/cmms_flutter_app/android/app/.cxx/Debug/6b3dl6y3/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/VINCENT/Documents/PROYECTOS/CMMS/NUEVO FRONT/cmms_flutter_app/android/app/.cxx/Debug/6b3dl6y3/x86_64/CMakeFiles/rebuild_cache.dir

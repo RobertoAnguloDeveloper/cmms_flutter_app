@@ -475,7 +475,7 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                          : const Icon(Icons.download),
+                          : const Icon(Icons.download, color: Colors.white),
                       label: Text(_isLoading ? 'Generating...' : 'Generate PDF'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
