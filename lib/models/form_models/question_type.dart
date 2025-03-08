@@ -16,7 +16,7 @@ enum QuestionType {
   file_upload('file_upload', 'Subir archivos', Icons.upload_file),
   linear_scale('linear_scale', 'Escala lineal', Icons.linear_scale),
   grid('grid', 'Cuadrícula', Icons.grid_on),
-  signature('Signature', 'Firma', Icons.draw); // Added new signature type
+  signature('signature', 'Firma', Icons.draw); // Fixed to use lowercase 'signature'
 
   final String value;
   final String displayName;
