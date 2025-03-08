@@ -261,7 +261,8 @@ class QuestionApiService {
         },
         body: json.encode(questionData),
       );
-
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         responseData['status'] = response.statusCode;
