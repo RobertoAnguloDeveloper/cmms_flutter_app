@@ -32,6 +32,19 @@ class QuestionCreationManager {
   void _showTypeSelectionBottomSheet(BuildContext context,
       List<dynamic> questionTypes,
       QuestionTypeSelectedCallback onTypeSelected,) {
+
+    // Crear una copia ordenada de los tipos de preguntas
+    List<dynamic> sortedQuestionTypes = List.from(questionTypes);
+
+    // Ordenar para que Signature siempre sea el último
+    sortedQuestionTypes.sort((a, b) {
+      String typeA = (a['type'] ?? '').toString().toLowerCase();
+      String typeB = (b['type'] ?? '').toString().toLowerCase();
+      if (typeA == 'signature') return 1;
+      if (typeB == 'signature') return -1;
+      return 0;
+    });
+
     // Use Dialog instead of BottomSheet for better sizing control
     showDialog(
       context: context,
@@ -65,9 +78,9 @@ class QuestionCreationManager {
                   Flexible(
                     child: ListView.builder(
                       shrinkWrap: true,
-                      itemCount: questionTypes.length,
+                      itemCount: sortedQuestionTypes.length,  // Usar la lista ordenada
                       itemBuilder: (context, index) {
-                        final type = questionTypes[index];
+                        final type = sortedQuestionTypes[index];  // Usar la lista ordenada
                         final String questionTypeString =
                         (type['type'] ?? '').toString();
 
@@ -156,7 +169,6 @@ class QuestionCreationManager {
       },
     );
   }
-
 // Add this new method to handle signature type selection
   void _handleSignatureTypeSelected(BuildContext context) {
     // Show tooltip or snackbar to inform the user about the signature field

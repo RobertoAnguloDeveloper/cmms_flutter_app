@@ -171,42 +171,60 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
   }
 
   /// Handles question creation (and can be expanded for other form data saving if needed).
+  /// Handles question creation (and can be expanded for other form data saving if needed).
   Future<void> _saveForm() async {
+    // Mostrar diálogo de carga para bloquear la pantalla
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Evita que el usuario cierre el diálogo tocando fuera
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+    );
+
     setState(() {
       _isValidating = true;
     });
 
-    // First, save all answer options for existing questions
-    bool optionsSaved = await _questionsListWidgetKey.currentState?.saveAllAnswerOptions() ?? true;
-
-    if (!optionsSaved) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to save some answer options'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    // Validate each newly added question
-    for (int i = 0; i < _questionCreations.length; i++) {
-      _questionCreationValidStates[i] = _validateQuestionCreation(i);
-    }
-
-    bool allValid = _questionCreationValidStates.every((valid) => valid);
-
-    if (!allValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please complete all required fields before saving.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
     try {
+      // First, save all answer options for existing questions
+      bool optionsSaved = await _questionsListWidgetKey.currentState?.saveAllAnswerOptions() ?? true;
+
+      if (!optionsSaved) {
+        // Cerrar el diálogo de carga
+        Navigator.of(context).pop();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save some answer options'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      // Validate each newly added question
+      for (int i = 0; i < _questionCreations.length; i++) {
+        _questionCreationValidStates[i] = _validateQuestionCreation(i);
+      }
+
+      bool allValid = _questionCreationValidStates.every((valid) => valid);
+
+      if (!allValid) {
+        // Cerrar el diálogo de carga
+        Navigator.of(context).pop();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please complete all required fields before saving.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
       final formId = widget.form['id'];
       if (formId == null || formId is! int) {
         throw Exception("The form ID is not valid.");
@@ -309,8 +327,16 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
       });
 
       await _fetchFormDetails();
+
+      // Cerrar el diálogo de carga después de completar todas las operaciones
+      Navigator.of(context).pop();
+
     } catch (e) {
       print('Error saving form: $e');
+
+      // Cerrar el diálogo de carga
+      Navigator.of(context).pop();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error saving form: $e'),
@@ -656,7 +682,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 50,
-                          vertical: 20,
+                          vertical: 15,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
@@ -668,9 +694,9 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
                           Icon(
                             Icons.save,
                             color: Colors.white,
-                            size: 20,
+                            size: 18,
                           ),
-                          SizedBox(width: 8),
+                          SizedBox(width: 6),
                           Text(
                             'Save',
                             style: TextStyle(fontSize: 20, color: Colors.white),

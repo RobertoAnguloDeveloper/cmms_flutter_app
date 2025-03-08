@@ -67,7 +67,7 @@ class _GoogleFormsLayoutHelperState extends State<GoogleFormsLayoutHelper> {
                           TextFormField(
                             controller: titleController,
                             decoration: const InputDecoration(
-                              hintText: 'Formulario sin título',
+                              hintText: 'Nameless Form',
                               border: InputBorder.none,
                               hintStyle: TextStyle(
                                 fontSize: 32,
@@ -90,7 +90,7 @@ class _GoogleFormsLayoutHelperState extends State<GoogleFormsLayoutHelper> {
                           TextFormField(
                             controller: descriptionController,
                             decoration: const InputDecoration(
-                              hintText: 'Descripción del formulario',
+                              hintText: 'Description',
                               border: InputBorder.none,
                               hintStyle: TextStyle(
                                 fontSize: 14,
@@ -126,7 +126,7 @@ class _GoogleFormsLayoutHelperState extends State<GoogleFormsLayoutHelper> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancelar'),
+                      child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 16),
                     ElevatedButton(
@@ -138,7 +138,7 @@ class _GoogleFormsLayoutHelperState extends State<GoogleFormsLayoutHelper> {
                           vertical: 12,
                         ),
                       ),
-                      child: const Text('Guardar'),
+                      child: const Text('Save'),
                     ),
                   ],
                 ),

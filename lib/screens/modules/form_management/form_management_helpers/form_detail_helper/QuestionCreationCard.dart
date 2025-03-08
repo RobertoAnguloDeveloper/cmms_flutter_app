@@ -366,78 +366,91 @@ class QuestionCreationCardState extends State<QuestionCreationCard> {
                       width: dropdownWidth,
                       child: widget.isLoadingQuestionTypes
                           ? const Center(child: CircularProgressIndicator())
-                          : DropdownButtonFormField<int>(
-                        value: widget.selectedQuestionTypeId,
-                        isDense: true,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Colors.grey),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: const BorderSide(color: Colors.grey),
-                          ),
-                          contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          errorText: widget.showValidationError && widget.selectedQuestionTypeId == null
-                              ? 'Question type is required'
-                              : null,
-                        ),
-                        dropdownColor: Colors.white,
-                        hint: const Text('Type'),
-                        items: widget.questionTypes.map((type) {
-                          final String questionTypeString =
-                          (type['type'] ?? '').toString().toLowerCase();
+                          : (() {
+                        // Crear una copia ordenada de los tipos de preguntas
+                        List<dynamic> sortedQuestionTypes = List.from(widget.questionTypes);
+                        // Ordenar para que Signature siempre sea el último
+                        sortedQuestionTypes.sort((a, b) {
+                          String typeA = (a['type'] ?? '').toString().toLowerCase();
+                          String typeB = (b['type'] ?? '').toString().toLowerCase();
+                          if (typeA == 'signature') return 1;
+                          if (typeB == 'signature') return -1;
+                          return 0;
+                        });
 
-                          IconData icon;
-                          switch (questionTypeString) {
-                            case 'multiple_choices':
-                              icon = Icons.radio_button_checked;
-                              break;
-                            case 'checkbox':
-                              icon = Icons.check_box;
-                              break;
-                            case 'date':
-                              icon = Icons.calendar_today;
-                              break;
-                            case 'datetime':
-                              icon = Icons.access_time;
-                              break;
-                            case 'text':
-                              icon = Icons.short_text;
-                              break;
-                            case 'user':
-                              icon = Icons.person;
-                              break;
-                            case 'signature':
-                              icon = Icons.draw;
-                              break;
-                            default:
-                              icon = Icons.question_answer;
-                          }
-
-                          return DropdownMenuItem<int>(
-                            value: type['id'] as int?,
-                            child: Row(
-                              children: [
-                                Icon(icon, size: 20, color: Colors.grey[700]),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    (type['type'] ?? '').toString(),
-                                    overflow: TextOverflow.ellipsis,
-                                    softWrap: false,
-                                  ),
-                                ),
-                              ],
+                        return DropdownButtonFormField<int>(
+                          value: widget.selectedQuestionTypeId,
+                          isDense: true,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Colors.grey),
                             ),
-                          );
-                        }).toList(),
-                        onChanged: widget.onTypeChanged,
-                      ),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.grey),
+                            ),
+                            contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            errorText: widget.showValidationError && widget.selectedQuestionTypeId == null
+                                ? 'Question type is required'
+                                : null,
+                          ),
+                          dropdownColor: Colors.white,
+                          hint: const Text('Type'),
+                          items: sortedQuestionTypes.map((type) {
+                            final String questionTypeString =
+                            (type['type'] ?? '').toString().toLowerCase();
+
+                            IconData icon;
+                            switch (questionTypeString) {
+                              case 'multiple_choices':
+                                icon = Icons.radio_button_checked;
+                                break;
+                              case 'checkbox':
+                                icon = Icons.check_box;
+                                break;
+                              case 'date':
+                                icon = Icons.calendar_today;
+                                break;
+                              case 'datetime':
+                                icon = Icons.access_time;
+                                break;
+                              case 'text':
+                                icon = Icons.short_text;
+                                break;
+                              case 'user':
+                                icon = Icons.person;
+                                break;
+                              case 'signature':
+                                icon = Icons.draw;
+                                break;
+                              default:
+                                icon = Icons.question_answer;
+                            }
+
+                            return DropdownMenuItem<int>(
+                              value: type['id'] as int?,
+                              child: Row(
+                                children: [
+                                  Icon(icon, size: 20, color: Colors.grey[700]),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      (type['type'] ?? '').toString(),
+                                      overflow: TextOverflow.ellipsis,
+                                      softWrap: false,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: widget.onTypeChanged,
+                        );
+                      })(),
                     ),
                     // Add the delete button here
                     IconButton(
