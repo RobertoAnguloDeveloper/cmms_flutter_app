@@ -1,5 +1,4 @@
-/*
-import 'dart:io';
+/*import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -242,39 +241,6 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
         for (int i = 0; i < stroke.length - 1; i++) {
           canvas.drawLine(stroke[i], stroke[i + 1], paint);
         }
-      }
-
-      // Optional: embed the metadata (author/position) onto the signature itself
-      final String authorText = 'Signed by: ${_authorController.text.trim()}';
-      final String positionText = _positionController.text.trim().isNotEmpty
-          ? 'Position: ${_positionController.text.trim()}'
-          : '';
-
-      final TextPainter authorPainter = TextPainter(
-        text: TextSpan(
-          text: authorText,
-          style: const TextStyle(color: Colors.black, fontSize: 12),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      final TextPainter positionPainter = TextPainter(
-        text: TextSpan(
-          text: positionText,
-          style: const TextStyle(color: Colors.black, fontSize: 12),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      // Paint author near the bottom-left
-      const double padding = 5;
-      final double yForAuthor = size.height - authorPainter.height - padding;
-      authorPainter.paint(canvas, Offset(10, yForAuthor));
-
-      // Paint the position above the author's name (if not empty)
-      if (positionText.isNotEmpty) {
-        final double yForPosition = yForAuthor - positionPainter.height - 2;
-        positionPainter.paint(canvas, Offset(10, yForPosition));
       }
 
       // Wrap up the drawing into a Picture
@@ -342,7 +308,9 @@ class SignaturePainter extends CustomPainter {
   @override
   bool shouldRepaint(SignaturePainter oldDelegate) => true;
 }
+
 */
+
 
 import 'dart:io';
 import 'dart:typed_data';
@@ -386,10 +354,14 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
   List<List<Offset>> _strokes = <List<Offset>>[];
   List<Offset>? _currentStroke;
   bool _hasSignature = false;
+  bool _isProcessing = false;
 
   /// Controllers for user-editable metadata
   final TextEditingController _authorController = TextEditingController();
   final TextEditingController _positionController = TextEditingController();
+
+  // Key for the drawing area used for capturing
+  final GlobalKey _signatureKey = GlobalKey();
 
   @override
   void initState() {
@@ -422,51 +394,66 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // === Signature drawing area ===
-        Container(
+        _isProcessing
+            ? Container(
           height: 200,
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: Colors.grey.shade300),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Stack(
-            children: [
-              // If there's an existing signature image, show it
-              if (widget.initialSignaturePath != null && _hasSignature)
-                Center(
-                  child: Image.file(
-                    File(widget.initialSignaturePath!),
-                    fit: BoxFit.contain,
-                  ),
-                ),
-
-              // Otherwise, show the signature pad for drawing
-              if (widget.initialSignaturePath == null || !_hasSignature)
-                GestureDetector(
-                  onPanDown: (details) {
-                    setState(() {
-                      _currentStroke = [details.localPosition];
-                      _strokes.add(_currentStroke!);
-                    });
-                  },
-                  onPanUpdate: (details) {
-                    setState(() {
-                      _currentStroke?.add(details.localPosition);
-                      _strokes.last = List.from(_currentStroke!);
-                    });
-                  },
-                  onPanEnd: (details) {
-                    _currentStroke = null;
-                  },
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CustomPaint(
-                      painter: SignaturePainter(strokes: _strokes),
-                      size: Size.infinite,
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        )
+            : RepaintBoundary(
+          key: _signatureKey,
+          child: Container(
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Stack(
+              children: [
+                // If there's an existing signature image, show it
+                if (widget.initialSignaturePath != null && _hasSignature)
+                  Center(
+                    child: Image.file(
+                      File(widget.initialSignaturePath!),
+                      fit: BoxFit.contain,
                     ),
                   ),
-                ),
-            ],
+
+                // Otherwise, show the signature pad for drawing
+                if (widget.initialSignaturePath == null || !_hasSignature)
+                  GestureDetector(
+                    onPanDown: (details) {
+                      setState(() {
+                        _currentStroke = [details.localPosition];
+                        _strokes.add(_currentStroke!);
+                      });
+                    },
+                    onPanUpdate: (details) {
+                      setState(() {
+                        _currentStroke?.add(details.localPosition);
+                        _strokes.last = List.from(_currentStroke!);
+                      });
+                    },
+                    onPanEnd: (details) {
+                      _currentStroke = null;
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CustomPaint(
+                        painter: SignaturePainter(strokes: _strokes),
+                        size: Size.infinite,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
 
@@ -477,7 +464,7 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
           controller: _authorController,
           decoration: const InputDecoration(
             labelText: 'Signature Author',
-            hintText: 'Enter the signer’s name',
+            hintText: "Enter the signer's name",
             border: OutlineInputBorder(),
             filled: true,
             fillColor: Colors.white,
@@ -502,7 +489,7 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             TextButton.icon(
-              onPressed: _clearSignature,
+              onPressed: _isProcessing ? null : _clearSignature,
               icon: const Icon(Icons.clear, color: Colors.red),
               label: const Text(
                 'Clear',
@@ -510,12 +497,26 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
               ),
             ),
             ElevatedButton.icon(
-              onPressed: _saveSignature,
-              icon: const Icon(Icons.save),
-              label: const Text('Save Signature'),
+              onPressed: _isProcessing
+                  ? null
+                  : (_strokes.isEmpty && widget.initialSignaturePath == null)
+                  ? null
+                  : _saveSignature,
+              icon: _isProcessing
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+                  : const Icon(Icons.save),
+              label: Text(_isProcessing ? 'Processing...' : 'Save Signature'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
               ),
             ),
           ],
@@ -535,7 +536,7 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
   }
 
   Future<void> _saveSignature() async {
-    // If we have no strokes and no initial signature, user hasn’t drawn anything yet.
+    // If we have no strokes and no initial signature, user hasn't drawn anything yet.
     if (_strokes.isEmpty && widget.initialSignaturePath == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please draw a signature first')),
@@ -552,6 +553,10 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
       return;
     }
 
+    setState(() {
+      _isProcessing = true;
+    });
+
     try {
       // If there's an existing signature path and we haven't cleared/drawn over it,
       // just return that existing file.
@@ -561,15 +566,33 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
           author: _authorController.text.trim(),
           position: _positionController.text.trim(),
         );
+        setState(() {
+          _isProcessing = false;
+        });
         return;
       }
 
-      // Otherwise, create a new signature image from the user's drawing
+      // Calculate the bounds of the signature to ensure nothing is cropped
+      Rect? signatureBounds = _calculateSignatureBounds();
+
+      // Create a new signature image from the user's drawing
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
 
-      // For final image dimensions, tweak as needed
-      const Size size = Size(400, 200);
+      // Apply padding to the signature bounds to ensure the full signature is captured
+      const double padding = 40.0; // Extra padding to ensure no cropping
+      double width = signatureBounds != null
+          ? signatureBounds.width + padding * 2
+          : 400.0;
+      double height = signatureBounds != null
+          ? signatureBounds.height + padding * 2
+          : 200.0;
+
+      // Ensure minimum dimensions
+      width = width < 400.0 ? 400.0 : width;
+      height = height < 200.0 ? 200.0 : height;
+
+      final Size size = Size(width, height);
 
       // Fill the background with white
       final Paint paint = Paint()
@@ -583,6 +606,19 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
         ..strokeCap = StrokeCap.round
         ..strokeWidth = 3.0;
 
+      // Calculate translation to center the signature within the canvas
+      double translateX = 0;
+      double translateY = 0;
+
+      if (signatureBounds != null) {
+        translateX = padding - signatureBounds.left;
+        translateY = padding - signatureBounds.top;
+      }
+
+      // Apply translation to center the signature
+      canvas.translate(translateX, translateY);
+
+      // Draw all strokes
       for (final List<Offset> stroke in _strokes) {
         for (int i = 0; i < stroke.length - 1; i++) {
           canvas.drawLine(stroke[i], stroke[i + 1], paint);
@@ -628,7 +664,36 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving signature: $e')),
       );
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
     }
+  }
+
+  /// Calculate the bounding box of the signature
+  Rect? _calculateSignatureBounds() {
+    if (_strokes.isEmpty) {
+      return null;
+    }
+
+    double minX = double.infinity;
+    double minY = double.infinity;
+    double maxX = double.negativeInfinity;
+    double maxY = double.negativeInfinity;
+
+    // Find the min and max points to determine the bounding box
+    for (final stroke in _strokes) {
+      for (final point in stroke) {
+        minX = point.dx < minX ? point.dx : minX;
+        minY = point.dy < minY ? point.dy : minY;
+        maxX = point.dx > maxX ? point.dx : maxX;
+        maxY = point.dy > maxY ? point.dy : maxY;
+      }
+    }
+
+    // Return the bounding rectangle
+    return Rect.fromLTRB(minX, minY, maxX, maxY);
   }
 }
 
