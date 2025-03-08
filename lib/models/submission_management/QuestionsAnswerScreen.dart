@@ -747,7 +747,60 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
     // Signature field
     if (questionType == 'signature') {
+
+// In the _buildAnswerField method, modify the onSignatureCaptured callback:
       return CustomSignaturePad(
+        questionTitle: questionText,
+        onSignatureCaptured: (file, {String? author, String? position}) {
+          if (file != null) {
+            // If there was a previous signature, remove it from attached files
+            if (answers.containsKey(questionId)) {
+              String? oldPath = answers[questionId];
+              if (oldPath != null && _attachedFiles.contains(oldPath)) {
+                _attachedFiles.remove(oldPath);
+              }
+            }
+
+            setState(() {
+              // Store the new signature information
+              answers[questionId] = file.path;
+              signatureFiles[questionId.toString()] = {
+                'path': file.path,
+                'author': author ?? widget.sessionData['fullname'] ?? '',
+                'position': position ?? questionText,
+              };
+
+              // Add to attached files list so it appears in UI
+              if (!_attachedFiles.contains(file.path)) {
+                _attachedFiles.add(file.path);
+              }
+
+              // Validate form after signing
+              _validateFormSubmission();
+            });
+          } else {
+            setState(() {
+              if (answers.containsKey(questionId)) {
+                // Remove from attached files list
+                String? oldPath = answers[questionId];
+                if (oldPath != null && _attachedFiles.contains(oldPath)) {
+                  _attachedFiles.remove(oldPath);
+                }
+
+                // Remove from other data structures
+                answers.remove(questionId);
+                signatureFiles.remove(questionId.toString());
+
+                // Validate form after removing signature
+                _validateFormSubmission();
+              }
+            });
+          }
+        },
+      );
+
+
+      /*return CustomSignaturePad(
         questionTitle: questionText, // Pass the question title to use as position
         onSignatureCaptured: (file, {String? author, String? position}) {
           if (file != null) {
@@ -772,7 +825,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
             });
           }
         },
-      );
+      );*/
     }
 
     // User field - procesar el currentValue de manera especial
@@ -1065,7 +1118,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                   'Size: ${_getFileSize(filePath)}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
-                trailing: Row(
+                /*trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (isImage)
@@ -1084,7 +1137,63 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                       tooltip: 'Remove',
                     ),
                   ],
+                ),*/
+
+// In the _buildAttachedFilesList method, modify the trailing IconButton onPressed callback:
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isImage)
+                      IconButton(
+                        icon: const Icon(Icons.preview),
+                        onPressed: () => _previewImage(filePath),
+                        tooltip: 'Preview',
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        setState(() {
+                          // Remove from attached files list
+                          _attachedFiles.remove(filePath);
+
+                          // Check if this file is a signature and remove from signatureFiles and answers
+                          if (filePath.contains('signature_')) {
+                            // Find the question ID associated with this signature file
+                            String? questionIdToRemove;
+                            signatureFiles.forEach((questionId, signatureData) {
+                              if (signatureData['path'] == filePath) {
+                                questionIdToRemove = questionId;
+                              }
+                            });
+
+                            if (questionIdToRemove != null) {
+                              // Remove from signatureFiles
+                              signatureFiles.remove(questionIdToRemove);
+
+                              // Remove from answers (converting questionId string to int)
+                              try {
+                                int qId = int.parse(questionIdToRemove!);
+                                if (answers.containsKey(qId)) {
+                                  answers.remove(qId);
+                                }
+                              } catch (e) {
+                                print('Error parsing question ID: $e');
+                              }
+
+                              // Validate form after removing signature
+                              _validateFormSubmission();
+                            }
+                          }
+                        });
+                      },
+                      tooltip: 'Remove',
+                    ),
+                  ],
                 ),
+
+
+
+
               ),
             );
           },
