@@ -63,12 +63,12 @@ class GoogleFormsQuestionControls extends StatelessWidget {
               Row(
                 children: [
                   // Duplicate icon
-                  IconButton(
+                  /*IconButton(
                     icon: Icon(Icons.content_copy, color: Colors.grey[700], size: 20),
                     splashRadius: 20,
                     tooltip: 'Duplicate',
                     onPressed: onDuplicate,
-                  ),
+                  ),*/
                   // Vertical divider
                   Container(
                     height: 24,

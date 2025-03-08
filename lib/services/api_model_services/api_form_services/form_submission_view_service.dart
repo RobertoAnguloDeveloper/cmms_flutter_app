@@ -106,12 +106,11 @@ class FormSubmissionViewService {
   /// Deletes a form submission
   /// Route: DELETE /forms/{submissionId}
   Future<bool> deleteFormSubmission(
-    BuildContext context,
-    int submissionId,
-  ) async {
+      BuildContext context,
+      int submissionId,
+      ) async {
     try {
-      print(
-          '[deleteFormSubmission] Attempting to delete submission: $submissionId');
+      print('[deleteFormSubmission] Attempting to delete submission: $submissionId');
 
       final response = await _dio.delete<Map<String, dynamic>>(
         '/api/form-submissions/$submissionId',
@@ -124,8 +123,7 @@ class FormSubmissionViewService {
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         // Successful deletion
-        print(
-            '[deleteFormSubmission] Successfully deleted submission: $submissionId');
+        print('[deleteFormSubmission] Successfully deleted submission: $submissionId');
         return true;
       } else if (response.statusCode == 401) {
         if (context.mounted) {
@@ -136,15 +134,8 @@ class FormSubmissionViewService {
       } else if (response.statusCode == 404) {
         print('[deleteFormSubmission] Submission not found: $submissionId');
         throw Exception('Submission not found');
-      } else if (response.statusCode == 401) {
-        if (context != null && context.mounted) {
-          await ApiResponseHandler.handleExpiredToken(
-              context, response.data as Map<String, dynamic>);
-        }
-        throw Exception('Session expired');
       } else {
-        print(
-            '[deleteFormSubmission] Failed to delete submission. Status: ${response.statusCode}');
+        print('[deleteFormSubmission] Failed to delete submission. Status: ${response.statusCode}');
         throw Exception(
           'Failed to delete submission. Status: ${response.statusCode}',
         );
