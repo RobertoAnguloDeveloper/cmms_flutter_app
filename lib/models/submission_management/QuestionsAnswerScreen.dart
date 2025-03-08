@@ -615,13 +615,17 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     );
   }
 
+  // Update your _buildAnswerField method in QuestionsAnswerScreen.dart
+
   Widget _buildAnswerField(Map<String, dynamic> question) {
     final questionType = question['type']?.toString().toLowerCase() ?? '';
     final int questionId = question['id'];
+    final String questionText = question['text'] ?? 'Signature';
 
     // Signature field
     if (questionType == 'signature') {
       return CustomSignaturePad(
+        questionTitle: questionText, // Pass the question title to use as position
         onSignatureCaptured: (file, {String? author, String? position}) {
           if (file != null) {
             setState(() {
@@ -629,9 +633,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               signatureFiles[questionId.toString()] = {
                 'path': file.path,
                 'author': author ?? widget.sessionData['fullname'] ?? '',
-                'position': (position != null && position.isNotEmpty)
-                    ? position
-                    : 'Form Signature'
+                'position': position ?? questionText, // Use question title as fallback
               };
               // Validate form after signing
               _validateFormSubmission();
