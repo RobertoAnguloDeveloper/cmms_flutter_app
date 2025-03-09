@@ -59,7 +59,7 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
 
       if (isSuperUser) {
         // Si es superusuario, cargar todos los usuarios
-        _users = await userService.fetchAllUsers(context);
+        _users = await userService.fetchUsers(context);
       } else {
         // Si no es superusuario, cargar solo los usuarios de su entorno
         final int environmentId = widget.sessionData['environment_id'] ?? 0;
