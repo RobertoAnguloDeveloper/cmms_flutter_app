@@ -1155,7 +1155,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       // En dispositivos móviles, usamos la implementación existente
       else {
         print('Executing mobile camera implementation');
-        final PermissionStatus cameraPermission = await Permission.camera.request();
+        final PermissionStatus cameraPermission =
+            await Permission.camera.request();
 
         if (cameraPermission != PermissionStatus.granted) {
           throw Exception('Camera permission not granted');
@@ -1174,7 +1175,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           final File originalFile = File(photo.path);
 
           // Create a renamed file with a shorter name
-          final File renamedFile = await FileUtils.createRenamedImageFile(originalFile);
+          final File renamedFile =
+              await FileUtils.createRenamedImageFile(originalFile);
 
           setState(() {
             _attachedFiles.add(renamedFile.path);
@@ -1183,7 +1185,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Photo added: ${path.basename(renamedFile.path)}'),
+                content:
+                    Text('Photo added: ${path.basename(renamedFile.path)}'),
                 backgroundColor: Colors.green,
                 duration: const Duration(seconds: 1),
               ),
@@ -1203,14 +1206,14 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
         if (e.toString().contains('channel-error')) {
           errorMessage =
-          'Camera connection failed. Please try again or use file attachment instead.';
+              'Camera connection failed. Please try again or use file attachment instead.';
         } else if (e.toString().contains('permission')) {
           errorMessage =
-          'Camera permission denied. Please enable camera access in settings.';
+              'Camera permission denied. Please enable camera access in settings.';
         } else if (e.toString().contains('NotAllowedError') ||
             e.toString().contains('NotFoundError')) {
           errorMessage =
-          'Camera access denied by browser. Please check your camera permissions.';
+              'Camera access denied by browser. Please check your camera permissions.';
         } else {
           errorMessage = 'Error accessing camera: $e';
         }
@@ -1263,8 +1266,10 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       ..srcObject = stream
       ..autoplay = true
       ..style.width = '100%'
-      ..style.height = '100%'  // Asegúrate de que sea 100% para llenar el contenedor
-      ..style.objectFit = 'cover';  // Usa 'cover' para llenar el área sin distorsión
+      ..style.height =
+          '100%' // Asegúrate de que sea 100% para llenar el contenedor
+      ..style.objectFit =
+          'cover'; // Usa 'cover' para llenar el área sin distorsión
 
     // Esperamos a que el video esté listo
     bool videoReady = false;
@@ -1300,27 +1305,40 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     // Cabecera del diálogo
     final headerContainer = html.DivElement()
       ..style.width = '100%'
-      ..style.padding = '12px 16px'
+      ..style.padding = '12px 1px'
       ..style.backgroundColor = '#1976D2'
       ..style.color = 'white'
       ..style.display = 'flex'
-      ..style.justifyContent = 'space-between'
-      ..style.alignItems = 'center';
+      ..style.justifyContent = 'space-between' // Cambia esto
+      ..style.alignItems = 'center'; // Cambiado para mejor alineación
 
     final headerTitle = html.HeadingElement.h3()
       ..innerText = 'Take Photo'
       ..style.margin = '0'
-      ..style.fontSize = '18px';
+      ..style.fontSize = '18px'
+      ..style.flex = '1' // Hace que el título ocupe el espacio restante
+      ..style.textAlign = 'center'; // Centra el título
 
     final closeButton = html.ButtonElement()
-      ..innerText = '✕'
-      ..style.background = 'none'
-      ..style.border = 'none'
+      ..innerText = ''
+      ..style.backgroundColor = '#1976D2'
       ..style.color = 'white'
-      ..style.fontSize = '20px'
+      ..style.border = 'none'
+      ..style.borderRadius = '4px'
+      ..style.padding = '8px 12px'
+      ..style.marginRight = '15px' // Espacio entre el botón y el título
+      ..style.fontSize = '14px'
+      ..style.fontWeight = 'bold'
       ..style.cursor = 'pointer'
-      ..style.padding = '0'
-      ..style.margin = '0';
+      ..style.display = 'flex'
+      ..style.alignItems = 'center'
+      ..style.justifyContent = 'center'
+      ..style.minWidth = '20px'; // Asegurar un ancho mínimo para el botón
+
+    final closeSpan = html.SpanElement()
+      ..innerText = '✕'
+      ..style.fontSize = '16px';
+    closeButton.append(closeSpan);
 
     headerContainer.children.addAll([headerTitle, closeButton]);
 
@@ -1406,7 +1424,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       ..style.color = '#0D47A1';
 
     final instructionText = html.ParagraphElement()
-      ..innerText = 'Position your camera to get a clear view, then tap the capture button.'
+      ..innerText =
+          'Position your camera to get a clear view, then tap the capture button.'
       ..style.margin = '0';
 
     instructionContainer.append(instructionText);
@@ -1491,7 +1510,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           postCaptureContainer.style.display = 'flex';
 
           // Actualizar instrucciones
-          instructionText.innerText = 'Verify the photo and tap "Use Photo" to continue or "Retake" to try again.';
+          instructionText.innerText =
+              'Verify the photo and tap "Use Photo" to continue or "Retake" to try again.';
         });
       } catch (e) {
         print('Error capturing photo: $e');
@@ -1526,7 +1546,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           postCaptureContainer.style.display = 'none';
 
           // Actualizar instrucciones
-          instructionText.innerText = 'Position your camera to get a clear view, then tap the capture button.';
+          instructionText.innerText =
+              'Position your camera to get a clear view, then tap the capture button.';
 
           // Limpiar la imagen capturada
           capturedImageElement = null;
@@ -1536,7 +1557,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         }
       } catch (e) {
         print('Error retaking photo: $e');
-        html.window.alert('Error reactivating camera. Please try again or close and reopen the camera.');
+        html.window.alert(
+            'Error reactivating camera. Please try again or close and reopen the camera.');
       }
     });
 
@@ -1599,13 +1621,15 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       }
 
       return await mediaDevices.getUserMedia({
-        'video': true,  // Simplificado para evitar problemas de compilación
+        'video': true, // Simplificado para evitar problemas de compilación
       });
     } catch (e) {
       print('Error accessing camera: $e');
       return null;
     }
   }
+
+
 
 // Método de detención seguro sin referencias a JS
   void _safeStopWebCameraStream(html.MediaStream? stream) {
@@ -1636,7 +1660,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       return Uint8List(0);
     }
   }
-
 
 // Método para detener el stream de la cámara
   void _stopWebCameraStream(html.MediaStream stream) {
