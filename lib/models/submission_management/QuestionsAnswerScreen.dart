@@ -1462,6 +1462,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     }
   }
 
+  // Modifica el método build de la clase _QuestionsAnswerScreenState para mostrar un mensaje cuando no hay formularios
+
   @override
   Widget build(BuildContext context) {
     String appBarTitle = showQuestions
@@ -1519,11 +1521,47 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
             ? const Center(child: CircularProgressIndicator())
             : showQuestions
             ? _buildQuestionsList()
+            : forms.isEmpty
+            ? _buildEmptyFormsMessage() // Mensaje cuando no hay formularios
             : ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: forms.length,
           itemBuilder: (context, index) => _buildFormCard(forms[index]),
         ),
+      ),
+    );
+  }
+
+// Añade este nuevo método para mostrar el mensaje cuando no hay formularios
+  Widget _buildEmptyFormsMessage() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.list_alt,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Forms Available',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'There are no forms available for you at this time.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
