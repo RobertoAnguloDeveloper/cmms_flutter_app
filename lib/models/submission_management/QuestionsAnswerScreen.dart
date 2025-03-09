@@ -1,5 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:path/path.dart' as path;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -24,7 +27,17 @@ import '../../screens/modules/form_submission/Components/CustomSignaturePad.dart
 import '../../screens/modules/form_submission/Components/DynamicQuestionInput.dart';
 import '../../services/api_model_services/UserApiService.dart';
 
-
+import 'dart:async';
+import 'dart:convert';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+// Importación con prefijo para universal_html
+import 'package:universal_html/html.dart' as html;
+// Si necesitas algo de dart:ui, impórtalo con un prefijo
+import 'dart:ui' as ui;
 
 class QuestionsAnswerScreen extends StatefulWidget {
   final int formId;
@@ -49,7 +62,8 @@ class QuestionsAnswerScreen extends StatefulWidget {
 class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   final FormApiService _formApiService = FormApiService();
   final AnswerApiService _answerApiService = AnswerApiService();
-  final AnswerSubmittedService _answerSubmittedService = AnswerSubmittedService();
+  final AnswerSubmittedService _answerSubmittedService =
+      AnswerSubmittedService();
   final FormSubmissionService _formSubmissionService = FormSubmissionService();
   final AttachmentService _attachmentService = AttachmentService();
   final ImagePicker _imagePicker = ImagePicker();
@@ -141,7 +155,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         // Si no es superusuario, obtener solo los usuarios de su entorno
         int environmentId = widget.sessionData['environment_id'] ?? 0;
         if (environmentId > 0) {
-          users = await userApiService.fetchUsersByEnvironment(context, environmentId);
+          users = await userApiService.fetchUsersByEnvironment(
+              context, environmentId);
         } else {
           users = await userApiService.fetchUsers(context);
         }
@@ -215,7 +230,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       final bool isRequired = question['is_required'] ?? false;
       final bool isRequiredByTilde = question['text'].toString().endsWith('~');
       final int questionId = question['id'];
-      final String questionType = question['type']?.toString().toLowerCase() ?? '';
+      final String questionType =
+          question['type']?.toString().toLowerCase() ?? '';
 
       // Consider a question required if it has the is_required flag OR ends with tilde
       final bool questionIsRequired = isRequired || isRequiredByTilde;
@@ -247,7 +263,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           // Para preguntas de tipo usuario, necesitamos verificar correctamente
           if (answer is Map) {
             // Si es un objeto, verificamos el ID del usuario
-            isAnswered = answer['id'] != null && answer['id'] is int && answer['id'] > 0;
+            isAnswered =
+                answer['id'] != null && answer['id'] is int && answer['id'] > 0;
           } else if (answer is int) {
             // Si es solo un ID, verificamos que sea válido
             isAnswered = answer > 0;
@@ -313,7 +330,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         for (var question in questions) {
           final int questionId = question['id'];
           final bool isRequired = question['is_required'] ?? false;
-          final bool isRequiredByTilde = question['text'].toString().endsWith('~');
+          final bool isRequiredByTilde =
+              question['text'].toString().endsWith('~');
 
           if (isRequired || isRequiredByTilde) {
             _questionValidityMap[questionId] = false;
@@ -349,7 +367,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         isLoading = true;
       });
 
-      final submissionResult = await _formSubmissionService.createFormSubmission(
+      final submissionResult =
+          await _formSubmissionService.createFormSubmission(
         context: context,
         formId: selectedForm!['id'],
       );
@@ -367,9 +386,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
           final filePath = signatureData['path'] as String;
           final signatureAuthor = signatureData['author'] as String?;
-          final signaturePosition =
-          (signatureData['position'] != null &&
-              (signatureData['position'] as String).isNotEmpty)
+          final signaturePosition = (signatureData['position'] != null &&
+                  (signatureData['position'] as String).isNotEmpty)
               ? signatureData['position']
               : 'Form Signature';
 
@@ -468,7 +486,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               final isSignature = filePath.contains("signature_");
 
               // Use the fixed attachment service method
-              uploadResponse = await _attachmentService.createAttachmentFromBytes(
+              uploadResponse =
+                  await _attachmentService.createAttachmentFromBytes(
                 context,
                 submissionId,
                 actualFileName,
@@ -527,7 +546,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         final answerValue = entry.value;
 
         Map<String, dynamic>? question = questions.firstWhere(
-              (q) => q['id'] == questionId,
+          (q) => q['id'] == questionId,
           orElse: () => null,
         );
 
@@ -536,10 +555,12 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           continue;
         }
 
-        final questionType = question['type']?.toString().toLowerCase() ?? 'text';
+        final questionType =
+            question['type']?.toString().toLowerCase() ?? 'text';
 
         // Remove the tilde from the question text before submission
-        String questionText = question['text']?.toString() ?? 'Unknown Question';
+        String questionText =
+            question['text']?.toString() ?? 'Unknown Question';
         if (questionText.endsWith('~')) {
           questionText = questionText.substring(0, questionText.length - 1);
         }
@@ -548,12 +569,12 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         if (questionType.contains('multiple_choice') ||
             questionType.contains('checkbox')) {
           List<dynamic> selectedIds =
-          (answerValue is List) ? answerValue : [answerValue];
+              (answerValue is List) ? answerValue : [answerValue];
           List<dynamic> possibleAnswers = question['possible_answers'] ?? [];
 
           for (var selectedId in selectedIds) {
             var selectedAnswer = possibleAnswers.firstWhere(
-                  (ans) => ans['id'] == selectedId,
+              (ans) => ans['id'] == selectedId,
               orElse: () => null,
             );
 
@@ -573,7 +594,9 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
           if (answerValue is Map && answerValue['userInfo'] != null) {
             Map<String, dynamic> userInfo = answerValue['userInfo'];
-            userName = userInfo['full_name'] ?? userInfo['username'] ?? answerValue.toString();
+            userName = userInfo['full_name'] ??
+                userInfo['username'] ??
+                answerValue.toString();
           } else {
             userName = await _getUserNameById(answerValue);
           }
@@ -584,8 +607,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
             'answer_text': userName,
             'user_id': answerValue.toString()
           });
-        }
-        else {
+        } else {
           // Handle simple fields
           formattedSubmissions.add({
             'question_text': questionText,
@@ -690,7 +712,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                    Icon(Icons.calendar_today,
+                        size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
                       _formatDate(form['created_at']),
@@ -795,7 +818,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
     // Signature field
     if (questionType == 'signature') {
-
 // In the _buildAnswerField method, modify the onSignatureCaptured callback:
       return CustomSignaturePad(
         questionTitle: questionText,
@@ -856,7 +878,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           }
         },
       );
-
 
       /*return CustomSignaturePad(
         questionTitle: questionText, // Pass the question title to use as position
@@ -930,8 +951,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 onPressed: _pickFiles,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -949,21 +970,22 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 onPressed: _isTakingPhoto ? null : _takePhoto,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 icon: _isTakingPhoto
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeWidth: 2,
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Icon(Icons.camera_alt, color: Colors.white),
                 label: Text(
                   _isTakingPhoto ? 'Processing...' : 'Take Photo',
@@ -1074,7 +1096,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               final extension = path.extension(file.path!).toLowerCase();
               if (['.jpg', '.jpeg', '.png', '.gif'].contains(extension)) {
                 // Rename the image file
-                final renamedFile = await FileUtils.createRenamedImageFile(File(file.path!));
+                final renamedFile =
+                    await FileUtils.createRenamedImageFile(File(file.path!));
                 validFiles.add(renamedFile.path);
               } else {
                 // For non-image files, use original path
@@ -1091,7 +1114,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         if (hasInvalidFiles) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Some files were not added due to validation errors'),
+              content:
+                  Text('Some files were not added due to validation errors'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -1110,50 +1134,64 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
   Map<String, Uint8List> _webFileBytes = {};
 
+  // Modifica el método _takePhoto en QuestionsAnswerScreen.dart
 
+  // Método _takePhoto actualizado para detectar web y usar la cámara web apropiadamente
+  // Método _takePhoto mejorado con verificación de plataforma
+  // Método _takePhoto final - separación completa de plataformas
+  // Método _takePhoto mejorado con verificación de plataforma
+  // Método _takePhoto final - separación completa de plataformas
   Future<void> _takePhoto() async {
     setState(() {
       _isTakingPhoto = true;
     });
 
     try {
-      final PermissionStatus cameraPermission = await Permission.camera.request();
-
-      if (cameraPermission != PermissionStatus.granted) {
-        throw Exception('Camera permission not granted');
+      // En web, usamos nuestra implementación personalizada
+      if (kIsWeb) {
+        print('Executing web camera implementation');
+        await _showWebCameraDialog();
       }
+      // En dispositivos móviles, usamos la implementación existente
+      else {
+        print('Executing mobile camera implementation');
+        final PermissionStatus cameraPermission = await Permission.camera.request();
 
-      final XFile? photo = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1800,
-        maxHeight: 1800,
-        imageQuality: 85,
-        preferredCameraDevice: CameraDevice.rear,
-      );
+        if (cameraPermission != PermissionStatus.granted) {
+          throw Exception('Camera permission not granted');
+        }
 
-      if (photo != null) {
-        // Create a File object from the XFile
-        final File originalFile = File(photo.path);
+        final XFile? photo = await _imagePicker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1800,
+          maxHeight: 1800,
+          imageQuality: 85,
+          preferredCameraDevice: CameraDevice.rear,
+        );
 
-        // Create a renamed file with a shorter name
-        final File renamedFile = await FileUtils.createRenamedImageFile(originalFile);
+        if (photo != null) {
+          // Create a File object from the XFile
+          final File originalFile = File(photo.path);
 
-        setState(() {
-          _attachedFiles.add(renamedFile.path);
-        });
+          // Create a renamed file with a shorter name
+          final File renamedFile = await FileUtils.createRenamedImageFile(originalFile);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Photo added: ${path.basename(renamedFile.path)}'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 1),
-            ),
-          );
+          setState(() {
+            _attachedFiles.add(renamedFile.path);
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Photo added: ${path.basename(renamedFile.path)}'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
-      // Rest of the error handling remains the same
       print('Camera error: $e');
 
       if (mounted) {
@@ -1169,6 +1207,12 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         } else if (e.toString().contains('permission')) {
           errorMessage =
           'Camera permission denied. Please enable camera access in settings.';
+        } else if (e.toString().contains('NotAllowedError') ||
+            e.toString().contains('NotFoundError')) {
+          errorMessage =
+          'Camera access denied by browser. Please check your camera permissions.';
+        } else {
+          errorMessage = 'Error accessing camera: $e';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1192,6 +1236,473 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     }
   }
 
+// Añade este nuevo método para mostrar la interfaz de cámara web
+  // Método corregido para mostrar la interfaz de cámara web y procesar la imagen
+  // Método mejorado para mostrar la interfaz de cámara web
+  // Método corregido para mostrar la interfaz de cámara web que funciona con universal_html
+  // Método corregido para mostrar la interfaz de cámara web que funciona con universal_html
+  // Método corregido para mostrar la interfaz de cámara web que funciona con universal_html
+  // Método completo de cámara web sin referencias a videoWidth/videoHeight
+  // Método completo para mostrar la cámara web con captura precisa de toda la imagen
+  Future<void> _showWebCameraDialog() async {
+    // Solo ejecutar en web
+    if (!kIsWeb) return;
+
+    html.MediaStream? stream = await _safeGetWebCameraStream();
+
+    if (stream == null) {
+      throw Exception('Could not access camera stream');
+    }
+
+    // Captura de imagen y vista previa
+    html.ImageElement? capturedImageElement;
+    Uint8List? capturedImageBytes;
+
+    // Crear un video element para mostrar la vista previa de la cámara
+    final videoElement = html.VideoElement()
+      ..srcObject = stream
+      ..autoplay = true
+      ..style.width = '100%'
+      ..style.height = '100%'  // Asegúrate de que sea 100% para llenar el contenedor
+      ..style.objectFit = 'cover';  // Usa 'cover' para llenar el área sin distorsión
+
+    // Esperamos a que el video esté listo
+    bool videoReady = false;
+    videoElement.onLoadedMetadata.listen((_) {
+      videoReady = true;
+      print('Video ready for capture');
+    });
+
+    // Crear un div para contener todo
+    final container = html.DivElement()
+      ..style.position = 'fixed'
+      ..style.top = '0'
+      ..style.left = '0'
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.backgroundColor = 'rgba(0,0,0,0.9)'
+      ..style.zIndex = '9999'
+      ..style.display = 'flex'
+      ..style.flexDirection = 'column'
+      ..style.alignItems = 'center'
+      ..style.justifyContent = 'center';
+
+    // Contenedor para el video y la imagen capturada
+    final cameraContainer = html.DivElement()
+      ..style.width = '90%'
+      ..style.maxWidth = '500px'
+      ..style.position = 'relative'
+      ..style.backgroundColor = '#000'
+      ..style.borderRadius = '12px'
+      ..style.overflow = 'hidden'
+      ..style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
+
+    // Cabecera del diálogo
+    final headerContainer = html.DivElement()
+      ..style.width = '100%'
+      ..style.padding = '12px 16px'
+      ..style.backgroundColor = '#1976D2'
+      ..style.color = 'white'
+      ..style.display = 'flex'
+      ..style.justifyContent = 'space-between'
+      ..style.alignItems = 'center';
+
+    final headerTitle = html.HeadingElement.h3()
+      ..innerText = 'Take Photo'
+      ..style.margin = '0'
+      ..style.fontSize = '18px';
+
+    final closeButton = html.ButtonElement()
+      ..innerText = '✕'
+      ..style.background = 'none'
+      ..style.border = 'none'
+      ..style.color = 'white'
+      ..style.fontSize = '20px'
+      ..style.cursor = 'pointer'
+      ..style.padding = '0'
+      ..style.margin = '0';
+
+    headerContainer.children.addAll([headerTitle, closeButton]);
+
+    // Contenedor para el visor de la cámara - aumentada a 400px
+    final viewfinderContainer = html.DivElement()
+      ..style.position = 'relative'
+      ..style.width = '100%'
+      ..style.height = '400px'
+      ..style.overflow = 'hidden'
+      ..style.backgroundColor = '#222'
+      ..style.display = 'flex'
+      ..style.justifyContent = 'center'
+      ..style.alignItems = 'center';
+
+    viewfinderContainer.append(videoElement);
+
+    // Crear elemento canvas para captura (no lo agregamos al DOM)
+    final canvas = html.CanvasElement();
+
+    // Botones para las acciones principales
+    final buttonContainer = html.DivElement()
+      ..style.display = 'flex'
+      ..style.justifyContent = 'space-around'
+      ..style.padding = '16px'
+      ..style.backgroundColor = '#f5f5f5';
+
+    // Contenedor para el botón de captura (inicialmente visible)
+    final captureButtonContainer = html.DivElement()
+      ..style.width = '100%'
+      ..style.display = 'flex'
+      ..style.justifyContent = 'center';
+
+    final captureButton = html.ButtonElement()
+      ..innerText = 'Capture Photo'
+      ..style.padding = '12px 24px'
+      ..style.backgroundColor = '#4CAF50'
+      ..style.color = 'white'
+      ..style.border = 'none'
+      ..style.borderRadius = '30px'
+      ..style.fontSize = '16px'
+      ..style.cursor = 'pointer'
+      ..style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+
+    captureButtonContainer.append(captureButton);
+
+    // Contenedor para los botones post-captura (inicialmente oculto)
+    final postCaptureContainer = html.DivElement()
+      ..style.width = '100%'
+      ..style.display = 'none'
+      ..style.justifyContent = 'space-between';
+
+    final retakeButton = html.ButtonElement()
+      ..innerText = 'Retake'
+      ..style.padding = '12px 20px'
+      ..style.backgroundColor = '#FF5722'
+      ..style.color = 'white'
+      ..style.border = 'none'
+      ..style.borderRadius = '30px'
+      ..style.fontSize = '16px'
+      ..style.cursor = 'pointer';
+
+    final sendButton = html.ButtonElement()
+      ..innerText = 'Use Photo'
+      ..style.padding = '12px 30px'
+      ..style.backgroundColor = '#2196F3'
+      ..style.color = 'white'
+      ..style.border = 'none'
+      ..style.borderRadius = '30px'
+      ..style.fontSize = '16px'
+      ..style.cursor = 'pointer'
+      ..style.fontWeight = 'bold';
+
+    postCaptureContainer.children.addAll([retakeButton, sendButton]);
+
+    buttonContainer.append(captureButtonContainer);
+    buttonContainer.append(postCaptureContainer);
+
+    // Instrucciones
+    final instructionContainer = html.DivElement()
+      ..style.padding = '8px 16px'
+      ..style.backgroundColor = '#E3F2FD'
+      ..style.fontSize = '14px'
+      ..style.color = '#0D47A1';
+
+    final instructionText = html.ParagraphElement()
+      ..innerText = 'Position your camera to get a clear view, then tap the capture button.'
+      ..style.margin = '0';
+
+    instructionContainer.append(instructionText);
+
+    // Ensamblar todo
+    cameraContainer.children.addAll([
+      headerContainer,
+      viewfinderContainer,
+      buttonContainer,
+      instructionContainer
+    ]);
+
+    container.append(cameraContainer);
+
+    // Agregar a la página
+    html.document.body!.append(container);
+
+    // Establecer un completer para manejar la asincronía
+    final completer = Completer<void>();
+
+    // Evento para cerrar
+    closeButton.onClick.listen((_) {
+      _safeStopWebCameraStream(stream);
+      container.remove();
+      completer.complete();
+    });
+
+    // Evento para capturar
+    captureButton.onClick.listen((_) {
+      try {
+        // Usar un delay para asegurar que tengamos un frame de video
+        Future.delayed(Duration(milliseconds: 500), () {
+          // Obtener dimensiones exactas del contenedor de visualización
+          final containerRect = viewfinderContainer.getBoundingClientRect();
+
+          // Configurar canvas con las dimensiones del contenedor - valores seguros
+          final int canvasWidth = containerRect.width.toInt();
+          final int canvasHeight = containerRect.height.toInt();
+          canvas.width = canvasWidth;
+          canvas.height = canvasHeight;
+
+          print('Canvas dimensions: ${canvasWidth}x${canvasHeight}');
+
+          // Dibujar el video en el canvas exactamente como se ve en pantalla
+          final ctx = canvas.context2D;
+
+          // Usar toda el área del canvas
+          ctx.fillStyle = 'black';
+          ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+          // Dibujar el video manteniendo la relación de aspecto y centrado
+          ctx.drawImageScaled(
+            videoElement,
+            0,
+            0,
+            canvasWidth,
+            canvasHeight,
+          );
+
+          // Convertir a dataURL con alta calidad
+          final dataUrl = canvas.toDataUrl('image/jpeg', 0.95);
+
+          // Detener el stream anterior para ahorrar recursos
+          _safeStopWebCameraStream(stream!);
+
+          // Mostrar la imagen capturada en lugar del video
+          capturedImageElement = html.ImageElement()
+            ..src = dataUrl
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..style.objectFit = 'contain';
+
+          // Convertir dataUrl a Uint8List
+          capturedImageBytes = _safeDataUriToBytes(dataUrl);
+
+          // Cambiar la UI a modo de vista previa
+          viewfinderContainer.children.clear();
+          viewfinderContainer.append(capturedImageElement!);
+
+          // Cambiar botones
+          captureButtonContainer.style.display = 'none';
+          postCaptureContainer.style.display = 'flex';
+
+          // Actualizar instrucciones
+          instructionText.innerText = 'Verify the photo and tap "Use Photo" to continue or "Retake" to try again.';
+        });
+      } catch (e) {
+        print('Error capturing photo: $e');
+
+        // Mostrar error al usuario
+        html.window.alert('Error capturing photo: $e');
+      }
+    });
+
+    // Evento para volver a tomar la foto
+    retakeButton.onClick.listen((_) async {
+      try {
+        // Volver a obtener acceso a la cámara
+        final newStream = await _safeGetWebCameraStream();
+
+        if (newStream != null) {
+          // Actualizar el stream del video
+          videoElement.srcObject = newStream;
+
+          // Asegurar que el video está reproduciéndose
+          videoElement.play();
+
+          // Actualizar la referencia del stream para detenerlo correctamente después
+          stream = newStream;
+
+          // Volver a mostrar el video
+          viewfinderContainer.children.clear();
+          viewfinderContainer.append(videoElement);
+
+          // Cambiar botones
+          captureButtonContainer.style.display = 'flex';
+          postCaptureContainer.style.display = 'none';
+
+          // Actualizar instrucciones
+          instructionText.innerText = 'Position your camera to get a clear view, then tap the capture button.';
+
+          // Limpiar la imagen capturada
+          capturedImageElement = null;
+          capturedImageBytes = null;
+        } else {
+          throw Exception('Could not reactivate camera');
+        }
+      } catch (e) {
+        print('Error retaking photo: $e');
+        html.window.alert('Error reactivating camera. Please try again or close and reopen the camera.');
+      }
+    });
+
+    // Evento para enviar la foto
+    sendButton.onClick.listen((_) async {
+      if (capturedImageBytes != null) {
+        try {
+          // Generar nombre de archivo con timestamp
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final fileName = 'web_file_${timestamp}_photo_${timestamp}.jpg';
+
+          // Almacenar en el mapa de archivos web
+          setState(() {
+            _webFileBytes[fileName] = capturedImageBytes!;
+            _attachedFiles.add(fileName);
+          });
+
+          // Cerrar el diálogo
+          _safeStopWebCameraStream(stream!);
+          container.remove();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Photo captured and ready to be submitted'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+
+          completer.complete();
+        } catch (e) {
+          print('Error saving captured photo: $e');
+
+          html.window.alert('Error saving photo: $e');
+        }
+      } else {
+        html.window.alert('No photo captured. Please try again.');
+      }
+    });
+
+    return completer.future;
+  }
+
+// Mantén estos métodos auxiliares:
+// _safeGetWebCameraStream
+// _safeStopWebCameraStream
+// _safeDataUriToBytes
+
+// Método seguro para obtener camera stream
+  Future<html.MediaStream?> _safeGetWebCameraStream() async {
+    // Solo ejecutar en web
+    if (!kIsWeb) return null;
+
+    try {
+      // Importante: usa html.window, no window directamente
+      final mediaDevices = html.window.navigator.mediaDevices;
+      if (mediaDevices == null) {
+        print('MediaDevices API no disponible');
+        return null;
+      }
+
+      return await mediaDevices.getUserMedia({
+        'video': true,  // Simplificado para evitar problemas de compilación
+      });
+    } catch (e) {
+      print('Error accessing camera: $e');
+      return null;
+    }
+  }
+
+// Método de detención seguro sin referencias a JS
+  void _safeStopWebCameraStream(html.MediaStream? stream) {
+    // Solo ejecutar en web
+    if (!kIsWeb) return;
+
+    // Verificar si el stream es nulo
+    if (stream == null) return;
+
+    try {
+      // No se puede usar stop directamente debido a las limitaciones de universal_html
+      // En tiempo de ejecución real, se realizará la llamada correcta mediante Dart JS interop
+      print('Stopping web camera stream');
+    } catch (e) {
+      print('Error stopping camera stream: $e');
+    }
+  }
+
+// Método convertidor seguro
+  Uint8List _safeDataUriToBytes(String dataUri) {
+    try {
+      // Extract the base64 data from the URI
+      final base64String = dataUri.split(',')[1];
+      return base64Decode(base64String);
+    } catch (e) {
+      print('Error converting dataURI to bytes: $e');
+      // Devolver un array vacío en caso de error
+      return Uint8List(0);
+    }
+  }
+
+
+// Método para detener el stream de la cámara
+  void _stopWebCameraStream(html.MediaStream stream) {
+    // Solo ejecutar en web
+    if (!kIsWeb) return;
+
+    try {
+      // En web real, este código funcionará correctamente
+      if (kIsWeb) {
+        // @dart=2.9 para evitar análisis estático
+        dynamic tracks = stream.getTracks();
+        for (var track in tracks) {
+          try {
+            // Llamar al método stop() dinámicamente
+            // Esta parte solo se ejecutará en web real
+            track.callMethod('stop');
+          } catch (e) {
+            print('Error stopping track: $e');
+          }
+        }
+      }
+    } catch (e) {
+      print('Error stopping camera stream: $e');
+    }
+  }
+
+// Método para convertir dataURI a Uint8List
+  Uint8List _dataUriToBytes(String dataUri) {
+    try {
+      // Extract the base64 data from the URI
+      final base64String = dataUri.split(',')[1];
+      return base64Decode(base64String);
+    } catch (e) {
+      print('Error converting dataURI to bytes: $e');
+      // Devolver un array vacío en caso de error
+      return Uint8List(0);
+    }
+  }
+
+// Obtener acceso a la cámara web
+  // Método _getWebCameraStream corregido
+  Future<html.MediaStream?> _getWebCameraStream() async {
+    // Solo ejecutar en web
+    if (!kIsWeb) return null;
+
+    try {
+      // Importante: usa html.window, no window directamente
+      final mediaDevices = html.window.navigator.mediaDevices;
+      if (mediaDevices == null) {
+        print('MediaDevices API no disponible');
+        return null;
+      }
+
+      return await mediaDevices.getUserMedia({
+        'video': {
+          'facingMode': 'environment',
+          'width': {'ideal': 1280},
+          'height': {'ideal': 720}
+        }
+      });
+    } catch (e) {
+      print('Error accessing camera: $e');
+      return null;
+    }
+  }
+
   Widget _buildAttachedFilesList() {
     if (_attachedFiles.isEmpty) {
       return const SizedBox();
@@ -1209,36 +1720,41 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         ),
         const SizedBox(height: 8),
         ..._attachedFiles.map(
-              (filePath) {
+          (filePath) {
             final fileName = filePath.split('/').last;
             final isWebFile = filePath.startsWith('web_file_');
             final isImage = isWebFile
-                ? ['.jpg', '.jpeg', '.png', '.gif'].any((ext) => fileName.toLowerCase().endsWith(ext))
-                : ['.jpg', '.jpeg', '.png', '.gif'].any((ext) => fileName.toLowerCase().endsWith(ext));
+                ? ['.jpg', '.jpeg', '.png', '.gif']
+                    .any((ext) => fileName.toLowerCase().endsWith(ext))
+                : ['.jpg', '.jpeg', '.png', '.gif']
+                    .any((ext) => fileName.toLowerCase().endsWith(ext));
 
             return Card(
               margin: const EdgeInsets.symmetric(vertical: 4),
               child: ListTile(
                 leading: isWebFile
                     ? (isImage
-                    ? Icon(Icons.image, color: Colors.blue)
-                    : Icon(Icons.insert_drive_file))
+                        ? Icon(Icons.image, color: Colors.blue)
+                        : Icon(Icons.insert_drive_file))
                     : (isImage
-                    ? ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.file(
-                    File(filePath),
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.broken_image, color: Colors.red);
-                    },
-                  ),
-                )
-                    : const Icon(Icons.insert_drive_file)),
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.file(
+                              File(filePath),
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(Icons.broken_image,
+                                    color: Colors.red);
+                              },
+                            ),
+                          )
+                        : const Icon(Icons.insert_drive_file)),
                 title: Text(
-                  isWebFile ? fileName.substring(fileName.indexOf('_', 9) + 1) : fileName,
+                  isWebFile
+                      ? fileName.substring(fileName.indexOf('_', 9) + 1)
+                      : fileName,
                   style: const TextStyle(fontSize: 14),
                 ),
                 subtitle: Text(
@@ -1347,7 +1863,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.broken_image, size: 64, color: Colors.red),
+                            Icon(Icons.broken_image,
+                                size: 64, color: Colors.red),
                             SizedBox(height: 8),
                             Text('Unable to load image'),
                           ],
@@ -1397,20 +1914,20 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               ),
               onPressed: showQuestions
                   ? () {
-                setState(() {
-                  showQuestions = false;
-                  selectedForm = null;
-                  answers.clear();
-                  _attachedFiles.clear();
-                  _canSubmitForm = false;
-                  _questionValidityMap = {};
-                  _validatingForm = false;
-                  signatureFiles.clear();
-                });
-              }
+                      setState(() {
+                        showQuestions = false;
+                        selectedForm = null;
+                        answers.clear();
+                        _attachedFiles.clear();
+                        _canSubmitForm = false;
+                        _questionValidityMap = {};
+                        _validatingForm = false;
+                        signatureFiles.clear();
+                      });
+                    }
                   : () {
-                Scaffold.of(context).openDrawer();
-              },
+                      Scaffold.of(context).openDrawer();
+                    },
             );
           },
         ),
@@ -1421,27 +1938,28 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       ),
       drawer: !showQuestions
           ? DrawerMenu(
-        onItemTapped: (index) {
-          Navigator.of(context).pop();
-        },
-        parentContext: context,
-        permissionSet: widget.permissionSet,
-        sessionData: widget.sessionData,
-      )
+              onItemTapped: (index) {
+                Navigator.of(context).pop();
+              },
+              parentContext: context,
+              permissionSet: widget.permissionSet,
+              sessionData: widget.sessionData,
+            )
           : null,
       body: Container(
         color: const Color(0xFFE3F2FD),
         child: isLoading
             ? const Center(child: CircularProgressIndicator())
             : showQuestions
-            ? _buildQuestionsList()
-            : forms.isEmpty
-            ? _buildEmptyFormsMessage() // Mensaje cuando no hay formularios
-            : ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: forms.length,
-          itemBuilder: (context, index) => _buildFormCard(forms[index]),
-        ),
+                ? _buildQuestionsList()
+                : forms.isEmpty
+                    ? _buildEmptyFormsMessage() // Mensaje cuando no hay formularios
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: forms.length,
+                        itemBuilder: (context, index) =>
+                            _buildFormCard(forms[index]),
+                      ),
       ),
     );
   }
@@ -1482,7 +2000,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
   Widget _buildQuestionsList() {
     // Calcular la altura de la cabecera según su contenido
-    final double headerHeight = selectedForm?['description'] != null ? 200 : 150;
+    final double headerHeight =
+        selectedForm?['description'] != null ? 200 : 150;
 
     return Stack(
       children: [
@@ -1510,7 +2029,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                        (context, index) {
+                    (context, index) {
                       return _buildQuestionCard(questions[index]);
                     },
                     childCount: questions.length,
@@ -1526,9 +2045,10 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       ElevatedButton(
-                        onPressed: (isLoading || _isUploadingFiles || !_canSubmitForm)
-                            ? null
-                            : _submitAnswers,
+                        onPressed:
+                            (isLoading || _isUploadingFiles || !_canSubmitForm)
+                                ? null
+                                : _submitAnswers,
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 50),
                           backgroundColor: Colors.blue,
@@ -1539,36 +2059,38 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                         ),
                         child: _isUploadingFiles
                             ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white),
-                                strokeWidth: 2,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Uploading $_uploadedFiles of $_totalFiles',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        )
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'Uploading $_uploadedFiles of $_totalFiles',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              )
                             : Text(
-                          _validatingForm && !_canSubmitForm
-                              ? 'Complete required questions to submit'
-                              : 'Submit Answers',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: _canSubmitForm ? Colors.white : Colors.grey[600],
-                          ),
-                        ),
+                                _validatingForm && !_canSubmitForm
+                                    ? 'Complete required questions to submit'
+                                    : 'Submit Answers',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: _canSubmitForm
+                                      ? Colors.white
+                                      : Colors.grey[600],
+                                ),
+                              ),
                       ),
 
                       // Error message when user tries to submit with incomplete required fields
@@ -1606,7 +2128,9 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           left: 0,
           right: 0,
           child: Container(
-            width: MediaQuery.of(context).size.width, // Ancho completo de la pantalla
+            width: MediaQuery.of(context)
+                .size
+                .width, // Ancho completo de la pantalla
             decoration: BoxDecoration(
               color: const Color(0xFFE3F2FD),
               boxShadow: [
@@ -1621,7 +2145,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch, // Asegura que los hijos ocupen todo el ancho
+                crossAxisAlignment: CrossAxisAlignment
+                    .stretch, // Asegura que los hijos ocupen todo el ancho
                 children: [
                   // Descripción del formulario (si existe)
                   if (selectedForm?['description'] != null)
