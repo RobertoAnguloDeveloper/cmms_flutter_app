@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../../utils/file_utils.dart';
 
 import '../../../components/drawer_menu/DrawerMenu.dart';
 import '../../../models/Permission_set.dart';
@@ -958,6 +959,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     );
   }
 
+
+  /*
   Future<void> _pickFiles() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -1022,8 +1025,89 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         ),
       );
     }
+  }*/
+
+
+  Future<void> _pickFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        allowedExtensions: [
+          'pdf',
+          'png',
+          'jpg',
+          'jpeg',
+          'gif',
+          'doc',
+          'docx',
+          'xls',
+          'xlsx',
+          'txt'
+        ],
+        type: FileType.custom,
+      );
+
+      if (result != null) {
+        bool hasInvalidFiles = false;
+        List<String> validFiles = [];
+
+        for (var file in result.files) {
+          if (file.path != null) {
+            final fileToCheck = File(file.path!);
+
+            if (fileToCheck.lengthSync() > 16 * 1024 * 1024) {
+              hasInvalidFiles = true;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${file.name}: File size exceeds 16MB limit'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              continue;
+            }
+
+            // For image files, rename them to shorter format
+            final extension = path.extension(file.path!).toLowerCase();
+            if (['.jpg', '.jpeg', '.png', '.gif'].contains(extension)) {
+              // Rename the image file
+              final renamedFile = await FileUtils.createRenamedImageFile(File(file.path!));
+              validFiles.add(renamedFile.path);
+            } else {
+              // For non-image files, use original path
+              validFiles.add(file.path!);
+            }
+          }
+        }
+
+        setState(() {
+          _attachedFiles.addAll(validFiles);
+        });
+
+        if (hasInvalidFiles) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Some files were not added due to validation errors'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error picking files: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking files: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
+
+
+
+
+  /*
   Future<void> _takePhoto() async {
     setState(() {
       _isTakingPhoto = true;
@@ -1096,7 +1180,90 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         });
       }
     }
+  }*/
+
+  Future<void> _takePhoto() async {
+    setState(() {
+      _isTakingPhoto = true;
+    });
+
+    try {
+      final PermissionStatus cameraPermission = await Permission.camera.request();
+
+      if (cameraPermission != PermissionStatus.granted) {
+        throw Exception('Camera permission not granted');
+      }
+
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+
+      if (photo != null) {
+        // Create a File object from the XFile
+        final File originalFile = File(photo.path);
+
+        // Create a renamed file with a shorter name
+        final File renamedFile = await FileUtils.createRenamedImageFile(originalFile);
+
+        setState(() {
+          _attachedFiles.add(renamedFile.path);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Photo added: ${path.basename(renamedFile.path)}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Rest of the error handling remains the same
+      print('Camera error: $e');
+
+      if (mounted) {
+        setState(() {
+          _cameraErrorDetected = true;
+        });
+
+        String errorMessage = 'Error taking photo';
+
+        if (e.toString().contains('channel-error')) {
+          errorMessage =
+          'Camera connection failed. Please try again or use file attachment instead.';
+        } else if (e.toString().contains('permission')) {
+          errorMessage =
+          'Camera permission denied. Please enable camera access in settings.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'OK',
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTakingPhoto = false;
+        });
+      }
+    }
   }
+
+
 
   Widget _buildAttachedFilesList() {
     if (_attachedFiles.isEmpty) {
