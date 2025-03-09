@@ -298,7 +298,7 @@ class QuestionCreationCardState extends State<QuestionCreationCard> {
     }
 
     // Default label for other question types
-    return 'Question title';
+    return 'Question title (Min 3 Characters)';
   }
 
   @override
