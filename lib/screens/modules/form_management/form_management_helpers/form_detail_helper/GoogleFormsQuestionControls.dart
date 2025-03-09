@@ -1,5 +1,3 @@
-// lib/screens/modules/form_management/form_detail_helper/GoogleFormsQuestionControls.dart
-
 import 'package:flutter/material.dart';
 
 class GoogleFormsQuestionControls extends StatelessWidget {
@@ -62,13 +60,6 @@ class GoogleFormsQuestionControls extends StatelessWidget {
               // Right side - Action icons
               Row(
                 children: [
-                  // Duplicate icon
-                  /*IconButton(
-                    icon: Icon(Icons.content_copy, color: Colors.grey[700], size: 20),
-                    splashRadius: 20,
-                    tooltip: 'Duplicate',
-                    onPressed: onDuplicate,
-                  ),*/
                   // Vertical divider
                   Container(
                     height: 24,
