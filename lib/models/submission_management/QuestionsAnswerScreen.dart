@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../../utils/file_utils.dart';
 
 import '../../../components/drawer_menu/DrawerMenu.dart';
 import '../../../models/Permission_set.dart';
@@ -996,7 +997,16 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               continue;
             }
 
-            validFiles.add(file.path!);
+            // For image files, rename them to shorter format
+            final extension = path.extension(file.path!).toLowerCase();
+            if (['.jpg', '.jpeg', '.png', '.gif'].contains(extension)) {
+              // Rename the image file
+              final renamedFile = await FileUtils.createRenamedImageFile(File(file.path!));
+              validFiles.add(renamedFile.path);
+            } else {
+              // For non-image files, use original path
+              validFiles.add(file.path!);
+            }
           }
         }
 
@@ -1045,21 +1055,28 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       );
 
       if (photo != null) {
+        // Create a File object from the XFile
+        final File originalFile = File(photo.path);
+
+        // Create a renamed file with a shorter name
+        final File renamedFile = await FileUtils.createRenamedImageFile(originalFile);
+
         setState(() {
-          _attachedFiles.add(photo.path);
+          _attachedFiles.add(renamedFile.path);
         });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Photo added to attachments'),
+            SnackBar(
+              content: Text('Photo added: ${path.basename(renamedFile.path)}'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 1),
+              duration: const Duration(seconds: 1),
             ),
           );
         }
       }
     } catch (e) {
+      // Rest of the error handling remains the same
       print('Camera error: $e');
 
       if (mounted) {
