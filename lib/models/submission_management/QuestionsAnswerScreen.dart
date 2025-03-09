@@ -400,7 +400,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         }
       }
 
-      // Upload attachments
       if (_attachedFiles.isNotEmpty) {
         setState(() {
           _isUploadingFiles = true;
@@ -411,8 +410,24 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         final failedUploads = <String>[];
 
         for (var filePath in _attachedFiles) {
+          // Skip files that are already handled as signatures
+          bool isSignatureFile = false;
+          for (var entry in signatureFiles.entries) {
+            if (entry.value['path'] == filePath) {
+              isSignatureFile = true;
+              break;
+            }
+          }
+
+          if (isSignatureFile) {
+            // Skip this file as it's already processed as a signature
+            continue;
+          }
+
           try {
             final fileExt = path.extension(filePath).toLowerCase();
+            // Note: we're not using signatureFiles check to determine if this is a signature
+            // since we already skipped signature files above
             final isSignature = filePath.contains("signature_");
 
             ScaffoldMessenger.of(context).showSnackBar(
@@ -441,6 +456,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           }
         }
 
+        // Show failed uploads notification
         if (failedUploads.isNotEmpty) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -749,28 +765,36 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     if (questionType == 'signature') {
 
 // In the _buildAnswerField method, modify the onSignatureCaptured callback:
+      // In the _buildAnswerField method, modify the onSignatureCaptured callback:
       return CustomSignaturePad(
         questionTitle: questionText,
         onSignatureCaptured: (file, {String? author, String? position}) {
           if (file != null) {
-            // If there was a previous signature, remove it from attached files
+            // Step 1: Check if we already have a signature file path stored
+            String? oldPath;
             if (answers.containsKey(questionId)) {
-              String? oldPath = answers[questionId];
-              if (oldPath != null && _attachedFiles.contains(oldPath)) {
-                _attachedFiles.remove(oldPath);
-              }
+              oldPath = answers[questionId];
             }
 
+            // Step 2: If we have an old path, remove it from _attachedFiles
+            if (oldPath != null && _attachedFiles.contains(oldPath)) {
+              setState(() {
+                _attachedFiles.remove(oldPath);
+              });
+            }
+
+            // Step 3: Store only the file path in answers, not the file object
             setState(() {
-              // Store the new signature information
               answers[questionId] = file.path;
+
+              // Step 4: Store signature metadata separately
               signatureFiles[questionId.toString()] = {
                 'path': file.path,
                 'author': author ?? widget.sessionData['fullname'] ?? '',
                 'position': position ?? questionText,
               };
 
-              // Add to attached files list so it appears in UI
+              // Step 5: Only add to _attachedFiles if not already there
               if (!_attachedFiles.contains(file.path)) {
                 _attachedFiles.add(file.path);
               }
@@ -779,15 +803,18 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               _validateFormSubmission();
             });
           } else {
+            // Handle clearing the signature
             setState(() {
               if (answers.containsKey(questionId)) {
-                // Remove from attached files list
+                // Get the old path
                 String? oldPath = answers[questionId];
+
+                // Remove from _attachedFiles if it exists
                 if (oldPath != null && _attachedFiles.contains(oldPath)) {
                   _attachedFiles.remove(oldPath);
                 }
 
-                // Remove from other data structures
+                // Remove from other tracking structures
                 answers.remove(questionId);
                 signatureFiles.remove(questionId.toString());
 
@@ -1140,6 +1167,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 ),*/
 
 // In the _buildAttachedFilesList method, modify the trailing IconButton onPressed callback:
+                // Inside _buildAttachedFilesList, update the trailing IconButton:
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1190,7 +1218,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                     ),
                   ],
                 ),
-
 
 
 
@@ -1268,8 +1295,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     }
   }
 
-  // Modifica el método build de la clase _QuestionsAnswerScreenState para mostrar un mensaje cuando no hay formularios
-
   @override
   Widget build(BuildContext context) {
     String appBarTitle = showQuestions
@@ -1327,47 +1352,11 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
             ? const Center(child: CircularProgressIndicator())
             : showQuestions
             ? _buildQuestionsList()
-            : forms.isEmpty
-            ? _buildEmptyFormsMessage() // Mensaje cuando no hay formularios
             : ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: forms.length,
           itemBuilder: (context, index) => _buildFormCard(forms[index]),
         ),
-      ),
-    );
-  }
-
-// Añade este nuevo método para mostrar el mensaje cuando no hay formularios
-  Widget _buildEmptyFormsMessage() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.list_alt,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Forms Available',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'There are no forms available for you at this time.',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }
