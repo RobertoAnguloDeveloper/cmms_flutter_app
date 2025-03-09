@@ -49,6 +49,21 @@ class SubmissionDetailScreen extends StatelessWidget {
     }
   }
 
+  String _cleanPositionString(String? position) {
+    if (position == null || position.isEmpty) {
+      return '';
+    }
+
+    if (position.endsWith('~')) {
+      return position.substring(0, position.length - 1);
+    }
+
+    return position;
+  }
+
+
+
+
   // Helper method to get color for file type
   Color _getColorForFileType(String filePath) {
     final extension = filePath.split('.').last.toLowerCase();
@@ -502,7 +517,7 @@ class SubmissionDetailScreen extends StatelessWidget {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Text(
-                              signature.signaturePosition!,
+                              _cleanPositionString(signature.signaturePosition!),
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[700],
