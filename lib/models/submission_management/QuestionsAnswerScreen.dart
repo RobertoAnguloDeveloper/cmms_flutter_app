@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:path/path.dart' as path;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../utils/file_utils.dart';
+
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 
 import '../../../components/drawer_menu/DrawerMenu.dart';
 import '../../../models/Permission_set.dart';
@@ -17,6 +23,8 @@ import '../../../services/api_model_services/api_form_services/form_submission_s
 import '../../screens/modules/form_submission/Components/CustomSignaturePad.dart';
 import '../../screens/modules/form_submission/Components/DynamicQuestionInput.dart';
 import '../../services/api_model_services/UserApiService.dart';
+
+
 
 class QuestionsAnswerScreen extends StatefulWidget {
   final int formId;
@@ -325,6 +333,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     }
   }
 
+  // Modify the _submitAnswers method to handle web files
+
   Future<void> _submitAnswers() async {
     try {
       // Final validation before submitting
@@ -410,6 +420,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         });
 
         final failedUploads = <String>[];
+        final attachmentService = AttachmentService();
 
         for (var filePath in _attachedFiles) {
           // Skip files that are already handled as signatures
@@ -427,24 +438,55 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           }
 
           try {
-            final fileExt = path.extension(filePath).toLowerCase();
-            // Note: we're not using signatureFiles check to determine if this is a signature
-            // since we already skipped signature files above
-            final isSignature = filePath.contains("signature_");
+            // Check if this is a web file
+            bool isWebFile = filePath.startsWith('web_file_');
+            String fileName = path.basename(filePath);
+
+            // Get the actual file name to display to the user
+            String displayName = isWebFile
+                ? fileName.substring(fileName.indexOf('_', 9) + 1)
+                : fileName;
 
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Uploading ${path.basename(filePath)}...'),
+                content: Text('Uploading $displayName...'),
                 duration: const Duration(seconds: 1),
               ),
             );
 
-            final uploadResponse = await _attachmentService.createAttachment(
-              context,
-              submissionId,
-              File(filePath),
-              isSignature,
-            );
+            Map<String, dynamic> uploadResponse;
+
+            if (isWebFile) {
+              // For web files, use the bytes stored in _webFileBytes
+              final bytes = _webFileBytes[filePath];
+              if (bytes == null) {
+                throw Exception('File data not found for $filePath');
+              }
+
+              // Extract the actual file name from the web file path
+              final actualFileName = displayName;
+              final isSignature = filePath.contains("signature_");
+
+              // Use the fixed attachment service method
+              uploadResponse = await _attachmentService.createAttachmentFromBytes(
+                context,
+                submissionId,
+                actualFileName,
+                bytes,
+                isSignature,
+              );
+            } else {
+              // For normal files, use the regular method
+              final fileExt = path.extension(filePath).toLowerCase();
+              final isSignature = filePath.contains("signature_");
+
+              uploadResponse = await _attachmentService.createAttachment(
+                context,
+                submissionId,
+                File(filePath),
+                isSignature,
+              );
+            }
 
             if (uploadResponse['attachment'] != null) {
               setState(() {
@@ -454,6 +496,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               throw Exception('Invalid server response');
             }
           } catch (e) {
+            print('Error uploading file: $e');
             failedUploads.add(path.basename(filePath));
           }
         }
@@ -478,10 +521,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       // Format answers for submission
       List<Map<String, dynamic>> formattedSubmissions = [];
 
-      // Modificar la parte relevante del método _submitAnswers
-// Específicamente en la sección donde se manejan los formattedSubmissions
-
-// Dentro del método _submitAnswers
+      // Inside the method _submitAnswers
       for (final entry in answers.entries) {
         final questionId = entry.key;
         final answerValue = entry.value;
@@ -493,7 +533,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
         if (question == null) {
           print('Warning: No question found for ID $questionId');
-          continue; // Usar continue en lugar de return para seguir con el siguiente elemento
+          continue;
         }
 
         final questionType = question['type']?.toString().toLowerCase() ?? 'text';
@@ -527,25 +567,14 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
             }
           }
         }
-        // Manejo especial para preguntas de tipo usuario
+        // Handle user type questions
         else if (questionType == 'user') {
-          // Aquí está el cambio - para preguntas de tipo "user", usamos DynamicQuestionInput
-          // que tiene la información del usuario completo
+          String userName = '';
 
-          // Busca el usuario en la lista de usuarios cargada en DynamicQuestionInput
-          // (Usamos un controlador o servicio para obtener el nombre del usuario)
-          String userName = ''; // Valor predeterminado
-
-          // Si el campo userInfo está disponible en answerValue
           if (answerValue is Map && answerValue['userInfo'] != null) {
-            // Si guardamos la información completa del usuario
             Map<String, dynamic> userInfo = answerValue['userInfo'];
             userName = userInfo['full_name'] ?? userInfo['username'] ?? answerValue.toString();
           } else {
-            // Si solo tenemos el ID, intentamos encontrar el nombre en session data
-            // o usar un servicio para obtenerlo de la API
-
-            // Llamamos a un método que nos ayude a obtener el nombre del usuario por su ID
             userName = await _getUserNameById(answerValue);
           }
 
@@ -553,7 +582,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
             'question_text': questionText,
             'question_type_text': questionType,
             'answer_text': userName,
-            'user_id': answerValue.toString() // Guardamos también el ID para referencia
+            'user_id': answerValue.toString()
           });
         }
         else {
@@ -592,6 +621,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         selectedForm = null;
         answers.clear();
         _attachedFiles.clear();
+        _webFileBytes.clear(); // Clear web files bytes
         signatureFiles.clear();
         isLoading = false;
         _canSubmitForm = false;
@@ -959,8 +989,17 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     );
   }
 
+  // Replace the existing _pickFiles method in QuestionsAnswerScreen.dart with this implementation
   Future<void> _pickFiles() async {
     try {
+      // Check if we're running on web
+      bool isWeb = false;
+      try {
+        isWeb = identical(0, 0.0);
+      } catch (e) {
+        isWeb = false;
+      }
+
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         allowedExtensions: [
@@ -976,6 +1015,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           'txt'
         ],
         type: FileType.custom,
+        // Only use withData for web platform
+        withData: isWeb,
       );
 
       if (result != null) {
@@ -983,29 +1024,62 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         List<String> validFiles = [];
 
         for (var file in result.files) {
-          if (file.path != null) {
-            final fileToCheck = File(file.path!);
+          if (isWeb) {
+            // Handle web platform file (which doesn't have a path but has bytes)
+            if (file.bytes != null) {
+              // For web, we'll need to create a temporary file from the bytes
+              // But since we can't create real files on web, we'll store the data
+              // and handle it differently
 
-            if (fileToCheck.lengthSync() > 16 * 1024 * 1024) {
-              hasInvalidFiles = true;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${file.name}: File size exceeds 16MB limit'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-              continue;
+              // Check file size (16MB limit)
+              if (file.size > 16 * 1024 * 1024) {
+                hasInvalidFiles = true;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${file.name}: File size exceeds 16MB limit'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                continue;
+              }
+
+              // Create a unique identifier for this file
+              final timestamp = DateTime.now().millisecondsSinceEpoch;
+              final webFilePath = 'web_file_${timestamp}_${file.name}';
+
+              // Store this path in the attachments list
+              validFiles.add(webFilePath);
+
+              // Store the file bytes for later use when uploading
+              // You'll need to add a Map to store these web file bytes
+              _webFileBytes[webFilePath] = file.bytes!;
             }
+          } else {
+            // Handle mobile platform file which has a path
+            if (file.path != null) {
+              final fileToCheck = File(file.path!);
 
-            // For image files, rename them to shorter format
-            final extension = path.extension(file.path!).toLowerCase();
-            if (['.jpg', '.jpeg', '.png', '.gif'].contains(extension)) {
-              // Rename the image file
-              final renamedFile = await FileUtils.createRenamedImageFile(File(file.path!));
-              validFiles.add(renamedFile.path);
-            } else {
-              // For non-image files, use original path
-              validFiles.add(file.path!);
+              if (fileToCheck.lengthSync() > 16 * 1024 * 1024) {
+                hasInvalidFiles = true;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${file.name}: File size exceeds 16MB limit'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                continue;
+              }
+
+              // For image files, rename them to shorter format
+              final extension = path.extension(file.path!).toLowerCase();
+              if (['.jpg', '.jpeg', '.png', '.gif'].contains(extension)) {
+                // Rename the image file
+                final renamedFile = await FileUtils.createRenamedImageFile(File(file.path!));
+                validFiles.add(renamedFile.path);
+              } else {
+                // For non-image files, use original path
+                validFiles.add(file.path!);
+              }
             }
           }
         }
@@ -1033,6 +1107,9 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       );
     }
   }
+
+  Map<String, Uint8List> _webFileBytes = {};
+
 
   Future<void> _takePhoto() async {
     setState(() {
@@ -1134,13 +1211,19 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         ..._attachedFiles.map(
               (filePath) {
             final fileName = filePath.split('/').last;
-            final isImage = ['.jpg', '.jpeg', '.png', '.gif']
-                .any((ext) => fileName.toLowerCase().endsWith(ext));
+            final isWebFile = filePath.startsWith('web_file_');
+            final isImage = isWebFile
+                ? ['.jpg', '.jpeg', '.png', '.gif'].any((ext) => fileName.toLowerCase().endsWith(ext))
+                : ['.jpg', '.jpeg', '.png', '.gif'].any((ext) => fileName.toLowerCase().endsWith(ext));
 
             return Card(
               margin: const EdgeInsets.symmetric(vertical: 4),
               child: ListTile(
-                leading: isImage
+                leading: isWebFile
+                    ? (isImage
+                    ? Icon(Icons.image, color: Colors.blue)
+                    : Icon(Icons.insert_drive_file))
+                    : (isImage
                     ? ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: Image.file(
@@ -1153,41 +1236,21 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                     },
                   ),
                 )
-                    : const Icon(Icons.insert_drive_file),
+                    : const Icon(Icons.insert_drive_file)),
                 title: Text(
-                  fileName,
+                  isWebFile ? fileName.substring(fileName.indexOf('_', 9) + 1) : fileName,
                   style: const TextStyle(fontSize: 14),
                 ),
                 subtitle: Text(
-                  'Size: ${_getFileSize(filePath)}',
+                  isWebFile
+                      ? 'Size: ${(_webFileBytes[filePath]?.length ?? 0) / 1024} KB'
+                      : 'Size: ${_getFileSize(filePath)}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
-                /*trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isImage)
-                      IconButton(
-                        icon: const Icon(Icons.preview),
-                        onPressed: () => _previewImage(filePath),
-                        tooltip: 'Preview',
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        setState(() {
-                          _attachedFiles.remove(filePath);
-                        });
-                      },
-                      tooltip: 'Remove',
-                    ),
-                  ],
-                ),*/
-
-// In the _buildAttachedFilesList method, modify the trailing IconButton onPressed callback:
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (isImage)
+                    if (isImage && !isWebFile)
                       IconButton(
                         icon: const Icon(Icons.preview),
                         onPressed: () => _previewImage(filePath),
@@ -1199,6 +1262,11 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                         setState(() {
                           // Remove from attached files list
                           _attachedFiles.remove(filePath);
+
+                          // If it's a web file, also remove from web bytes storage
+                          if (isWebFile) {
+                            _webFileBytes.remove(filePath);
+                          }
 
                           // Check if this file is a signature and remove from signatureFiles and answers
                           if (filePath.contains('signature_')) {
@@ -1234,10 +1302,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                     ),
                   ],
                 ),
-
-
-
-
               ),
             );
           },

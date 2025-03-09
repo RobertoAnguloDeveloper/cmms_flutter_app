@@ -247,6 +247,84 @@ class AttachmentService {
     }
   }
 
+  // Add this new method to the AttachmentService class
+
+  // Replace the createAttachmentFromBytes method with this fixed version
+  Future<Map<String, dynamic>> createAttachmentFromBytes(
+      BuildContext context,
+      int formSubmissionId,
+      String fileName,
+      Uint8List bytes,
+      bool isSignature, {
+        String? signatureAuthor,
+        String? signaturePosition,
+      }) async {
+    try {
+      // Check file size
+      if (bytes.length > maxFileSize) {
+        throw AttachmentException('File size exceeds maximum limit of ${maxFileSize / (1024 * 1024)}MB');
+      }
+
+      // Get file extension from the filename
+      final extension = path.extension(fileName).toLowerCase().replaceAll('.', '');
+      if (!allowedExtensions.contains(extension)) {
+        throw AttachmentException('File type not allowed. Allowed types: ${allowedExtensions.join(", ")}');
+      }
+
+      String? token = await SessionManager.getToken();
+      var uri = Uri.parse('${_http.baseUrl}/api/attachments');
+
+      // For web platform, we'll use a different approach with http package
+      var request = http.MultipartRequest('POST', uri);
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add form fields
+      request.fields['form_submission_id'] = formSubmissionId.toString();
+      request.fields['is_signature'] = isSignature.toString();
+
+      if (isSignature) {
+        if (signatureAuthor != null && signatureAuthor.isNotEmpty) {
+          request.fields['signature_author'] = signatureAuthor;
+        }
+        if (signaturePosition != null && signaturePosition.isNotEmpty) {
+          request.fields['signature_position'] = signaturePosition;
+        }
+      }
+
+      // Create the file part
+      final mimeType = _getMimeType(fileName);
+      var multipartFile = http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: fileName,
+        contentType: MediaType.parse(mimeType),
+      );
+      request.files.add(multipartFile);
+
+      // Send the request
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else if (response.statusCode == 401) {
+        if (context.mounted) {
+          await ApiResponseHandler.handleExpiredToken(context, json.decode(response.body));
+        }
+        throw AttachmentException('Authentication error', 401);
+      } else {
+        var responseData = json.decode(response.body);
+        throw AttachmentException(
+          'Error creating attachment: ${responseData['message'] ?? response.statusCode}',
+          response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is AttachmentException) rethrow;
+      throw AttachmentException('Exception while creating attachment: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> uploadSignature(
       BuildContext context,
       int formSubmissionId,
