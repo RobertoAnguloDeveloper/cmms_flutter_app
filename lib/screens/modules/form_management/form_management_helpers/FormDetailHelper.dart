@@ -170,13 +170,409 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         data.selectedQuestionTypeId != null;
   }
 
-  /// Handles question creation (and can be expanded for other form data saving if needed).
-  /// Handles question creation (and can be expanded for other form data saving if needed).
+  // Add the missing methods (referenced but not defined in the code)
+  void _deleteFormQuestion(BuildContext context, int formQuestionId) async {
+    try {
+      final bool? shouldDelete =
+      await FormDialogs.showDeleteQuestionDialog(context);
+
+      if (shouldDelete != true) return;
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
+      final result = await _formQuestionApiService.deleteQuestionFromForm(
+        context,
+        formQuestionId,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      if (result['status'] == 200 || result['status'] == 204) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Question successfully deleted'),
+            duration: Duration(milliseconds: 1500),
+          ),
+        );
+        await _fetchFormDetails();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Error deleting the question'),
+            duration: const Duration(milliseconds: 1500),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          duration: const Duration(milliseconds: 1500),
+        ),
+      );
+    }
+  }
+
+  void _showEditAnswerDialog(String currentValue, dynamic answerData) {
+    FormDialogs.showEditAnswerDialog(
+      context: context,
+      currentValue: currentValue,
+      onSave: (updatedValue) async {
+        try {
+          await _answerApiService.updateAnswer(
+            context,
+            {
+              'value': updatedValue,
+              'remarks': answerData['remarks'] ?? null,
+            },
+            answerData['answer']['id'],
+          );
+          await _fetchFormDetails();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Response updated successfully'),
+              duration: Duration(milliseconds: 1500),
+            ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating the response: $e'),
+              duration: const Duration(milliseconds: 1500),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _deleteAnswer(int formAnswerId) async {
+    try {
+      final bool? confirm = await FormDialogs.showDeleteAnswerDialog(context);
+
+      if (confirm != true) return;
+
+      await _answerApiService.deleteAnswerFromQuestion(
+        context,
+        formAnswerId,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Response deleted successfully'),
+          duration: Duration(milliseconds: 500),
+        ),
+      );
+
+      await _fetchFormDetails();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting the response: $e'),
+          duration: const Duration(milliseconds: 1500),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  bool _shouldShowAnswerSelection(String questionType) {
+    return !['date', 'datetime', 'text', 'user', 'signature']
+        .contains(questionType.toLowerCase());
+  }
+
+
   Future<void> _saveForm() async {
-    // Mostrar diálogo de carga para bloquear la pantalla
+    setState(() {
+      _isValidating = true;
+    });
+
+    // Check if there are any questions at all (existing or new)
+    bool hasExistingQuestions = (formDetails?['questions'] as List?)?.isNotEmpty ?? false;
+    bool hasNewQuestions = _questionCreations.isNotEmpty;
+
+    if (!hasExistingQuestions && !hasNewQuestions) {
+      setState(() {
+        _isValidating = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one question before saving.'),
+          duration: Duration(seconds: 3),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Check if any new questions need validation
+    bool allNewQuestionsValid = true;
+    List<String> missingFields = [];
+
+    for (int i = 0; i < _questionCreations.length; i++) {
+      final data = _questionCreations[i];
+      final bool isValid = data.key.currentState?.isValid() ?? false;
+      _questionCreationValidStates[i] = isValid;
+
+      if (!isValid) {
+        allNewQuestionsValid = false;
+
+        // Determine which fields are missing
+        if (data.questionTextController.text.length < 3) {
+          missingFields.add("Question title (min 3 characters)");
+        }
+
+        if (data.selectedQuestionTypeId == null) {
+          missingFields.add("Question type");
+        }
+
+        // Check for missing options
+        final bool requiresOptions = data.selectedQuestionTypeId != null &&
+            questionTypes
+                .firstWhere(
+                  (type) => type['id'] == data.selectedQuestionTypeId,
+              orElse: () => {'type': ''},
+            )['type']
+                .toString()
+                .toLowerCase()
+                .contains(RegExp(r'multiple_choice|checkbox|dropdown'));
+
+        if (requiresOptions && (data.key.currentState?.getCurrentOptions().isEmpty ?? true)) {
+          missingFields.add("Answer options");
+        }
+      }
+    }
+
+    // Check if any questions (new or existing) have options
+    bool hasOptionsForAllQuestions = true;
+
+    // Check existing questions that require options
+    if (hasExistingQuestions) {
+      List<dynamic> existingQuestions = formDetails?['questions'] as List? ?? [];
+      for (var question in existingQuestions) {
+        String questionType = question['type']?.toString().toLowerCase() ?? '';
+        bool requiresOptions = ['multiple_choice', 'checkbox', 'dropdown']
+            .contains(questionType);
+
+        if (requiresOptions) {
+          List possibleAnswers = question['possible_answers'] as List? ?? [];
+          if (possibleAnswers.isEmpty) {
+            hasOptionsForAllQuestions = false;
+            missingFields.add("Answer options for existing question: ${question['text']}");
+          }
+        }
+      }
+    }
+
+    // If validation fails, show error
+    if (!allNewQuestionsValid || !hasOptionsForAllQuestions) {
+      setState(() {
+        _isValidating = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please complete all required fields in the Answer section before saving.',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (missingFields.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('See below the fields that need to be filled out:'),
+                ...missingFields.toSet().map((field) => Text('• $field')).toList(),
+              ],
+            ],
+          ),
+          duration: const Duration(seconds: 5),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Showing loading dialog
     showDialog(
       context: context,
-      barrierDismissible: false, // Evita que el usuario cierre el diálogo tocando fuera
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+    );
+
+    try {
+      // First, save all answer options for existing questions
+      bool optionsSaved = await _questionsListWidgetKey.currentState?.saveAllAnswerOptions() ?? true;
+
+      if (!optionsSaved) {
+        // Close the loading dialog
+        Navigator.of(context).pop();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save some answer options'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      final formId = widget.form['id'];
+      if (formId == null || formId is! int) {
+        throw Exception("The form ID is not valid.");
+      }
+
+      int order = (formDetails?['questions']?.length ?? 0) + 1;
+
+      // Create each question and assign it to the form
+      for (var data in _questionCreations) {
+        // Get the latest options from the component state if available
+        if (data.key.currentState != null) {
+          data.options = data.key.currentState!.getCurrentOptions();
+        }
+
+        String questionText = data.questionTextController.text;
+
+        // Only add the '~' if it's required and doesn't already have it
+        if (data.isRequired && !questionText.endsWith("~")) {
+          questionText = "$questionText~";
+        }
+        // Remove the '~' if it's no longer required but still has it
+        else if (!data.isRequired && questionText.endsWith("~")) {
+          questionText = questionText.substring(0, questionText.length - 1);
+        }
+
+        final questionData = {
+          'text': questionText,
+          'question_type_id': data.selectedQuestionTypeId,
+          'is_required': data.isRequired,  // Make sure this gets passed to the API
+        };
+
+        print('Creating question with data: $questionData'); // Debug output
+
+        final createdQuestion =
+        await _formQuestionApiService.createQuestion(context, questionData);
+
+        final newQuestionId = createdQuestion['question']['id'] as int?;
+        if (newQuestionId == null) {
+          throw Exception("The created question did not return a valid ID.");
+        }
+
+        // Assign question to form
+        final assignedQuestion = await _formQuestionApiService.assignQuestionToForm(
+          context,
+          formId,
+          newQuestionId,
+          order++,
+        );
+
+        // Get the form_question_id from the assigned question
+        final formQuestionId = assignedQuestion['form_question']['id'] as int?;
+        if (formQuestionId == null) {
+          throw Exception("The assigned question did not return a valid form_question_id.");
+        }
+
+        // Now create any options/answers for this question
+        if (data.options.isNotEmpty) {
+          for (String optionText in data.options) {
+            if (optionText.trim().isEmpty) continue;
+
+            // First create the answer
+            final answerData = {'value': optionText};
+            final createdAnswer = await _answerApiService.createAnswer(
+              context,
+              answerData,
+            );
+
+            // Then assign it to the question
+            if (createdAnswer['status'] == 200 || createdAnswer['status'] == 201) {
+              final int answerId = createdAnswer['answer']['id'];
+              await _answerApiService.assignAnswerToQuestion(
+                context,
+                formQuestionId,
+                answerId,
+              );
+            }
+          }
+        }
+      }
+
+      // After successful save, update any existing questions' required state too
+      if (_questionsListWidgetKey.currentState != null) {
+        await _questionsListWidgetKey.currentState!.saveAllChanges();
+      }
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Form saved successfully'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      // Clear out local state, re-fetch form details
+      setState(() {
+        _questionCreations.clear();
+        _questionCreationValidStates.clear();
+        _isValidating = false;
+        _hasUnsavedChanges = false; // Reset the flag
+      });
+
+      await _fetchFormDetails();
+
+      // Close the loading dialog after completing all operations
+      Navigator.of(context).pop();
+
+    } catch (e) {
+      print('Error saving form: $e');
+
+      // Close the loading dialog
+      Navigator.of(context).pop();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving form: $e'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() {
+        _isValidating = false;
+      });
+    }
+  }
+
+
+
+ /* Future<void> _saveForm() async {
+    // Show dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return const Center(
           child: CircularProgressIndicator(),
@@ -193,7 +589,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
       bool optionsSaved = await _questionsListWidgetKey.currentState?.saveAllAnswerOptions() ?? true;
 
       if (!optionsSaved) {
-        // Cerrar el diálogo de carga
+        // Close the loading dialog
         Navigator.of(context).pop();
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -213,7 +609,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
       bool allValid = _questionCreationValidStates.every((valid) => valid);
 
       if (!allValid) {
-        // Cerrar el diálogo de carga
+        // Close the loading dialog
         Navigator.of(context).pop();
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -328,13 +724,13 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
 
       await _fetchFormDetails();
 
-      // Cerrar el diálogo de carga después de completar todas las operaciones
+      // Close the loading dialog after completing all operations
       Navigator.of(context).pop();
 
     } catch (e) {
       print('Error saving form: $e');
 
-      // Cerrar el diálogo de carga
+      // Close the loading dialog
       Navigator.of(context).pop();
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -348,7 +744,7 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
         _isValidating = false;
       });
     }
-  }
+  }*/
 
   Widget _buildQuestionCreationCard(int index) {
     final data = _questionCreations[index];
@@ -405,448 +801,6 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final formTitle =
-    (formDetails?['title'] ?? widget.form['title'] ?? 'Untitled Form')
-        .toString();
-    final formDescription =
-    (formDetails?['description'] ?? 'No description').toString();
-
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.grey[700]),
-          onPressed: () => Navigator.pop(context, true),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      backgroundColor: const Color(0xFFE3F2FD),
-      body: OrientationBuilder(builder: (context, orientation) {
-        return Stack(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : SingleChildScrollView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(
-                      left: 16.0,
-                      right: 16.0,
-                      top: 8.0,
-                      bottom: 100.0,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Card(
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Container(
-                              width:
-                              MediaQuery.of(context).size.width * 0.9,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: const Border(
-                                  top: BorderSide(
-                                    color:
-                                    Color.fromARGB(255, 1, 116, 209),
-                                    width: 8.0,
-                                  ),
-                                ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(24.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          formTitle,
-                                          style: const TextStyle(
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.w400,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          formDescription,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 16,
-                                    right: 16,
-                                    child: IconButton(
-                                      icon: const Icon(Icons.edit),
-                                      color: Colors.grey[700],
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder:
-                                              (BuildContext context) =>
-                                              FormUpdateDialog(
-                                                form: formDetails ??
-                                                    widget.form,
-                                                refreshForms:
-                                                _fetchFormDetails,
-                                              ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Existing questions
-                        if ((formDetails?['questions'] as List? ?? [])
-                            .isEmpty)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Text(
-                                'No questions available',
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.grey),
-                              ),
-                            ),
-                          )
-                        else
-                          QuestionsListWidget(
-                            key: _questionsListWidgetKey,
-                            questions: formDetails?['questions'] as List? ?? [],
-                            deleteFormQuestion: _deleteFormQuestion,
-                            showEditAnswerDialog: _showEditAnswerDialog,
-                            deleteAnswer: _deleteAnswer,
-                            shouldShowAnswerSelection: _shouldShowAnswerSelection,
-                            fetchFormDetails: _fetchFormDetails,
-                            formId: widget.form['id'],
-                            setUnsavedChanges: _setUnsavedChanges, // Pass the function here
-                          ),
-
-                        // Render the new question creation cards (if any)
-                        for (int i = 0;
-                        i < _questionCreations.length;
-                        i++)
-                          _buildQuestionCreationCard(i),
-                      ],
-                    ),
-                  ),
-                ),
-                Container(
-                  width: 80,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      FloatingActionButton(
-                        heroTag: 'add_question',
-                        onPressed: () {
-                          _addQuestionCreationCard();
-                        },
-                        backgroundColor:
-                        const Color.fromARGB(255, 34, 118, 186),
-                        child: const Icon(
-                          Icons.add,
-                          size: 36,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      FloatingActionButton(
-                        heroTag: 'assign_question',
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (BuildContext context) =>
-                                QuestionSelectionDialog(
-                                  refreshQuestions: _fetchFormDetails,
-                                  formId: widget.form['id'],
-                                ),
-                          );
-                        },
-                        backgroundColor: Colors.white,
-                        child: const Icon(
-                          Icons.assignment,
-                          color: Color.fromARGB(255, 34, 118, 186),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      if (orientation == Orientation.portrait)
-                        FloatingActionButton(
-                          heroTag: 'menu_button',
-                          onPressed: isAnimating
-                              ? null
-                              : () {
-                            setState(() {
-                              isAnimating = true;
-                              showMenuButtons = !showMenuButtons;
-                            });
-
-                            Future.delayed(
-                                const Duration(milliseconds: 300), () {
-                              setState(() {
-                                isAnimating = false;
-                              });
-                            });
-                          },
-                          backgroundColor: Colors.white,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                'Menu',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color.fromARGB(255, 34, 118, 186),
-                                ),
-                              ),
-                              AnimatedRotation(
-                                turns: showMenuButtons ? 0.5 : 0,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                                child: const Icon(
-                                  Icons.keyboard_arrow_down,
-                                  size: 24,
-                                  color: Color.fromARGB(255, 34, 118, 186),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (showMenuButtons ||
-                          orientation == Orientation.landscape)
-                        Column(
-                          children: [
-                            const SizedBox(height: 8),
-                            FloatingActionButton(
-                              heroTag: 'delete_form',
-                              onPressed: _showDeleteConfirmation,
-                              backgroundColor: Colors.red,
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            FloatingActionButton(
-                              heroTag: 'export_form',
-                              onPressed: _showExportDialog,
-                              backgroundColor:
-                              const Color.fromARGB(255, 74, 180, 246),
-                              child: const Icon(
-                                Icons.ios_share_rounded,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                )
-              ],
-            ),
-
-            // Show the Save button if there are unsaved new questions OR if unsaved changes exist
-            if (_questionCreations.isNotEmpty || _hasUnsavedChanges)
-              Positioned(
-                bottom: 20,
-                left: 0,
-                right: 80,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ElevatedButton(
-                      onPressed: _saveForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 23, 99, 161),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 50,
-                          vertical: 15,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.save,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Save',
-                            style: TextStyle(fontSize: 20, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      }),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-    );
-  }
-
-  // Handle delete form question
-  void _deleteFormQuestion(BuildContext context, int formQuestionId) async {
-    try {
-      final bool? shouldDelete =
-      await FormDialogs.showDeleteQuestionDialog(context);
-
-      if (shouldDelete != true) return;
-      if (!mounted) return;
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        },
-      );
-
-      final result = await _formQuestionApiService.deleteQuestionFromForm(
-        context,
-        formQuestionId,
-      );
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      if (result['status'] == 200 || result['status'] == 204) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Question successfully deleted'),
-            duration: Duration(milliseconds: 1500),
-          ),
-        );
-        await _fetchFormDetails();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['error'] ?? 'Error deleting the question'),
-            duration: const Duration(milliseconds: 1500),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          duration: const Duration(milliseconds: 1500),
-        ),
-      );
-    }
-  }
-
-  // Handle show edit answer dialog
-  void _showEditAnswerDialog(String currentValue, dynamic answerData) {
-    FormDialogs.showEditAnswerDialog(
-      context: context,
-      currentValue: currentValue,
-      onSave: (updatedValue) async {
-        try {
-          await _answerApiService.updateAnswer(
-            context,
-            {
-              'value': updatedValue,
-              'remarks': answerData['remarks'] ?? null,
-            },
-            answerData['answer']['id'],
-          );
-          await _fetchFormDetails();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Response updated successfully'),
-              duration: Duration(milliseconds: 1500),
-            ),
-          );
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error updating the response: $e'),
-              duration: const Duration(milliseconds: 1500),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      },
-    );
-  }
-
-  // Handle delete answer
-  Future<void> _deleteAnswer(int formAnswerId) async {
-    try {
-      final bool? confirm = await FormDialogs.showDeleteAnswerDialog(context);
-
-      if (confirm != true) return;
-
-      await _answerApiService.deleteAnswerFromQuestion(
-        context,
-        formAnswerId,
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Response deleted successfully'),
-          duration: Duration(milliseconds: 500),
-        ),
-      );
-
-      await _fetchFormDetails();
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error deleting the response: $e'),
-          duration: const Duration(milliseconds: 1500),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // Check if answer selection should be shown
-  bool _shouldShowAnswerSelection(String questionType) {
-    return !['date', 'datetime', 'text', 'user', 'signature']
-        .contains(questionType.toLowerCase());
-  }
-
-  // Handle show delete confirmation
   void _showDeleteConfirmation() async {
     final confirm = await FormDialogs.showDeleteConfirmationDialog(context);
     if (confirm == true) {
@@ -854,7 +808,6 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
     }
   }
 
-  // Handle delete form
   Future<void> _deleteForm() async {
     setState(() {
       isDeleting = true;
@@ -896,7 +849,6 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
     }
   }
 
-  // Handle show export dialog
   void _showExportDialog() {
     showDialog(
       context: context,
@@ -927,6 +879,317 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
           },
         );
       },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final formTitle =
+    (formDetails?['title'] ?? widget.form['title'] ?? 'Untitled Form')
+        .toString();
+    final formDescription =
+    (formDetails?['description'] ?? 'No description').toString();
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.grey[700]),
+          onPressed: () => Navigator.pop(context, true),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
+      backgroundColor: const Color(0xFFE3F2FD),
+      body: OrientationBuilder(
+        builder: (context, orientation) {
+          return Stack(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : SingleChildScrollView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.only(
+                        left: 16.0,
+                        right: 16.0,
+                        top: 8.0,
+                        bottom: 100.0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Card(
+                              elevation: 1,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Container(
+                                width:
+                                MediaQuery.of(context).size.width * 0.9,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: const Border(
+                                    top: BorderSide(
+                                      color:
+                                      Color.fromARGB(255, 1, 116, 209),
+                                      width: 8.0,
+                                    ),
+                                  ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(24.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            formTitle,
+                                            style: const TextStyle(
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.w400,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            formDescription,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 16,
+                                      right: 16,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.edit),
+                                        color: Colors.grey[700],
+                                        onPressed: () {
+                                          showDialog(
+                                            context: context,
+                                            builder:
+                                                (BuildContext context) =>
+                                                FormUpdateDialog(
+                                                  form: formDetails ??
+                                                      widget.form,
+                                                  refreshForms:
+                                                  _fetchFormDetails,
+                                                ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Existing questions
+                          if ((formDetails?['questions'] as List? ?? [])
+                              .isEmpty)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Text(
+                                  'No questions available',
+                                  style: TextStyle(
+                                      fontSize: 16, color: Colors.grey),
+                                ),
+                              ),
+                            )
+                          else
+                            QuestionsListWidget(
+                              key: _questionsListWidgetKey,
+                              questions: formDetails?['questions'] as List? ?? [],
+                              deleteFormQuestion: _deleteFormQuestion,
+                              showEditAnswerDialog: _showEditAnswerDialog,
+                              deleteAnswer: _deleteAnswer,
+                              shouldShowAnswerSelection: _shouldShowAnswerSelection,
+                              fetchFormDetails: _fetchFormDetails,
+                              formId: widget.form['id'],
+                              setUnsavedChanges: _setUnsavedChanges, // Pass the function here
+                            ),
+
+                          // Render the new question creation cards (if any)
+                          for (int i = 0;
+                          i < _questionCreations.length;
+                          i++)
+                            _buildQuestionCreationCard(i),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 80,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        FloatingActionButton(
+                          heroTag: 'add_question',
+                          onPressed: () {
+                            _addQuestionCreationCard();
+                          },
+                          backgroundColor:
+                          const Color.fromARGB(255, 34, 118, 186),
+                          child: const Icon(
+                            Icons.add,
+                            size: 36,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        FloatingActionButton(
+                          heroTag: 'assign_question',
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) =>
+                                  QuestionSelectionDialog(
+                                    refreshQuestions: _fetchFormDetails,
+                                    formId: widget.form['id'],
+                                  ),
+                            );
+                          },
+                          backgroundColor: Colors.white,
+                          child: const Icon(
+                            Icons.assignment,
+                            color: Color.fromARGB(255, 34, 118, 186),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        if (orientation == Orientation.portrait)
+                          FloatingActionButton(
+                            heroTag: 'menu_button',
+                            onPressed: isAnimating
+                                ? null
+                                : () {
+                              setState(() {
+                                isAnimating = true;
+                                showMenuButtons = !showMenuButtons;
+                              });
+
+                              Future.delayed(
+                                  const Duration(milliseconds: 300), () {
+                                setState(() {
+                                  isAnimating = false;
+                                });
+                              });
+                            },
+                            backgroundColor: Colors.white,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'Menu',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color.fromARGB(255, 34, 118, 186),
+                                  ),
+                                ),
+                                AnimatedRotation(
+                                  turns: showMenuButtons ? 0.5 : 0,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                  child: const Icon(
+                                    Icons.keyboard_arrow_down,
+                                    size: 24,
+                                    color: Color.fromARGB(255, 34, 118, 186),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (showMenuButtons ||
+                            orientation == Orientation.landscape)
+                          Column(
+                            children: [
+                              const SizedBox(height: 8),
+                              FloatingActionButton(
+                                heroTag: 'delete_form',
+                                onPressed: _showDeleteConfirmation,
+                                backgroundColor: Colors.red,
+                                child: const Icon(
+                                  Icons.delete,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              FloatingActionButton(
+                                heroTag: 'export_form',
+                                onPressed: _showExportDialog,
+                                backgroundColor:
+                                const Color.fromARGB(255, 74, 180, 246),
+                                child: const Icon(
+                                  Icons.ios_share_rounded,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  )
+                ],
+              ),
+
+              // Show the Save button if there are unsaved new questions OR if unsaved changes exist
+              if (_questionCreations.isNotEmpty || _hasUnsavedChanges)
+                Positioned(
+                  bottom: 20,
+                  left: 0,
+                  right: 80,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ElevatedButton(
+                        onPressed: _saveForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color.fromARGB(255, 23, 99, 161),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 50,
+                            vertical: 15,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              Icons.save,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Save',
+                              style: TextStyle(fontSize: 20, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

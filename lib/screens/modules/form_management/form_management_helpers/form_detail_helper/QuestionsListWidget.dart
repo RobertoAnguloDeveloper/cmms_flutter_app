@@ -372,7 +372,7 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
     );
   }*/
 
-
+/*
   Widget _buildQuestionCard(Map<String, dynamic> question) {
     final int questionId = question['id'];
     final int formQuestionId = question['form_question_id'];
@@ -464,8 +464,120 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
         ],
       ),
     );
-  }
+  }*/
 
+
+  Widget _buildQuestionCard(Map<String, dynamic> question) {
+    final int questionId = question['id'];
+    final int formQuestionId = question['form_question_id'];
+
+    // Get required state from local state if available
+    final bool questionIsRequired = _localRequiredState[questionId] ??
+        ((question['is_required'] ?? false) ||
+            (question['text']?.toString() ?? '').endsWith('~'));
+
+    // Display question text without the trailing '~'
+    String displayText = question['text'] ?? 'No question text';
+    if (displayText.endsWith('~')) {
+      displayText = displayText.substring(0, displayText.length - 1);
+    }
+
+    // Get the question type string and capitalize first letter
+    String questionType = question['type']?.toString() ?? 'Unknown Type';
+    // Capitalize first letter
+    if (questionType.isNotEmpty) {
+      questionType = questionType[0].toUpperCase() + questionType.substring(1);
+    }
+
+    // Validation state
+    final bool isInvalid = _validatingForm &&
+        _questionValidityMap.containsKey(questionId) &&
+        !_questionValidityMap[questionId]!;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 2,
+      color: isInvalid ? Colors.red[50] : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isInvalid
+            ? const BorderSide(color: Colors.red, width: 1.0)
+            : BorderSide.none,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top bar with question type badge
+          Container(
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Question type badge
+                Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 34, 118, 186).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color.fromARGB(255, 34, 118, 186).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    questionType,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: const Color.fromARGB(255, 34, 118, 186),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildQuestionHeader(question, displayText, questionIsRequired),
+
+                if (isInvalid)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      'This question is required',
+                      style: TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+
+                const SizedBox(height: 8),
+                _buildAnswerField(question),
+              ],
+            ),
+          ),
+
+          // Controls
+          GoogleFormsQuestionControls(
+            isRequired: questionIsRequired,
+            onRequiredChanged: (value) => _handleRequiredToggle(questionId, value),
+            onDuplicate: () => _duplicateQuestion(question),
+            onDelete: () => widget.deleteFormQuestion(context, formQuestionId),
+          ),
+        ],
+      ),
+    );
+  }
 
 
 
