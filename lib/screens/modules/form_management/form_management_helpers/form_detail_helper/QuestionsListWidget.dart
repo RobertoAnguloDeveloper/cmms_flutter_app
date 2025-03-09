@@ -388,6 +388,13 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
       displayText = displayText.substring(0, displayText.length - 1);
     }
 
+    // Get the question type string and capitalize first letter
+    String questionType = question['type']?.toString() ?? 'Unknown Type';
+    // Capitalize first letter
+    if (questionType.isNotEmpty) {
+      questionType = questionType[0].toUpperCase() + questionType.substring(1);
+    }
+
     // Validation state
     final bool isInvalid = _validatingForm &&
         _questionValidityMap.containsKey(questionId) &&
@@ -406,7 +413,7 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top bar with delete button
+          // Top bar with question type badge
           Container(
             height: 40,
             decoration: const BoxDecoration(
@@ -419,15 +426,27 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // Always visible trash can icon for deletion
-                /*IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      size: 20, color: Colors.red),
-                  padding: const EdgeInsets.all(8),
-                  constraints: const BoxConstraints(),
-                  onPressed: () => widget.deleteFormQuestion(context, formQuestionId),
-                  tooltip: 'Delete question',
-                ),*/
+                // Question type badge
+                Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 34, 118, 186).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color.fromARGB(255, 34, 118, 186).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    questionType,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: const Color.fromARGB(255, 34, 118, 186),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -465,7 +484,6 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
       ),
     );
   }
-
 
 
 
