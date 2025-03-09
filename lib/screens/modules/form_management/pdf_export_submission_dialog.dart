@@ -34,9 +34,9 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
   // Form fields
   double _headerOpacity = 100;
   double _headerSize = 20;
-  String _headerAlignment = 'center';
+  String _headerAlignment = 'left';
   double _signaturesSize = 100;
-  String _signaturesAlignment = 'vertical';
+  String _signaturesAlignment = 'horizontal';
   bool _isLoading = false;
   String? _errorMessage;
 
