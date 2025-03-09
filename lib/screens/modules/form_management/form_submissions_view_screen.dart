@@ -140,601 +140,677 @@ class SubmissionDetailScreen extends StatelessWidget {
     }
   }
 
+  // Nuevo método para centralizar la navegación de regreso a la lista
+  void _navigateBackToSubmissionsList(BuildContext context) {
+    print("DEBUG: Executing _navigateBackToSubmissionsList");
+    try {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => FormSubmissionsViewScreen(
+            formId: submission.submissionId,
+            formTitle: submission.formTitle,
+            permissionSet: permissionSet,
+            sessionData: sessionData,
+          ),
+        ),
+      );
+      print("DEBUG: Navigation complete");
+    } catch (e) {
+      print("DEBUG: Navigation error: $e");
+      // En caso de error, intentar un enfoque alternativo
+      try {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FormSubmissionsViewScreen(
+              formId: submission.submissionId,
+              formTitle: submission.formTitle,
+              permissionSet: permissionSet,
+              sessionData: sessionData,
+            ),
+          ),
+              (route) => false,
+        );
+        print("DEBUG: Alternative navigation complete");
+      } catch (altE) {
+        print("DEBUG: Alternative navigation error: $altE");
+      }
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     // Debug flag to help troubleshoot
     final bool hasAttachments = submission.attachments.isNotEmpty;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            // Navigate back to FormSubmissionsViewScreen with pushReplacement
-            // and recreate it to force refresh of the submissions list
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => FormSubmissionsViewScreen(
-                  formId: submission.submissionId,
-                  formTitle: submission.formTitle,
-                  permissionSet: permissionSet,
-                  sessionData: sessionData,
+    return WillPopScope(
+      onWillPop: () async {
+        print("DEBUG: WillPopScope triggered");
+        _navigateBackToSubmissionsList(context);
+        return false; // Impedir la navegación predeterminada hacia atrás
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () {
+              print("DEBUG: Back button pressed");
+              _navigateBackToSubmissionsList(context);
+            },
+          ),
+          title: Text(
+            submission.formTitle,
+            style: const TextStyle(color: Colors.black87),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        drawer: DrawerMenu(
+          onItemTapped: (index) => Navigator.pop(context),
+          parentContext: context,
+          permissionSet: permissionSet,
+          sessionData: sessionData,
+        ),
+        body: Container(
+          color: const Color(0xFFE3F2FD),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Submission header
+              Card(
+                color: Colors.white,
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ),
-            );
-          },
-        ),
-        title: Text(
-          submission.formTitle,
-          style: const TextStyle(color: Colors.black87),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      drawer: DrawerMenu(
-        onItemTapped: (index) => Navigator.pop(context),
-        parentContext: context,
-        permissionSet: permissionSet,
-        sessionData: sessionData,
-      ),
-      body: // Versión corregida de la parte del ListView para evitar respuestas duplicadas
-// Reemplaza todo el bloque del ListView en el método build con este código
-
-      Container(
-        color: const Color(0xFFE3F2FD),
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Submission header
-            // Submission header
-            Card(
-              color: Colors.white,
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Título con Expanded para evitar desbordamiento
-                        Expanded(
-                          child: Text(
-                            'Form Title: ${submission.formTitle.isNotEmpty ? submission.formTitle : "No title"}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
-                              color: Colors.black87,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Título con Expanded para evitar desbordamiento
+                          Expanded(
+                            child: Text(
+                              'Form Title: ${submission.formTitle.isNotEmpty ? submission.formTitle : "No title"}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 22,
+                                color: Colors.black87,
+                              ),
                             ),
                           ),
-                        ),
-                        // Botones de acción agrupados
-                        Row(
-                          children: [
-                            // Botón de exportar a PDF
-                            IconButton(
-                              icon: const Icon(
-                                Icons.ios_share,
-                                size: 28,
-                                color: Colors.blue,
-                              ),
-                              tooltip: 'Export to PDF',
-                              onPressed: () {
-                                // Mostrar el diálogo de exportación de PDF
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return PdfExportDialog(
-                                      submissionId: submission.submissionId,
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                            // Botón de eliminar - solo visible para superusuarios
-                            if (sessionData.containsKey('role') &&
-                                sessionData['role'] != null &&
-                                sessionData['role']['is_super_user'] == true)
+                          // Botones de acción agrupados
+                          Row(
+                            children: [
+                              // Botón de exportar a PDF
                               IconButton(
                                 icon: const Icon(
-                                  Icons.delete_outline,
+                                  Icons.ios_share,
                                   size: 28,
-                                  color: Colors.red,
+                                  color: Colors.blue,
                                 ),
-                                tooltip: 'Delete Submission',
+                                tooltip: 'Export to PDF',
                                 onPressed: () {
-                                  // Mostrar diálogo de confirmación para eliminar
+                                  // Mostrar el diálogo de exportación de PDF
                                   showDialog(
                                     context: context,
                                     builder: (BuildContext context) {
-                                      return AlertDialog(
-                                        title: const Text('Delete Submission'),
-                                        content: const Text(
-                                          'Are you sure you want to delete this submission? This action cannot be undone.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () async {
-                                              Navigator.pop(context); // Close confirmation dialog
-
-
-
-                                              try {
-                                                // Use the service to delete the submission
-                                                final FormSubmissionViewService service = FormSubmissionViewService();
-                                                await service.deleteFormSubmission(
-                                                    context,
-                                                    submission.submissionId
-                                                );
-
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text('Submission deleted successfully'),
-                                                      backgroundColor: Colors.green,
-                                                    ),
-                                                  );
-
-                                                  // Pop ALL the way back to the submissions list screen
-                                                  // This assumes the submissions list is directly below in the navigation stack
-                                                  Navigator.of(context).pop(true);
-                                                }
-                                              } catch (e) {
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text('Error deleting submission: $e'),
-                                                      backgroundColor: Colors.red,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            },
-                                            style: TextButton.styleFrom(
-                                              foregroundColor: Colors.red,
-                                            ),
-                                            child: const Text('Delete'),
-                                          )
-                                        ],
+                                      return PdfExportDialog(
+                                        submissionId: submission.submissionId,
                                       );
                                     },
                                   );
                                 },
                               ),
-                          ],
+                              // Botón de eliminar - solo visible para superusuarios
+                              if (sessionData.containsKey('role') &&
+                                  sessionData['role'] != null &&
+                                  sessionData['role']['is_super_user'] == true)
+                              // Ubicación: dentro del onPressed del botón de eliminar en el AlertDialog
+// Mejora en el manejo del contexto después de eliminar un envío
+
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 28,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: 'Delete Submission',
+                                  onPressed: () {
+                                    // Almacenar el BuildContext original
+                                    final BuildContext mainContext = context;
+                                    print("DEBUG: Delete button pressed");
+
+                                    // Mostrar diálogo de confirmación para eliminar
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext dialogContext) {
+                                        return AlertDialog(
+                                          title: const Text('Delete Submission'),
+                                          content: const Text(
+                                            'Are you sure you want to delete this submission? This action cannot be undone.',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () {
+                                                print("DEBUG: Cancel button pressed");
+                                                Navigator.pop(dialogContext);
+                                              },
+                                              child: const Text('Cancel'),
+                                            ),
+                                            TextButton(
+                                              onPressed: () async {
+                                                print("DEBUG: Delete confirmation pressed");
+                                                // Primero, cerrar el diálogo de confirmación
+                                                Navigator.pop(dialogContext);
+                                                print("DEBUG: Confirmation dialog closed");
+
+                                                try {
+                                                  print("DEBUG: Attempting to delete submission ID: ${submission.submissionId}");
+
+                                                  // IMPORTANTE: Antes de eliminar, almacenar toda la información necesaria para navegar
+                                                  final int formId = submission.submissionId;
+                                                  final String formTitle = submission.formTitle;
+                                                  final permissionSetCopy = permissionSet;
+                                                  final sessionDataCopy = sessionData;
+
+                                                  // Mostrar un indicador de progreso mientras se procesa la eliminación
+                                                  showDialog(
+                                                    context: mainContext,
+                                                    barrierDismissible: false,
+                                                    builder: (BuildContext loadingContext) {
+                                                      return AlertDialog(
+                                                        content: Row(
+                                                          children: [
+                                                            const CircularProgressIndicator(),
+                                                            const SizedBox(width: 20),
+                                                            const Text("Deleting submission..."),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    },
+                                                  );
+
+                                                  // Use the service to delete the submission
+                                                  final FormSubmissionViewService service = FormSubmissionViewService();
+                                                  await service.deleteFormSubmission(
+                                                      mainContext,
+                                                      submission.submissionId
+                                                  );
+                                                  print("DEBUG: Deletion successful");
+
+                                                  // IMPORTANTE: Navegar incluso si el contexto original ya no está montado
+                                                  // Al cerrar el diálogo de carga y realizar la navegación
+                                                  Navigator.of(mainContext).pushAndRemoveUntil(
+                                                    MaterialPageRoute(
+                                                      builder: (context) => FormSubmissionsViewScreen(
+                                                        formId: formId,
+                                                        formTitle: formTitle,
+                                                        permissionSet: permissionSetCopy,
+                                                        sessionData: sessionDataCopy,
+                                                      ),
+                                                    ),
+                                                        (route) => false,
+                                                  );
+
+                                                  // Mostrar mensaje de éxito después de la navegación
+                                                  Future.delayed(Duration(milliseconds: 300), () {
+                                                    if (mainContext.mounted) {
+                                                      ScaffoldMessenger.of(mainContext).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text('Submission deleted successfully'),
+                                                          backgroundColor: Colors.green,
+                                                        ),
+                                                      );
+                                                    }
+                                                  });
+                                                } catch (e) {
+                                                  print("DEBUG: Error during deletion: $e");
+                                                  // Cerrar el diálogo de carga si hay un error
+                                                  if (mainContext.mounted) {
+                                                    Navigator.of(mainContext).pop();
+                                                    ScaffoldMessenger.of(mainContext).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text('Error deleting submission: $e'),
+                                                        backgroundColor: Colors.red,
+                                                      ),
+                                                    );
+                                                  }
+                                                }
+                                              },
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: Colors.red,
+                                              ),
+                                              child: const Text('Delete'),
+                                            )
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Submitted by: ${submission.submittedBy}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.black54,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Submitted by: ${submission.submittedBy}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.black54,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(submission.submittedAt)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
+                      const SizedBox(height: 8),
+                      Text(
+                        'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(submission.submittedAt)}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            // Form answers - ESTA ES LA ÚNICA SECCIÓN DE RESPUESTAS
-            const SizedBox(height: 16),
-            ..._processAnswers(submission.answers
-                .where((answer) =>
-            answer.questionType.toLowerCase() != 'signature')
-                .toList())
-                .map((processedAnswer) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFB3E5FC),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      processedAnswer.question,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (processedAnswer.questionType.toLowerCase() ==
-                        'checkbox' &&
-                        processedAnswer.answer.contains(','))
-                    // Para respuestas tipo checkbox con múltiples opciones
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children:
-                        processedAnswer.answer.split(',').map((option) {
-                          final trimmedOption = option.trim();
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.check_circle,
-                                    size: 18, color: Colors.blue),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    trimmedOption,
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      )
-                    else
-                    // Para respuestas no-checkbox o checkbox con una sola opción
-                      Text(
-                        processedAnswer.answer,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                  ],
-                ),
-              );
-            }).toList(),
-
-            // Usar método construido para generar widgets en función de las condiciones
-            ...(() {
-              // Primero comprobamos si hay firmas o adjuntos
-              final signatures =
-              submission.attachments.where((a) => a.isSignature).toList();
-              final regularAttachments =
-              submission.attachments.where((a) => !a.isSignature).toList();
-              final hasSignatures = signatures.isNotEmpty;
-              final hasRegularAttachments = regularAttachments.isNotEmpty;
-
-              // Lista para almacenar todos los widgets a retornar
-              final List<Widget> attachmentWidgets = [];
-
-              // Sección de Signatures
-              // Versión mejorada para identificar correctamente el nombre de cada firma
-// Modifica solo la parte de las firmas en la sección de adjuntos
-
-// Sección de Signatures
-              // Sección de Signatures - versión mejorada
-              // Sección de Signatures - versión con nombre de archivo
-              // Sección de Signatures mejorada
-              // Sección de Signatures mejorada con imágenes precargadas
-              // Sección de Signatures mejorada con los nuevos campos
-              if (hasSignatures) {
-                attachmentWidgets.add(const SizedBox(height: 24));
-                attachmentWidgets.add(const Text(
-                  'Signatures:',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+              // Form answers
+              const SizedBox(height: 16),
+              ..._processAnswers(submission.answers
+                  .where((answer) =>
+              answer.questionType.toLowerCase() != 'signature')
+                  .toList())
+                  .map((processedAnswer) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB3E5FC),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ));
-                attachmentWidgets.add(const SizedBox(height: 8));
-
-                // Obtener todas las preguntas tipo signature
-                final signatureQuestions = submission.answers
-                    .where((answer) =>
-                answer.questionType.toLowerCase() == 'signature')
-                    .toList();
-
-                // Añadir cada firma a la lista de widgets
-                for (var signature in signatures) {
-                  // Buscar la pregunta correspondiente para esta firma específica
-                  String questionName = 'Electronic Signature';
-
-                  // Buscar coincidencia basada en los nombres de archivos
-                  for (var question in signatureQuestions) {
-                    // Extraer el nombre base del archivo de la respuesta de la pregunta
-                    String answerFileName = "";
-                    if (question.answer.contains('/')) {
-                      // Si la respuesta contiene una ruta, extraer el nombre del archivo
-                      answerFileName = question.answer.split('/').last;
-                      if (answerFileName.contains('.')) {
-                        answerFileName = answerFileName.split('.').first;
-                      }
-                    }
-
-                    // Extraer el nombre base del archivo de la firma
-                    String signatureFileName = "";
-                    if (signature.filePath.contains('\\')) {
-                      signatureFileName = signature.filePath.split('\\').last;
-                      if (signatureFileName.contains('_')) {
-                        // Obtener la parte principal del nombre (antes de los timestamp)
-                        signatureFileName = signatureFileName.split('_').first +
-                            "_" +
-                            signatureFileName.split('_')[1];
-                      }
-                    }
-
-                    // Verificar si los nombres de archivo coinciden
-                    if (!answerFileName.isEmpty &&
-                        !signatureFileName.isEmpty &&
-                        signatureFileName.contains(answerFileName)) {
-                      questionName = question.question;
-                      break;
-                    }
-                  }
-
-                  // Determinar el texto a mostrar para el autor de la firma
-                  final String signatureAuthorText =
-                  signature.signatureAuthor != null &&
-                      signature.signatureAuthor!.isNotEmpty
-                      ? signature.signatureAuthor!
-                      : questionName;
-
-                  // Añadir tarjeta de firma con la imagen precargada
-                  attachmentWidgets.add(Card(
-                    color: Colors.white,
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Encabezado con título
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                          child: Text(
-                            'Signature by: $signatureAuthorText',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        processedAnswer.question,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (processedAnswer.questionType.toLowerCase() ==
+                          'checkbox' &&
+                          processedAnswer.answer.contains(','))
+                      // Para respuestas tipo checkbox con múltiples opciones
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children:
+                          processedAnswer.answer.split(',').map((option) {
+                            final trimmedOption = option.trim();
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.check_circle,
+                                      size: 18, color: Colors.blue),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      trimmedOption,
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        )
+                      else
+                      // Para respuestas no-checkbox o checkbox con una sola opción
+                        Text(
+                          processedAnswer.answer,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                    ],
+                  ),
+                );
+              }).toList(),
 
-                        // Mostrar el cargo/posición si está disponible
-                        if (signature.signaturePosition != null &&
-                            signature.signaturePosition!.isNotEmpty)
+              // Usar método construido para generar widgets en función de las condiciones
+              ...(() {
+                // Primero comprobamos si hay firmas o adjuntos
+                final signatures =
+                submission.attachments.where((a) => a.isSignature).toList();
+                final regularAttachments =
+                submission.attachments.where((a) => !a.isSignature).toList();
+                final hasSignatures = signatures.isNotEmpty;
+                final hasRegularAttachments = regularAttachments.isNotEmpty;
+
+                // Lista para almacenar todos los widgets a retornar
+                final List<Widget> attachmentWidgets = [];
+
+                // Sección de Signatures
+                if (hasSignatures) {
+                  attachmentWidgets.add(const SizedBox(height: 24));
+                  attachmentWidgets.add(const Text(
+                    'Signatures:',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ));
+                  attachmentWidgets.add(const SizedBox(height: 8));
+
+                  // Obtener todas las preguntas tipo signature
+                  final signatureQuestions = submission.answers
+                      .where((answer) =>
+                  answer.questionType.toLowerCase() == 'signature')
+                      .toList();
+
+                  // Añadir cada firma a la lista de widgets
+                  for (var signature in signatures) {
+                    // Buscar la pregunta correspondiente para esta firma específica
+                    String questionName = 'Electronic Signature';
+
+                    // Buscar coincidencia basada en los nombres de archivos
+                    for (var question in signatureQuestions) {
+                      // Extraer el nombre base del archivo de la respuesta de la pregunta
+                      String answerFileName = "";
+                      if (question.answer.contains('/')) {
+                        // Si la respuesta contiene una ruta, extraer el nombre del archivo
+                        answerFileName = question.answer.split('/').last;
+                        if (answerFileName.contains('.')) {
+                          answerFileName = answerFileName.split('.').first;
+                        }
+                      }
+
+                      // Extraer el nombre base del archivo de la firma
+                      String signatureFileName = "";
+                      if (signature.filePath.contains('\\')) {
+                        signatureFileName = signature.filePath.split('\\').last;
+                        if (signatureFileName.contains('_')) {
+                          // Obtener la parte principal del nombre (antes de los timestamp)
+                          signatureFileName = signatureFileName.split('_').first +
+                              "_" +
+                              signatureFileName.split('_')[1];
+                        }
+                      }
+
+                      // Verificar si los nombres de archivo coinciden
+                      if (!answerFileName.isEmpty &&
+                          !signatureFileName.isEmpty &&
+                          signatureFileName.contains(answerFileName)) {
+                        questionName = question.question;
+                        break;
+                      }
+                    }
+
+                    // Determinar el texto a mostrar para el autor de la firma
+                    final String signatureAuthorText =
+                    signature.signatureAuthor != null &&
+                        signature.signatureAuthor!.isNotEmpty
+                        ? signature.signatureAuthor!
+                        : questionName;
+
+                    // Añadir tarjeta de firma con la imagen precargada
+                    attachmentWidgets.add(Card(
+                      color: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Encabezado con título
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                             child: Text(
-                              _cleanPositionString(signature.signaturePosition!),
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                                fontStyle: FontStyle.italic,
+                              'Signature by: $signatureAuthorText',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
 
-                        // Imagen de la firma
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          width: double.infinity,
-                          child: signature.id != null
-                              ? FutureBuilder<Uint8List>(
-                            future: _loadSignatureImage(
-                                context, signature.id!),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return Container(
-                                  height: 100,
-                                  alignment: Alignment.center,
-                                  child:
-                                  const CircularProgressIndicator(),
-                                );
-                              } else if (snapshot.hasError) {
-                                return Container(
-                                  height: 100,
-                                  alignment: Alignment.center,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.error_outline,
-                                          color: Colors.red, size: 32),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Could not load signature',
-                                        style:
-                                        TextStyle(color: Colors.red),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              } else if (snapshot.hasData) {
-                                return Container(
-                                  constraints:
-                                  BoxConstraints(maxHeight: 150),
-                                  child: Image.memory(
-                                    snapshot.data!,
-                                    fit: BoxFit.contain,
-                                  ),
-                                );
-                              } else {
-                                return Container(
-                                  height: 100,
-                                  alignment: Alignment.center,
-                                  child:
-                                  Text('No signature data available'),
-                                );
-                              }
-                            },
-                          )
-                              : Container(
-                            height: 100,
-                            alignment: Alignment.center,
-                            child: Text('Signature ID missing'),
-                          ),
-                        ),
+                          // Mostrar el cargo/posición si está disponible
+                          if (signature.signaturePosition != null &&
+                              signature.signaturePosition!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                _cleanPositionString(signature.signaturePosition!),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
 
-                        // Botón para ver en pantalla completa
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              icon: const Icon(Icons.fullscreen),
-                              label: const Text('View Full Size'),
-                              onPressed: () async {
-                                try {
-                                  if (signature.id != null) {
-                                    await FormSubmissionViewService()
-                                        .openAttachment(context, signature.id!);
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content:
-                                          Text('Signature ID is missing')),
-                                    );
-                                  }
-                                } catch (e) {
-                                  print('Error opening signature: $e');
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text(
-                                            'Error opening signature: $e')),
+                          // Imagen de la firma
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            width: double.infinity,
+                            child: signature.id != null
+                                ? FutureBuilder<Uint8List>(
+                              future: _loadSignatureImage(
+                                  context, signature.id!),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return Container(
+                                    height: 100,
+                                    alignment: Alignment.center,
+                                    child:
+                                    const CircularProgressIndicator(),
+                                  );
+                                } else if (snapshot.hasError) {
+                                  return Container(
+                                    height: 100,
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.error_outline,
+                                            color: Colors.red, size: 32),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Could not load signature',
+                                          style:
+                                          TextStyle(color: Colors.red),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                } else if (snapshot.hasData) {
+                                  return Container(
+                                    constraints:
+                                    BoxConstraints(maxHeight: 150),
+                                    child: Image.memory(
+                                      snapshot.data!,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  );
+                                } else {
+                                  return Container(
+                                    height: 100,
+                                    alignment: Alignment.center,
+                                    child:
+                                    Text('No signature data available'),
                                   );
                                 }
                               },
+                            )
+                                : Container(
+                              height: 100,
+                              alignment: Alignment.center,
+                              child: Text('Signature ID missing'),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ));
+
+                          // Botón para ver en pantalla completa
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.fullscreen),
+                                label: const Text('View Full Size'),
+                                onPressed: () async {
+                                  try {
+                                    if (signature.id != null) {
+                                      await FormSubmissionViewService()
+                                          .openAttachment(context, signature.id!);
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content:
+                                            Text('Signature ID is missing')),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    print('Error opening signature: $e');
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content: Text(
+                                              'Error opening signature: $e')),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ));
+                  }
                 }
-              }
 
-              // Sección de Attachments
-              if (hasRegularAttachments) {
-                attachmentWidgets.add(const SizedBox(height: 24));
-                attachmentWidgets.add(const Text(
-                  'Attachments:',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ));
-                attachmentWidgets.add(const SizedBox(height: 8));
-
-                attachmentWidgets.add(Text(
-                  'Files attached: ${regularAttachments.length}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontStyle: FontStyle.italic,
-                  ),
-                ));
-
-                // Añadir cada adjunto normal a la lista de widgets
-                for (var attachment in regularAttachments) {
-                  // Extract just the filename for display
-                  final fileName = attachment.filePath.split('\\').last;
-
-                  attachmentWidgets.add(Card(
-                    color: Colors.white,
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      leading: Icon(
-                        _getIconForFileType(attachment.filePath),
-                        color: _getColorForFileType(attachment.filePath),
-                        size: 36,
-                      ),
-                      title: Text(
-                        fileName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Attachment',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      onTap: () async {
-                        try {
-                          if (attachment.id != null) {
-                            print('Opening attachment ${attachment.id}');
-                            await FormSubmissionViewService()
-                                .openAttachment(context, attachment.id!);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Attachment ID is missing')),
-                            );
-                          }
-                        } catch (e) {
-                          print('Error opening attachment: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Error opening attachment: $e')),
-                          );
-                        }
-                      },
-                    ),
-                  ));
-                }
-              }
-
-              // Mensaje si no hay adjuntos de ningún tipo
-              if (!hasAttachments) {
-                attachmentWidgets.add(const SizedBox(height: 24));
-                attachmentWidgets.add(Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'No files or signatures attached to this submission.',
+                // Sección de Attachments
+                if (hasRegularAttachments) {
+                  attachmentWidgets.add(const SizedBox(height: 24));
+                  attachmentWidgets.add(const Text(
+                    'Attachments:',
                     style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ));
+                  attachmentWidgets.add(const SizedBox(height: 8));
+
+                  attachmentWidgets.add(Text(
+                    'Files attached: ${regularAttachments.length}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
                       fontStyle: FontStyle.italic,
                     ),
-                  ),
-                ));
-              }
+                  ));
 
-              return attachmentWidgets;
-            })(),
-          ],
+                  // Añadir cada adjunto normal a la lista de widgets
+                  for (var attachment in regularAttachments) {
+                    // Extract just the filename for display
+                    final fileName = attachment.filePath.split('\\').last;
+
+                    attachmentWidgets.add(Card(
+                      color: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        leading: Icon(
+                          _getIconForFileType(attachment.filePath),
+                          color: _getColorForFileType(attachment.filePath),
+                          size: 36,
+                        ),
+                        title: Text(
+                          fileName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Attachment',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        onTap: () async {
+                          try {
+                            if (attachment.id != null) {
+                              print('Opening attachment ${attachment.id}');
+                              await FormSubmissionViewService()
+                                  .openAttachment(context, attachment.id!);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Attachment ID is missing')),
+                              );
+                            }
+                          } catch (e) {
+                            print('Error opening attachment: $e');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text('Error opening attachment: $e')),
+                            );
+                          }
+                        },
+                      ),
+                    ));
+                  }
+                }
+
+                // Mensaje si no hay adjuntos de ningún tipo
+                if (!hasAttachments) {
+                  attachmentWidgets.add(const SizedBox(height: 24));
+                  attachmentWidgets.add(Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'No files or signatures attached to this submission.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ));
+                }
+
+                return attachmentWidgets;
+              })(),
+            ],
+          ),
         ),
       ),
     );
   }
+
 }
 
 /// Main screen: lists the submissions for a form, one pastel card per submission.

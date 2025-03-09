@@ -106,15 +106,21 @@ class FormSubmissionViewService {
 
   /// Deletes a form submission
   /// Route: DELETE /forms/{submissionId}
+  // Modificar este método en FormSubmissionViewService
+// Ubicación: form_submission_view_service.dart
+
   Future<void> deleteFormSubmission(
       BuildContext context,
       int submissionId,
       ) async {
     try {
-      print('[deleteFormSubmission] Attempting to delete submission: $submissionId');
+      print('[DEBUG-DELETE] Attempting to delete submission: $submissionId');
 
       String? token = await SessionManager.getToken();
       final url = Uri.parse('${_http.baseUrl}/api/form-submissions/$submissionId');
+
+      print('[DEBUG-DELETE] Request URL: $url');
+      print('[DEBUG-DELETE] Token available: ${token != null ? 'Yes' : 'No'}');
 
       final response = await http.delete(
         url,
@@ -124,26 +130,30 @@ class FormSubmissionViewService {
         },
       );
 
-      print('[deleteFormSubmission] Response => ${response.statusCode}');
+      print('[DEBUG-DELETE] Response status code: ${response.statusCode}');
+      print('[DEBUG-DELETE] Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        print('[deleteFormSubmission] Successfully deleted submission: $submissionId');
+        print('[DEBUG-DELETE] Successfully deleted submission: $submissionId');
+        return; // Éxito sin lanzar excepción
       } else if (response.statusCode == 401) {
+        print('[DEBUG-DELETE] Authentication error (401)');
         final responseData = json.decode(response.body);
         await ApiResponseHandler.handleExpiredToken(context, responseData);
         throw Exception('Session expired');
       } else if (response.statusCode == 404) {
-        print('[deleteFormSubmission] Submission not found: $submissionId');
+        print('[DEBUG-DELETE] Submission not found: $submissionId');
         throw Exception('Submission not found');
       } else {
         final responseData = json.decode(response.body);
-        print('[deleteFormSubmission] Failed to delete submission. Status: ${response.statusCode}');
+        print('[DEBUG-DELETE] Failed to delete submission. Status: ${response.statusCode}');
+        print('[DEBUG-DELETE] Error message: ${responseData['message'] ?? "No message"}');
         throw Exception(
           'Failed to delete submission: ${responseData['message'] ?? response.statusCode}',
         );
       }
     } catch (e) {
-      print('[deleteFormSubmission] Error deleting submission: $e');
+      print('[DEBUG-DELETE] Exception while deleting submission: $e');
       throw Exception('Exception while deleting submission: $e');
     }
   }
