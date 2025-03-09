@@ -411,8 +411,24 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         final failedUploads = <String>[];
 
         for (var filePath in _attachedFiles) {
+          // Skip files that are already handled as signatures
+          bool isSignatureFile = false;
+          for (var entry in signatureFiles.entries) {
+            if (entry.value['path'] == filePath) {
+              isSignatureFile = true;
+              break;
+            }
+          }
+
+          if (isSignatureFile) {
+            // Skip this file as it's already processed as a signature
+            continue;
+          }
+
           try {
             final fileExt = path.extension(filePath).toLowerCase();
+            // Note: we're not using signatureFiles check to determine if this is a signature
+            // since we already skipped signature files above
             final isSignature = filePath.contains("signature_");
 
             ScaffoldMessenger.of(context).showSnackBar(
@@ -441,6 +457,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           }
         }
 
+        // Show failed uploads notification
         if (failedUploads.isNotEmpty) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -753,24 +770,31 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         questionTitle: questionText,
         onSignatureCaptured: (file, {String? author, String? position}) {
           if (file != null) {
-            // If there was a previous signature, remove it from attached files
+            // Step 1: Check if we already have a signature file path stored
+            String? oldPath;
             if (answers.containsKey(questionId)) {
-              String? oldPath = answers[questionId];
-              if (oldPath != null && _attachedFiles.contains(oldPath)) {
-                _attachedFiles.remove(oldPath);
-              }
+              oldPath = answers[questionId];
             }
 
+            // Step 2: If we have an old path, remove it from _attachedFiles
+            if (oldPath != null && _attachedFiles.contains(oldPath)) {
+              setState(() {
+                _attachedFiles.remove(oldPath);
+              });
+            }
+
+            // Step 3: Store only the file path in answers, not the file object
             setState(() {
-              // Store the new signature information
               answers[questionId] = file.path;
+
+              // Step 4: Store signature metadata separately
               signatureFiles[questionId.toString()] = {
                 'path': file.path,
                 'author': author ?? widget.sessionData['fullname'] ?? '',
                 'position': position ?? questionText,
               };
 
-              // Add to attached files list so it appears in UI
+              // Step 5: Only add to _attachedFiles if not already there
               if (!_attachedFiles.contains(file.path)) {
                 _attachedFiles.add(file.path);
               }
@@ -779,15 +803,18 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
               _validateFormSubmission();
             });
           } else {
+            // Handle clearing the signature
             setState(() {
               if (answers.containsKey(questionId)) {
-                // Remove from attached files list
+                // Get the old path
                 String? oldPath = answers[questionId];
+
+                // Remove from _attachedFiles if it exists
                 if (oldPath != null && _attachedFiles.contains(oldPath)) {
                   _attachedFiles.remove(oldPath);
                 }
 
-                // Remove from other data structures
+                // Remove from other tracking structures
                 answers.remove(questionId);
                 signatureFiles.remove(questionId.toString());
 
