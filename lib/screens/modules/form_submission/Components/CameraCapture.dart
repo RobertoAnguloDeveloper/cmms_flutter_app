@@ -127,6 +127,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../utils/file_utils.dart';
+import 'package:path/path.dart' as path;
 
 class CameraCapture extends StatefulWidget {
   final Function(File) onImageCaptured;
