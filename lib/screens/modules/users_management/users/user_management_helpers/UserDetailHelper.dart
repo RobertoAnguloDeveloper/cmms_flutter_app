@@ -15,15 +15,16 @@ class UserDetailHelper {
     required int currentUserId,
   }) {
     TextEditingController firstNameController =
-        TextEditingController(text: user['first_name'] ?? 'No First Name');
+    TextEditingController(text: user['first_name'] ?? 'No First Name');
     TextEditingController lastNameController =
-        TextEditingController(text: user['last_name'] ?? 'No Last Name');
+    TextEditingController(text: user['last_name'] ?? 'No Last Name');
     TextEditingController emailController =
-        TextEditingController(text: user['email'] ?? 'No Email');
+    TextEditingController(text: user['email'] ?? 'No Email');
     TextEditingController usernameController =
-        TextEditingController(text: user['username'] ?? 'No Username');
+    TextEditingController(text: user['username'] ?? 'No Username');
     TextEditingController contactNumberController = TextEditingController(
         text: user['contact_number'] ?? 'No Contact Number');
+    TextEditingController passwordController = TextEditingController();
 
     String? selectedRole = user['role']?['id']?.toString();
     String? selectedEnvironment = user['environment']?['id']?.toString();
@@ -32,10 +33,12 @@ class UserDetailHelper {
     final bool isDeleted = user['is_deleted'] ?? false;
     final bool isCurrentUser = user['id'] == currentUserId;
     String? emailError;
+    String? passwordError;
+    bool showPasswordField = false;
 
     bool isValidEmail(String email) {
       final emailRegex =
-          RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$');
+      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$');
       return emailRegex.hasMatch(email);
     }
 
@@ -47,11 +50,11 @@ class UserDetailHelper {
           builder: (BuildContext context, StateSetter setState) {
             final bool isAdminRole = selectedRole != null &&
                 roles.firstWhere((role) =>
-                        role['id'].toString() == selectedRole)['name'] ==
+                role['id'].toString() == selectedRole)['name'] ==
                     "Admin";
             final bool isAdminEnvironment = selectedEnvironment != null &&
                 environments.firstWhere((env) =>
-                        env['id'].toString() == selectedEnvironment)['name'] ==
+                env['id'].toString() == selectedEnvironment)['name'] ==
                     "ADMIN";
 
             List<dynamic> filteredEnvironments = environments;
@@ -72,7 +75,7 @@ class UserDetailHelper {
               elevation: 10,
               child: Container(
                 width: 400,
-                height: 700,
+                height: showPasswordField ? 750 : 700,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20.0),
@@ -170,7 +173,15 @@ class UserDetailHelper {
                               hint: const Text('Select Role',
                                   style: TextStyle(fontSize: 16)),
                               isExpanded: true,
-                              items: roles.map((role) {
+                              items: roles.where((role) {
+                                // Filter out Admin role if current user is not Admin
+                                if (user['role'] != null &&
+                                    user['role']['name'] != "Admin" &&
+                                    role['name'] == "Admin") {
+                                  return false;
+                                }
+                                return true;
+                              }).map((role) {
                                 return DropdownMenuItem<String>(
                                   value: role['id'].toString(),
                                   child: Text(role['name'],
@@ -179,20 +190,25 @@ class UserDetailHelper {
                               }).toList(),
                               onChanged: (!isDeleted && !isCurrentUser)
                                   ? (String? newRole) {
-                                      setState(() {
-                                        selectedRole = newRole;
-                                        if (newRole != null &&
-                                            roles.firstWhere((role) =>
-                                                    role['id'].toString() ==
-                                                    newRole)['name'] ==
-                                                "Admin") {
-                                          selectedEnvironment = environments
-                                              .firstWhere((env) =>
-                                                  env['name'] == "ADMIN")['id']
-                                              .toString();
-                                        }
-                                      });
-                                    }
+                                setState(() {
+                                  selectedRole = newRole;
+                                  if (newRole != null &&
+                                      roles.firstWhere((role) =>
+                                      role['id'].toString() ==
+                                          newRole)['name'] ==
+                                          "Admin") {
+                                    selectedEnvironment = environments
+                                        .firstWhere((env) =>
+                                    env['name'] == "ADMIN")['id']
+                                        .toString();
+
+                                    // If changing to Admin role, disable password change
+                                    showPasswordField = false;
+                                    passwordController.clear();
+                                    passwordError = null;
+                                  }
+                                });
+                              }
                                   : null,
                             ),
                             const SizedBox(height: 15),
@@ -213,14 +229,76 @@ class UserDetailHelper {
                                 );
                               }).toList(),
                               onChanged:
-                                  (!isAdminRole && !isDeleted && !isCurrentUser)
-                                      ? (String? newEnv) {
-                                          setState(() {
-                                            selectedEnvironment = newEnv;
-                                          });
-                                        }
-                                      : null,
+                              (!isAdminRole && !isDeleted && !isCurrentUser)
+                                  ? (String? newEnv) {
+                                setState(() {
+                                  selectedEnvironment = newEnv;
+                                });
+                              }
+                                  : null,
                             ),
+
+                            // Password change option for non-admin users
+                            // Only show for users that have a non-admin role in their data
+                            // AND the currently selected role is not Admin
+                            if (!isDeleted && !isCurrentUser &&
+                                user['role'] != null &&
+                                user['role']['name'] != "Admin" &&
+                                !isAdminRole) ...[
+                              const SizedBox(height: 15),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Change Password',
+                                    style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: showPasswordField,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        showPasswordField = value;
+                                        if (!value) {
+                                          passwordController.clear();
+                                          passwordError = null;
+                                        }
+                                      });
+                                    },
+                                    activeColor: Color.fromARGB(255, 34, 118, 186),
+                                  ),
+                                ],
+                              ),
+                              if (showPasswordField) ...[
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: passwordController,
+                                  decoration: InputDecoration(
+                                    labelText: 'New Password',
+                                    labelStyle: const TextStyle(fontSize: 18),
+                                    border: const OutlineInputBorder(),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 15.0,
+                                      horizontal: 20.0,
+                                    ),
+                                    errorText: passwordError,
+                                    suffixIcon: Icon(Icons.password, color: Color.fromARGB(255, 34, 118, 186)),
+                                  ),
+                                  obscureText: true,
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  'Password must be at least 8 characters long',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ],
                         ),
                       ),
@@ -271,36 +349,46 @@ class UserDetailHelper {
                               onPressed: () async {
                                 final email = emailController.text.trim();
                                 final firstName =
-                                    firstNameController.text.trim();
+                                firstNameController.text.trim();
                                 final lastName = lastNameController.text.trim();
                                 final username = usernameController.text.trim();
                                 final contactNumber =
-                                    contactNumberController.text.trim();
+                                contactNumberController.text.trim();
+                                final password = passwordController.text.trim();
 
                                 setState(() {
                                   emailError = email.isEmpty
                                       ? 'This field is required'
                                       : (!isValidEmail(email)
-                                          ? 'Please enter a valid email address'
-                                          : null);
+                                      ? 'Please enter a valid email address'
+                                      : null);
+
+                                  if (showPasswordField) {
+                                    passwordError = password.isEmpty
+                                        ? 'This field is required'
+                                        : (password.length < 8
+                                        ? 'Password must be at least 8 characters long'
+                                        : null);
+                                  }
 
                                   firstNameController.text =
-                                      firstName.isEmpty ? '' : firstName;
+                                  firstName.isEmpty ? '' : firstName;
                                   lastNameController.text =
-                                      lastName.isEmpty ? '' : lastName;
+                                  lastName.isEmpty ? '' : lastName;
                                   usernameController.text =
-                                      username.isEmpty ? '' : username;
+                                  username.isEmpty ? '' : username;
                                   contactNumberController.text =
-                                      contactNumber.isEmpty
-                                          ? ''
-                                          : contactNumber;
+                                  contactNumber.isEmpty
+                                      ? ''
+                                      : contactNumber;
                                 });
 
                                 if (emailError != null ||
                                     firstName.isEmpty ||
                                     lastName.isEmpty ||
                                     username.isEmpty ||
-                                    contactNumber.isEmpty) {
+                                    contactNumber.isEmpty ||
+                                    (showPasswordField && !isAdminRole && passwordError != null)) {
                                   return;
                                 }
 
@@ -313,12 +401,17 @@ class UserDetailHelper {
                                   "contact_number": contactNumber,
                                   "role_id": int.parse(selectedRole!),
                                   "environment_id":
-                                      int.parse(selectedEnvironment!),
+                                  int.parse(selectedEnvironment!),
                                 };
+
+                                // Add password to update data if changed
+                                if (showPasswordField && password.isNotEmpty) {
+                                  updatedData["password"] = password;
+                                }
 
                                 try {
                                   final response =
-                                      await userControllerServices.updateUser(
+                                  await userControllerServices.updateUser(
                                     context,
                                     userId,
                                     updatedData,
@@ -329,7 +422,7 @@ class UserDetailHelper {
                                       context: context,
                                       message: 'User updated successfully',
                                       duration:
-                                          const Duration(milliseconds: 500),
+                                      const Duration(milliseconds: 500),
                                     );
                                     fetchUsers();
                                     Navigator.of(context).pop();

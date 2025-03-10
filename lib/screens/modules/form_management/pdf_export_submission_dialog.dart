@@ -92,6 +92,7 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
+      // User-friendly validation
       if (_headerImage == null) {
         setState(() {
           _errorMessage = 'Please select a header image';
@@ -99,6 +100,7 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
         return;
       }
 
+      // Save current preferences before generating PDF
       await SessionManager.savePdfExportPreferences(
         headerOpacity: _headerOpacity,
         headerSize: _headerSize,
@@ -106,7 +108,6 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
         signaturesSize: _signaturesSize,
         signaturesAlignment: _signaturesAlignment,
       );
-
 
       setState(() {
         _isLoading = true;
@@ -193,7 +194,7 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
                           OpenFile.open(filePath).then((result) {
                             if (result.type != ResultType.done && context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error opening PDF: ${result.message}')),
+                                SnackBar(content: Text('Could not open the PDF file')),
                               );
                             }
                           });
@@ -207,6 +208,7 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
           }
         } else if (response.statusCode == 401) {
           if (mounted) {
+            // For authentication errors, we can be more specific since this is a common issue
             String responseBody = String.fromCharCodes(responseBytes);
             try {
               Map<String, dynamic> jsonResponse = {};
@@ -215,31 +217,41 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
               }
               await ApiResponseHandler.handleExpiredToken(context, jsonResponse);
             } catch (e) {
-              print('Error parsing JSON: $e');
+              // Log the actual error for debugging but don't show to user
+              print('Error parsing JSON during auth error: $e');
             }
             setState(() {
               _isLoading = false;
-              _errorMessage = 'Session expired. Please log in again.';
+              _errorMessage = 'Your session has expired. Please log in again.';
             });
           }
         } else {
+          // For other HTTP errors, log details but show generic message
           String errorMsg = String.fromCharCodes(responseBytes);
           try {
-            final jsonResponse = {'message': errorMsg};
-            errorMsg = jsonResponse['message'] ?? 'Failed to generate PDF';
-          } catch (e) {
-            // Use the raw response if not valid JSON
-          }
+            // Log the detailed error for debugging
+            print('PDF Generation Error (HTTP ${response.statusCode}): $errorMsg');
 
-          setState(() {
-            _isLoading = false;
-            _errorMessage = 'Error: $errorMsg';
-          });
+            setState(() {
+              _isLoading = false;
+              _errorMessage = 'Unable to generate PDF. Please try again later.';
+            });
+          } catch (e) {
+            // Log parse error but show generic message
+            print('Error handling response: $e');
+            setState(() {
+              _isLoading = false;
+              _errorMessage = 'Unable to generate PDF. Please try again later.';
+            });
+          }
         }
       } catch (e) {
+        // For any other exceptions, log details but show generic message
+        print('Exception during PDF generation: $e');
+
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Error: $e';
+          _errorMessage = 'Unable to generate PDF. Please try again later.';
         });
       }
     }
