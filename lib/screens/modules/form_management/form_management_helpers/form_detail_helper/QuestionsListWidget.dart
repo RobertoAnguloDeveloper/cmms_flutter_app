@@ -18,7 +18,7 @@ class QuestionsListWidget extends StatefulWidget {
   final bool Function(String) shouldShowAnswerSelection;
   final VoidCallback fetchFormDetails;
   final int formId;
-  final Function(bool) setUnsavedChanges; // Add this parameter
+  final Function(bool) setUnsavedChanges;
 
   const QuestionsListWidget({
     Key? key,
@@ -29,7 +29,7 @@ class QuestionsListWidget extends StatefulWidget {
     required this.shouldShowAnswerSelection,
     required this.fetchFormDetails,
     required this.formId,
-    required this.setUnsavedChanges, // Make it required
+    required this.setUnsavedChanges,
   }) : super(key: key);
 
   @override
@@ -41,8 +41,11 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
   final Map<int, bool> _questionValidityMap = {};
   final Map<int, bool> _localRequiredState = {};
   final Map<int, GlobalKey<ResponseOptionsManagerState>> _optionsManagerKeys = {};
+  final Map<int, TextEditingController> _questionTextControllers = {};
+  final Map<int, bool> _isEditingQuestionText = {};
 
   final AnswerApiService _answerApiService = AnswerApiService();
+  final QuestionApiService _questionApiService = QuestionApiService();
 
   @override
   void initState() {
@@ -66,6 +69,26 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
       final bool isRequired = text.endsWith('~') || (question['is_required'] == true);
 
       _localRequiredState[questionId] = isRequired;
+
+      // Initialize text controllers if they don't exist
+      if (!_questionTextControllers.containsKey(questionId)) {
+        String displayText = text;
+        if (displayText.endsWith('~')) {
+          displayText = displayText.substring(0, displayText.length - 1);
+        }
+        _questionTextControllers[questionId] = TextEditingController(text: displayText);
+      } else {
+        // Update existing controller text
+        String displayText = text;
+        if (displayText.endsWith('~')) {
+          displayText = displayText.substring(0, displayText.length - 1);
+        }
+        _questionTextControllers[questionId]?.text = displayText;
+      }
+
+      // Initialize editing state
+      _isEditingQuestionText[questionId] = _isEditingQuestionText[questionId] ?? false;
+
       print('Initialized question $questionId with required=$isRequired'); // Debug output
     }
   }
@@ -197,276 +220,6 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
     );
   }
 
-
-  /*
-  Widget _buildQuestionCard(Map<String, dynamic> question) {
-    final int questionId = question['id'];
-    final int formQuestionId = question['form_question_id'];
-
-    // Get required state from local state if available
-    final bool questionIsRequired = _localRequiredState[questionId] ??
-        ((question['is_required'] ?? false) ||
-            (question['text']?.toString() ?? '').endsWith('~'));
-
-    // Display question text without the trailing '~'
-    String displayText = question['text'] ?? 'No question text';
-    if (displayText.endsWith('~')) {
-      displayText = displayText.substring(0, displayText.length - 1);
-    }
-
-    // Validation state
-    final bool isInvalid = _validatingForm &&
-        _questionValidityMap.containsKey(questionId) &&
-        !_questionValidityMap[questionId]!;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
-      color: isInvalid ? Colors.red[50] : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isInvalid
-            ? const BorderSide(color: Colors.red, width: 1.0)
-            : BorderSide.none,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Colored top bar
-          Container(
-            height: 9,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildQuestionHeader(question, displayText, questionIsRequired),
-
-                if (isInvalid)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4, bottom: 8),
-                    child: Text(
-                      'This question is required',
-                      style: TextStyle(color: Colors.red, fontSize: 12),
-                    ),
-                  ),
-
-                const SizedBox(height: 8),
-                _buildAnswerField(question),
-              ],
-            ),
-          ),
-
-          // Controls
-          GoogleFormsQuestionControls(
-            isRequired: questionIsRequired,
-            onRequiredChanged: (value) => _handleRequiredToggle(questionId, value),
-            onDuplicate: () => _duplicateQuestion(question),
-            onDelete: () => widget.deleteFormQuestion(context, formQuestionId),
-          ),
-        ],
-      ),
-    );
-  }*/
-
-
-/*
-  Widget _buildQuestionCard(Map<String, dynamic> question) {
-    final int questionId = question['id'];
-    final int formQuestionId = question['form_question_id'];
-
-    // Get required state from local state if available
-    final bool questionIsRequired = _localRequiredState[questionId] ??
-        ((question['is_required'] ?? false) ||
-            (question['text']?.toString() ?? '').endsWith('~'));
-
-    // Display question text without the trailing '~'
-    String displayText = question['text'] ?? 'No question text';
-    if (displayText.endsWith('~')) {
-      displayText = displayText.substring(0, displayText.length - 1);
-    }
-
-    // Validation state
-    final bool isInvalid = _validatingForm &&
-        _questionValidityMap.containsKey(questionId) &&
-        !_questionValidityMap[questionId]!;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
-      color: isInvalid ? Colors.red[50] : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isInvalid
-            ? const BorderSide(color: Colors.red, width: 1.0)
-            : BorderSide.none,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top bar with close button
-          Container(
-            height: 40,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                // Always visible X button to delete the question
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20, color: Colors.red),
-                  padding: const EdgeInsets.all(8),
-                  constraints: const BoxConstraints(),
-                  onPressed: () => widget.deleteFormQuestion(context, formQuestionId),
-                  tooltip: 'Delete question',
-                ),
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildQuestionHeader(question, displayText, questionIsRequired),
-
-                if (isInvalid)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4, bottom: 8),
-                    child: Text(
-                      'This question is required',
-                      style: TextStyle(color: Colors.red, fontSize: 12),
-                    ),
-                  ),
-
-                const SizedBox(height: 8),
-                _buildAnswerField(question),
-              ],
-            ),
-          ),
-
-          // Controls
-          GoogleFormsQuestionControls(
-            isRequired: questionIsRequired,
-            onRequiredChanged: (value) => _handleRequiredToggle(questionId, value),
-            onDuplicate: () => _duplicateQuestion(question),
-            onDelete: () => widget.deleteFormQuestion(context, formQuestionId),
-          ),
-        ],
-      ),
-    );
-  }*/
-
-/*
-  Widget _buildQuestionCard(Map<String, dynamic> question) {
-    final int questionId = question['id'];
-    final int formQuestionId = question['form_question_id'];
-
-    // Get required state from local state if available
-    final bool questionIsRequired = _localRequiredState[questionId] ??
-        ((question['is_required'] ?? false) ||
-            (question['text']?.toString() ?? '').endsWith('~'));
-
-    // Display question text without the trailing '~'
-    String displayText = question['text'] ?? 'No question text';
-    if (displayText.endsWith('~')) {
-      displayText = displayText.substring(0, displayText.length - 1);
-    }
-
-    // Validation state
-    final bool isInvalid = _validatingForm &&
-        _questionValidityMap.containsKey(questionId) &&
-        !_questionValidityMap[questionId]!;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
-      color: isInvalid ? Colors.red[50] : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isInvalid
-            ? const BorderSide(color: Colors.red, width: 1.0)
-            : BorderSide.none,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top bar with delete button
-          Container(
-            height: 40,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                // Always visible trash can icon for deletion
-                /*IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      size: 20, color: Colors.red),
-                  padding: const EdgeInsets.all(8),
-                  constraints: const BoxConstraints(),
-                  onPressed: () => widget.deleteFormQuestion(context, formQuestionId),
-                  tooltip: 'Delete question',
-                ),*/
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildQuestionHeader(question, displayText, questionIsRequired),
-
-                if (isInvalid)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4, bottom: 8),
-                    child: Text(
-                      'This question is required',
-                      style: TextStyle(color: Colors.red, fontSize: 12),
-                    ),
-                  ),
-
-                const SizedBox(height: 8),
-                _buildAnswerField(question),
-              ],
-            ),
-          ),
-
-          // Controls
-          GoogleFormsQuestionControls(
-            isRequired: questionIsRequired,
-            onRequiredChanged: (value) => _handleRequiredToggle(questionId, value),
-            onDuplicate: () => _duplicateQuestion(question),
-            onDelete: () => widget.deleteFormQuestion(context, formQuestionId),
-          ),
-        ],
-      ),
-    );
-  }*/
-
-
   Widget _buildQuestionCard(Map<String, dynamic> question) {
     final int questionId = question['id'];
     final int formQuestionId = question['form_question_id'];
@@ -493,6 +246,9 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
     final bool isInvalid = _validatingForm &&
         _questionValidityMap.containsKey(questionId) &&
         !_questionValidityMap[questionId]!;
+
+    // Check if editing mode is active for this question
+    final bool isEditing = _isEditingQuestionText[questionId] ?? false;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -550,7 +306,9 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildQuestionHeader(question, displayText, questionIsRequired),
+                isEditing
+                    ? _buildQuestionEditingField(question, questionId, questionIsRequired)
+                    : _buildQuestionHeader(question, displayText, questionIsRequired),
 
                 if (isInvalid)
                   const Padding(
@@ -562,13 +320,16 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
                   ),
 
                 const SizedBox(height: 8),
-                _buildAnswerField(question),
+                if (!isEditing) // Only show answer field when not editing question text
+                  _buildAnswerField(question),
               ],
             ),
           ),
 
-          // Controls
-          GoogleFormsQuestionControls(
+          // Controls - use editing controls when in edit mode
+          isEditing
+              ? _buildEditingControls(questionId)
+              : GoogleFormsQuestionControls(
             isRequired: questionIsRequired,
             onRequiredChanged: (value) => _handleRequiredToggle(questionId, value),
             onDuplicate: () => _duplicateQuestion(question),
@@ -579,10 +340,85 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
     );
   }
 
+  Widget _buildQuestionEditingField(Map<String, dynamic> question, int questionId, bool isRequired) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Edit Question Text',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _questionTextControllers[questionId],
+          decoration: InputDecoration(
+            hintText: 'Enter question text',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            suffixIcon: isRequired
+                ? const Tooltip(
+              message: 'Required question',
+              child: Icon(Icons.star, color: Colors.red, size: 16),
+            )
+                : null,
+          ),
+          maxLines: null, // Allow multiple lines
+          autofocus: true,
+          onChanged: (value) {
+            // Mark that changes were made
+            widget.setUnsavedChanges(true);
+          },
+        ),
+      ],
+    );
+  }
 
+  Widget _buildEditingControls(int questionId) {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(8),
+          bottomRight: Radius.circular(8),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton(
+            onPressed: () {
+              // Cancel editing and revert changes
+              _cancelQuestionEditing(questionId);
+            },
+            child: const Text('Cancel'),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () {
+              // Save the question text changes
+              _saveQuestionTextChanges(questionId);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 34, 118, 186),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildQuestionHeader(Map<String, dynamic> question, String displayText, bool questionIsRequired) {
     final String questionType = question['type']?.toString().toLowerCase() ?? '';
+    final int questionId = question['id'];
 
     return Row(
       children: [
@@ -609,6 +445,13 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
                 ),
             ],
           ),
+        ),
+        // Edit button (new position) - placed before the add button
+        IconButton(
+          icon: const Icon(Icons.edit, size: 20),
+          color: Colors.blue,
+          tooltip: 'Edit question',
+          onPressed: () => _toggleQuestionEditMode(questionId),
         ),
         if (widget.shouldShowAnswerSelection(questionType))
           IconButton(
@@ -669,11 +512,122 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
         },
         questionType: questionType,
         formQuestionId: formQuestionId,
-        setUnsavedChanges: widget.setUnsavedChanges, // Pass through the setUnsavedChanges function
+        setUnsavedChanges: widget.setUnsavedChanges,
       );
     }
 
     return Container();
+  }
+
+  void _toggleQuestionEditMode(int questionId) {
+    setState(() {
+      _isEditingQuestionText[questionId] = true;
+    });
+
+    // Notify parent about edit mode
+    widget.setUnsavedChanges(true);
+  }
+
+  void _cancelQuestionEditing(int questionId) {
+    // Get the question from the list
+    final question = widget.questions.firstWhere(
+          (q) => q['id'] == questionId,
+      orElse: () => {},
+    );
+
+    if (question.isNotEmpty) {
+      // Reset text controller to original value
+      String originalText = question['text'] ?? '';
+      if (originalText.endsWith('~')) {
+        originalText = originalText.substring(0, originalText.length - 1);
+      }
+
+      setState(() {
+        _questionTextControllers[questionId]?.text = originalText;
+        _isEditingQuestionText[questionId] = false;
+      });
+    } else {
+      setState(() {
+        _isEditingQuestionText[questionId] = false;
+      });
+    }
+
+    // No changes were saved, but we need to check if there are other unsaved changes
+    widget.setUnsavedChanges(false);
+  }
+
+  Future<void> _saveQuestionTextChanges(int questionId) async {
+    try {
+      // Get the new text from the controller
+      final String newText = _questionTextControllers[questionId]?.text.trim() ?? '';
+
+      // Check if text is empty
+      if (newText.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Question text cannot be empty'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Get required status
+      final bool isRequired = _localRequiredState[questionId] ?? false;
+
+      // Prepare text with required marker if needed
+      final String textToSave = isRequired && !newText.endsWith('~') ? '$newText~' : newText;
+
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
+      // Update the question in the API
+      await _updateQuestionText(questionId, textToSave, isRequired);
+
+      // Exit edit mode
+      setState(() {
+        _isEditingQuestionText[questionId] = false;
+      });
+
+      // Dismiss loading indicator
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Refresh the form to show updated question
+      widget.fetchFormDetails();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Question updated successfully'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      // Dismiss loading indicator if it's showing
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating question: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _handleRequiredToggle(int questionId, bool value) {
@@ -750,9 +704,6 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
 
   Future<void> _updateQuestionText(int questionId, String newText, bool isRequired) async {
     try {
-      // Use QuestionApiService to update the question
-      final questionService = QuestionApiService();
-
       // Log the request data for debugging
       print('Updating question $questionId with text: "$newText" and isRequired: $isRequired');
 
@@ -765,7 +716,7 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
       // Log the actual payload being sent
       print('API request payload: ${json.encode(updateData)}');
 
-      var result = await questionService.updateQuestion(
+      var result = await _questionApiService.updateQuestion(
         context,
         questionId,
         updateData,
@@ -791,11 +742,22 @@ class QuestionsListWidgetState extends State<QuestionsListWidget> {
           ),
         );
       }
+      // Re-throw to allow batch operations to detect failure
+      throw e;
     }
   }
 
   void _duplicateQuestion(Map<String, dynamic> questionToDuplicate) {
     // Implement question duplication and refresh the form
     widget.fetchFormDetails();
+  }
+
+  @override
+  void dispose() {
+    // Dispose all text controllers
+    for (var controller in _questionTextControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 }
