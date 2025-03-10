@@ -303,13 +303,16 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
         final DateTime? picked = await showDatePicker(
           context: context,
           initialDate: widget.currentValue != null
-              ? DateTime.parse(widget.currentValue)
+              ? (widget.currentValue.contains('/')
+              ? DateFormat('dd/MM/yyyy').parse(widget.currentValue)
+              : DateFormat('yyyy-MM-dd').parse(widget.currentValue))
               : DateTime.now(),
           firstDate: DateTime(1900),
           lastDate: DateTime(2100),
         );
         if (picked != null) {
-          widget.onAnswerChanged(DateFormat('yyyy-MM-dd').format(picked));
+          // Cambiar el formato de fecha a dd/MM/yyyy en lugar de yyyy-MM-dd
+          widget.onAnswerChanged(DateFormat('dd/MM/yyyy').format(picked));
         }
       },
       child: InputDecorator(
@@ -322,7 +325,9 @@ class _DynamicQuestionInputState extends State<DynamicQuestionInput> {
         ),
         child: Text(
           widget.currentValue != null
-              ? DateFormat('dd/MM/yyyy').format(DateTime.parse(widget.currentValue))
+              ? (widget.currentValue.contains('/')
+              ? widget.currentValue
+              : DateFormat('dd/MM/yyyy').format(DateFormat('yyyy-MM-dd').parse(widget.currentValue)))
               : 'Select date',
           style: TextStyle(
             color: widget.currentValue != null ? Colors.black : Colors.grey[600],

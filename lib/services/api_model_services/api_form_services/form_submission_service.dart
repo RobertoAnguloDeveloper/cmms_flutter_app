@@ -14,9 +14,14 @@ class FormSubmissionService {
       return value.isEmpty ? '' : value.join(',');
     } else if (questionType == 'date') {
       try {
-        // Ensure proper date formatting
+        // Si la fecha ya está en formato dd/MM/yyyy, no la cambiamos
+        if (value.toString().contains('/')) {
+          return value.toString();
+        }
+
+        // Asegurar formato de fecha adecuado, convirtiendo de yyyy-MM-dd a dd/MM/yyyy si es necesario
         DateTime date = DateTime.parse(value.toString());
-        return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+        return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
       } catch (e) {
         print('Error formatting date: $e');
         return value?.toString() ?? '';
@@ -24,6 +29,9 @@ class FormSubmissionService {
     }
     return value?.toString() ?? '';
   }
+
+  // Path: lib/services/api_model_services/form_submission_service.dart
+// Modificar el método submitFormWithAnswers para ordenar las respuestas según el orden de las preguntas
 
   Future<Map<String, dynamic>> submitFormWithAnswers({
     required BuildContext context,
@@ -39,8 +47,7 @@ class FormSubmissionService {
       // 1. Create form submission
       final submissionData = {'form_id': formId};
 
-      print(
-          'Creating form submission with data: ${json.encode(submissionData)}');
+      print('Creating form submission with data: ${json.encode(submissionData)}');
 
       var submissionUri = Uri.parse('${_http.baseUrl}/api/form-submissions');
       var submissionResponse = await http.post(
@@ -79,19 +86,48 @@ class FormSubmissionService {
         throw Exception('Invalid submission ID in response');
       }
 
-      // 2. Submit answers
+      // 2. Ordenar preguntas por order_number (si existe) o por el número en el texto de la pregunta
+      List<dynamic> orderedQuestions = List.from(questions);
+
+      // Primero intentamos ordenar por order_number
+      orderedQuestions.sort((a, b) {
+        int orderA = a['order_number'] ?? 0;
+        int orderB = b['order_number'] ?? 0;
+        return orderA.compareTo(orderB);
+      });
+
+      // Si las preguntas tienen un prefijo numérico (como "1 TEXT", "2 CHOICE", etc.),
+      // usamos eso como respaldo para el orden
+      if (orderedQuestions.first['order_number'] == null ||
+          orderedQuestions.first['order_number'] == 0) {
+        orderedQuestions.sort((a, b) {
+          // Intentamos extraer el número del inicio del texto de la pregunta
+          RegExp regExp = RegExp(r'^(\d+)');
+          String textA = a['text'] ?? '';
+          String textB = b['text'] ?? '';
+
+          Match? matchA = regExp.firstMatch(textA);
+          Match? matchB = regExp.firstMatch(textB);
+
+          int orderA = matchA != null ? int.tryParse(matchA.group(1) ?? '0') ?? 0 : 0;
+          int orderB = matchB != null ? int.tryParse(matchB.group(1) ?? '0') ?? 0 : 0;
+
+          return orderA.compareTo(orderB);
+        });
+      }
+
+      // 3. Submit answers in the order of questions
       var answersUri = Uri.parse('${_http.baseUrl}/api/answers-submitted');
 
-      for (var entry in answers.entries) {
-        var question = questions.firstWhere(
-          (q) => q['id'] == entry.key,
-          orElse: () => null,
-        );
+      for (var question in orderedQuestions) {
+        int questionId = question['id'];
 
-        if (question == null) continue;
+        // Skip questions that don't have an answer
+        if (!answers.containsKey(questionId)) {
+          continue;
+        }
 
-        String formattedAnswer =
-            formatAnswerValue(entry.value, question['type']);
+        String formattedAnswer = formatAnswerValue(answers[questionId], question['type']);
 
         final answerData = {
           'form_submission_id': submissionId,
@@ -118,7 +154,7 @@ class FormSubmissionService {
         }
       }
 
-      // 3. Handle attachments
+      // 4. Handle attachments
       if (attachmentPaths.isNotEmpty) {
         var attachmentsUri = Uri.parse('${_http.baseUrl}/api/attachments');
 
@@ -143,7 +179,7 @@ class FormSubmissionService {
           var attachmentResponse = await request.send();
           if (attachmentResponse.statusCode != 201) {
             var responseBody =
-                await http.Response.fromStream(attachmentResponse);
+            await http.Response.fromStream(attachmentResponse);
             throw Exception(
                 'Failed to upload attachment: ${responseBody.body}');
           }
