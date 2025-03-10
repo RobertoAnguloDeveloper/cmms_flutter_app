@@ -12,7 +12,6 @@ import '../../../services/api_session_client_services/ApiResponseHandler.dart';
 import '../../../services/api_session_client_services/Http.dart';
 import '../../../services/api_session_client_services/SessionManager.dart';
 
-
 class PdfExportDialog extends StatefulWidget {
   final int submissionId;
 
@@ -38,7 +37,7 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
   double _signaturesSize = 100;
   String _signaturesAlignment = 'horizontal';
   bool _isLoading = false;
-  bool _isInitialized = false; // Add this line to declare the variable
+  bool _isInitialized = false;
   String? _errorMessage;
 
   final List<String> _alignmentOptions = ['left', 'center', 'right'];
@@ -51,7 +50,6 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
     _loadSavedPreferences();
   }
 
-
   Future<void> _loadSavedPreferences() async {
     try {
       final prefs = await SessionManager.getPdfExportPreferences();
@@ -63,6 +61,19 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
           _headerAlignment = prefs['headerAlignment'];
           _signaturesSize = prefs['signaturesSize'];
           _signaturesAlignment = prefs['signaturesAlignment'];
+
+          // Load saved image if it exists
+          String? savedImagePath = prefs['headerImagePath'];
+          if (savedImagePath != null) {
+            // Add this check to ensure the file exists
+            if (File(savedImagePath).existsSync()) {
+              _headerImage = XFile(savedImagePath);
+            } else {
+              print('Saved image file not found: $savedImagePath');
+              // Don't set _headerImage if file doesn't exist
+            }
+          }
+
           _isInitialized = true;
         });
       }
@@ -85,6 +96,16 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
       setState(() {
         _headerImage = image;
       });
+
+      // Save the new image path to preferences
+      await SessionManager.savePdfExportPreferences(
+        headerOpacity: _headerOpacity,
+        headerSize: _headerSize,
+        headerAlignment: _headerAlignment,
+        signaturesSize: _signaturesSize,
+        signaturesAlignment: _signaturesAlignment,
+        headerImagePath: image.path,
+      );
     }
   }
 
@@ -107,6 +128,7 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
         headerAlignment: _headerAlignment,
         signaturesSize: _signaturesSize,
         signaturesAlignment: _signaturesAlignment,
+        headerImagePath: _headerImage!.path,
       );
 
       setState(() {
@@ -208,7 +230,7 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
           }
         } else if (response.statusCode == 401) {
           if (mounted) {
-            // For authentication errors, we can be more specific since this is a common issue
+            // For authentication errors, we can be more specific
             String responseBody = String.fromCharCodes(responseBytes);
             try {
               Map<String, dynamic> jsonResponse = {};
@@ -217,7 +239,6 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
               }
               await ApiResponseHandler.handleExpiredToken(context, jsonResponse);
             } catch (e) {
-              // Log the actual error for debugging but don't show to user
               print('Error parsing JSON during auth error: $e');
             }
             setState(() {
@@ -228,22 +249,12 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
         } else {
           // For other HTTP errors, log details but show generic message
           String errorMsg = String.fromCharCodes(responseBytes);
-          try {
-            // Log the detailed error for debugging
-            print('PDF Generation Error (HTTP ${response.statusCode}): $errorMsg');
+          print('PDF Generation Error (HTTP ${response.statusCode}): $errorMsg');
 
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'Unable to generate PDF. Please try again later.';
-            });
-          } catch (e) {
-            // Log parse error but show generic message
-            print('Error handling response: $e');
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'Unable to generate PDF. Please try again later.';
-            });
-          }
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Unable to generate PDF. Please try again later.';
+          });
         }
       } catch (e) {
         // For any other exceptions, log details but show generic message
@@ -304,15 +315,173 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
       print('Error opening PDF in browser: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error opening PDF: $e')),
+          SnackBar(content: Text('Error opening PDF')),
         );
       }
     }
   }
 
+  Widget _buildHeaderPreview() {
+    if (_headerImage == null) {
+      return Container(
+        height: 150,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[400]!),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey),
+            SizedBox(height: 8),
+            Text('Click to select header image'),
+          ],
+        ),
+      );
+    }
+
+    // Convert opacity from percentage (0-100) to decimal (0.0-1.0)
+    final double opacity = _headerOpacity / 100;
+
+    // Get container width to calculate maximum image size
+    final double containerWidth = MediaQuery.of(context).size.width - 40; // accounting for padding
+
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white, // White background to simulate PDF
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[400]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Container to simulate PDF page with light grey guidelines
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.white,
+            child: Center(
+              child: Opacity(
+                opacity: 0.1,
+                child: Icon(Icons.description, size: 64, color: Colors.grey),
+              ),
+            ),
+          ),
+
+          // Header image with applied settings
+          Align(
+            alignment: _getAlignmentFromString(_headerAlignment),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Calculate image width based on container width and header size percentage
+                final double maxWidth = constraints.maxWidth;
+                final double imageWidth = maxWidth * (_headerSize / 100);
+
+                return Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Container(
+                    width: imageWidth,
+                    child: Opacity(
+                      opacity: opacity,
+                      child: Image.file(
+                        File(_headerImage!.path),
+                        fit: BoxFit.fitWidth, // Make sure image scales properly
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Information overlay
+          Positioned(
+            bottom: 4,
+            right: 4,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.preview, size: 14, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    'Preview',
+                    style: TextStyle(color: Colors.white, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Header size indicator
+          Positioned(
+            top: 4,
+            left: 4,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Size: ${_headerSize.round()}%',
+                style: TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ),
+
+          // Opacity indicator
+          Positioned(
+            top: 4,
+            right: 4,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Opacity: ${_headerOpacity.round()}%',
+                style: TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Helper method to convert string alignment to Flutter's Alignment
+  Alignment _getAlignmentFromString(String align) {
+    switch (align) {
+      case 'left':
+        return Alignment.topLeft;
+      case 'center':
+        return Alignment.topCenter;
+      case 'right':
+        return Alignment.topRight;
+      default:
+        return Alignment.topCenter;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-
     if (!_isInitialized) {
       return Dialog(
         child: Container(
@@ -366,51 +535,63 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
                 const SizedBox(height: 16),
 
                 // Header Image Section
-                const Text(
-                  'Header Image',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                Row(
+                  children: [
+                    const Text(
+                      'Header Image',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const Spacer(),
+                    if (_headerImage != null)
+                      TextButton.icon(
+                        icon: Icon(Icons.refresh, size: 18),
+                        label: Text('Change'),
+                        onPressed: _pickImage,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.blue,
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 8),
 
-                // Image picker
+                // Image preview with live updates
                 InkWell(
-                  onTap: _pickImage,
-                  child: Container(
-                    height: 120,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[400]!),
-                    ),
-                    child: _headerImage != null
-                        ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(_headerImage!.path),
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                        : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text('Click to select header image'),
-                      ],
-                    ),
-                  ),
+                  onTap: _headerImage == null ? _pickImage : null,
+                  child: _buildHeaderPreview(),
                 ),
+
                 const SizedBox(height: 16),
 
-                // Header Opacity
-                const Text('Header Opacity (%)'),
+                // Header Opacity with label showing percentage
+                Row(
+                  children: [
+                    const Text('Header Opacity'),
+                    const Spacer(),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_headerOpacity.round()}%',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 Slider(
                   value: _headerOpacity,
                   min: 0,
                   max: 100,
                   divisions: 100,
-                  label: _headerOpacity.round().toString(),
+                  activeColor: Colors.blue,
+                  inactiveColor: Colors.blue.shade100,
                   onChanged: (double value) {
                     setState(() {
                       _headerOpacity = value;
@@ -418,14 +599,34 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
                   },
                 ),
 
-                // Header Size
-                const Text('Header Size (%)'),
+                // Header Size with label showing percentage
+                Row(
+                  children: [
+                    const Text('Header Size'),
+                    const Spacer(),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_headerSize.round()}%',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 Slider(
                   value: _headerSize,
                   min: 1,
                   max: 100,
                   divisions: 100,
-                  label: _headerSize.round().toString(),
+                  activeColor: Colors.blue,
+                  inactiveColor: Colors.blue.shade100,
                   onChanged: (double value) {
                     setState(() {
                       _headerSize = value;
@@ -468,13 +669,33 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
                 const SizedBox(height: 8),
 
                 // Signatures Size
-                const Text('Signatures Size (%)'),
+                Row(
+                  children: [
+                    const Text('Signatures Size'),
+                    const Spacer(),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_signaturesSize.round()}%',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 Slider(
                   value: _signaturesSize,
                   min: 1,
                   max: 200,
                   divisions: 200,
-                  label: _signaturesSize.round().toString(),
+                  activeColor: Colors.blue,
+                  inactiveColor: Colors.blue.shade100,
                   onChanged: (double value) {
                     setState(() {
                       _signaturesSize = value;

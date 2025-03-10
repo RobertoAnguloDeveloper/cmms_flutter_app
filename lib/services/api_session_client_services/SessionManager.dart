@@ -1,4 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../models/user_management_models/User.dart';
 
@@ -19,6 +24,7 @@ class SessionManager {
   static const String _keyPdfHeaderAlignment = 'pdf_header_alignment';
   static const String _keyPdfSignaturesSize = 'pdf_signatures_size';
   static const String _keyPdfSignaturesAlignment = 'pdf_signatures_alignment';
+  static const String _keyPdfHeaderImagePath = 'pdf_header_image_path';
 
   static Future<void> saveSession(User user) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -36,13 +42,13 @@ class SessionManager {
   static Future<void> setToken(String token) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setString(_keyToken, token);
-    print('Token guardado en SessionManager: $token');
+    print('Token saved in SessionManager: $token');
   }
 
   static Future<String?> getToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString(_keyToken);
-    print('Token recuperado de SessionManager: $token');
+    print('Token retrieved from SessionManager: $token');
     return token;
   }
 
@@ -81,12 +87,14 @@ class SessionManager {
     return token != null && token.isNotEmpty;
   }
 
+  // Updated to include header image path
   static Future<void> savePdfExportPreferences({
     required double headerOpacity,
     required double headerSize,
     required String headerAlignment,
     required double signaturesSize,
     required String signaturesAlignment,
+    String? headerImagePath,
   }) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setDouble(_keyPdfHeaderOpacity, headerOpacity);
@@ -94,10 +102,59 @@ class SessionManager {
     prefs.setString(_keyPdfHeaderAlignment, headerAlignment);
     prefs.setDouble(_keyPdfSignaturesSize, signaturesSize);
     prefs.setString(_keyPdfSignaturesAlignment, signaturesAlignment);
+
+    // Save header image path if provided
+    if (headerImagePath != null) {
+      // Save the original path
+      prefs.setString(_keyPdfHeaderImagePath, headerImagePath);
+
+      // Also copy the image to app documents directory for persistence
+      await _saveHeaderImageCopy(headerImagePath);
+    }
   }
 
+  // Helper method to make a persistent copy of the header image
+  static Future<void> _saveHeaderImageCopy(String originalPath) async {
+    try {
+      final File originalFile = File(originalPath);
+      if (await originalFile.exists()) {
+        final bytes = await originalFile.readAsBytes();
+
+        // Get app documents directory for saving the copy
+        final directory = await getApplicationDocumentsDirectory();
+        final String filename = 'header_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final String persistentPath = '${directory.path}/$filename';
+
+        // Save the copy
+        final File persistentFile = File(persistentPath);
+        await persistentFile.writeAsBytes(bytes);
+
+        // Update the stored path to point to our persistent copy
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        prefs.setString(_keyPdfHeaderImagePath, persistentPath);
+
+        print('Header image saved to persistent location: $persistentPath');
+      }
+    } catch (e) {
+      print('Error saving header image copy: $e');
+      // Continue anyway - original path will still be used
+    }
+  }
+
+  // Updated to include header image path in returned preferences
   static Future<Map<String, dynamic>> getPdfExportPreferences() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    String? headerImagePath = prefs.getString(_keyPdfHeaderImagePath);
+
+    // Verify the image file still exists
+    if (headerImagePath != null) {
+      File imageFile = File(headerImagePath);
+      if (!await imageFile.exists()) {
+        print('Saved image no longer exists at path: $headerImagePath');
+        headerImagePath = null;
+      }
+    }
 
     return {
       'headerOpacity': prefs.getDouble(_keyPdfHeaderOpacity) ?? 100.0,
@@ -105,15 +162,14 @@ class SessionManager {
       'headerAlignment': prefs.getString(_keyPdfHeaderAlignment) ?? 'left',
       'signaturesSize': prefs.getDouble(_keyPdfSignaturesSize) ?? 100.0,
       'signaturesAlignment': prefs.getString(_keyPdfSignaturesAlignment) ?? 'horizontal',
+      'headerImagePath': headerImagePath,
     };
   }
-
-  // lib/services/api_session_client_services/SessionManager.dart
 
   static Future<void> clearSession() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    // Remover solo las claves relacionadas con la sesión del usuario
+    // Remove only user session related keys
     await prefs.remove(_keyUserId);
     await prefs.remove(_keyIdType);
     await prefs.remove(_keyIdentification);
@@ -125,7 +181,7 @@ class SessionManager {
     await prefs.remove(_keyPassword);
     await prefs.remove(_keyToken);
 
-    // Las preferencias de PDF no se eliminan, permanecen intactas
+    // PDF preferences are not deleted, they remain intact
     print('Session cleared but PDF preferences retained');
   }
 }
