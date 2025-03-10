@@ -38,10 +38,44 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
   double _signaturesSize = 100;
   String _signaturesAlignment = 'horizontal';
   bool _isLoading = false;
+  bool _isInitialized = false; // Add this line to declare the variable
   String? _errorMessage;
 
   final List<String> _alignmentOptions = ['left', 'center', 'right'];
   final List<String> _signatureAlignmentOptions = ['vertical', 'horizontal'];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load saved preferences when dialog opens
+    _loadSavedPreferences();
+  }
+
+
+  Future<void> _loadSavedPreferences() async {
+    try {
+      final prefs = await SessionManager.getPdfExportPreferences();
+
+      if (mounted) {
+        setState(() {
+          _headerOpacity = prefs['headerOpacity'];
+          _headerSize = prefs['headerSize'];
+          _headerAlignment = prefs['headerAlignment'];
+          _signaturesSize = prefs['signaturesSize'];
+          _signaturesAlignment = prefs['signaturesAlignment'];
+          _isInitialized = true;
+        });
+      }
+    } catch (e) {
+      print('Error loading PDF preferences: $e');
+      // Continue with default values
+      if (mounted) {
+        setState(() {
+          _isInitialized = true; // Mark as initialized even on error
+        });
+      }
+    }
+  }
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -64,6 +98,15 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
         });
         return;
       }
+
+      await SessionManager.savePdfExportPreferences(
+        headerOpacity: _headerOpacity,
+        headerSize: _headerSize,
+        headerAlignment: _headerAlignment,
+        signaturesSize: _signaturesSize,
+        signaturesAlignment: _signaturesAlignment,
+      );
+
 
       setState(() {
         _isLoading = true;
@@ -257,6 +300,23 @@ class _PdfExportDialogState extends State<PdfExportDialog> {
 
   @override
   Widget build(BuildContext context) {
+
+    if (!_isInitialized) {
+      return Dialog(
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              CircularProgressIndicator(),
+              SizedBox(height: 20),
+              Text('Loading preferences...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),

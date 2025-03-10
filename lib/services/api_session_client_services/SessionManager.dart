@@ -14,6 +14,12 @@ class SessionManager {
   static const String _keyPassword = 'password';
   static const String _keyToken = 'token';
 
+  static const String _keyPdfHeaderOpacity = 'pdf_header_opacity';
+  static const String _keyPdfHeaderSize = 'pdf_header_size';
+  static const String _keyPdfHeaderAlignment = 'pdf_header_alignment';
+  static const String _keyPdfSignaturesSize = 'pdf_signatures_size';
+  static const String _keyPdfSignaturesAlignment = 'pdf_signatures_alignment';
+
   static Future<void> saveSession(User user) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.setInt(_keyUserId, user.id);
@@ -75,8 +81,51 @@ class SessionManager {
     return token != null && token.isNotEmpty;
   }
 
+  static Future<void> savePdfExportPreferences({
+    required double headerOpacity,
+    required double headerSize,
+    required String headerAlignment,
+    required double signaturesSize,
+    required String signaturesAlignment,
+  }) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setDouble(_keyPdfHeaderOpacity, headerOpacity);
+    prefs.setDouble(_keyPdfHeaderSize, headerSize);
+    prefs.setString(_keyPdfHeaderAlignment, headerAlignment);
+    prefs.setDouble(_keyPdfSignaturesSize, signaturesSize);
+    prefs.setString(_keyPdfSignaturesAlignment, signaturesAlignment);
+  }
+
+  static Future<Map<String, dynamic>> getPdfExportPreferences() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    return {
+      'headerOpacity': prefs.getDouble(_keyPdfHeaderOpacity) ?? 100.0,
+      'headerSize': prefs.getDouble(_keyPdfHeaderSize) ?? 20.0,
+      'headerAlignment': prefs.getString(_keyPdfHeaderAlignment) ?? 'left',
+      'signaturesSize': prefs.getDouble(_keyPdfSignaturesSize) ?? 100.0,
+      'signaturesAlignment': prefs.getString(_keyPdfSignaturesAlignment) ?? 'horizontal',
+    };
+  }
+
+  // lib/services/api_session_client_services/SessionManager.dart
+
   static Future<void> clearSession() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+
+    // Remover solo las claves relacionadas con la sesión del usuario
+    await prefs.remove(_keyUserId);
+    await prefs.remove(_keyIdType);
+    await prefs.remove(_keyIdentification);
+    await prefs.remove(_keyFirstName);
+    await prefs.remove(_keyLastName);
+    await prefs.remove(_keyEmail);
+    await prefs.remove(_keyRoleId);
+    await prefs.remove(_keyUsername);
+    await prefs.remove(_keyPassword);
+    await prefs.remove(_keyToken);
+
+    // Las preferencias de PDF no se eliminan, permanecen intactas
+    print('Session cleared but PDF preferences retained');
   }
 }

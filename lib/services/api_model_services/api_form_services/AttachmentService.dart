@@ -454,58 +454,53 @@ class AttachmentService {
     }
   }
 
+  // 📂 lib/services/api_model_services/api_form_services/attachment_service.dart
+
   Future<void> _downloadWithRangeRequests(
       BuildContext context,
       int attachmentId,
       String url,
       String token,
       ) async {
+    // Initial progress value
     double progress = 0.0;
+
+    // Reference to the dialog context
     late BuildContext dialogContext;
 
+    // Create a dialog with StatefulBuilder to allow updating progress
     if (context.mounted) {
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) {
-          dialogContext = ctx;
-          return AlertDialog(
-            title: const Text('Downloading...'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LinearProgressIndicator(value: progress),
-                const SizedBox(height: 10),
-                Text('${(progress * 100).toStringAsFixed(0)}%'),
-              ],
-            ),
+          return StatefulBuilder(
+            builder: (context, setState) {
+              dialogContext = context;
+              return AlertDialog(
+                title: const Text('Downloading...'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(value: progress),
+                    const SizedBox(height: 10),
+                    Text('${(progress * 100).toStringAsFixed(0)}%'),
+                  ],
+                ),
+              );
+            },
           );
         },
       );
     }
 
+    // Function to update progress without recreating the dialog
     void updateProgress(double newProgress) {
-      progress = newProgress;
       if (context.mounted) {
-        Navigator.of(context).pop();
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) {
-            dialogContext = ctx;
-            return AlertDialog(
-              title: const Text('Downloading...'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LinearProgressIndicator(value: progress),
-                  const SizedBox(height: 10),
-                  Text('${(progress * 100).toStringAsFixed(0)}%'),
-                ],
-              ),
-            );
-          },
-        );
+        // Update only the StatefulBuilder state
+        (dialogContext as StatefulElement).state.setState(() {
+          progress = newProgress;
+        });
       }
     }
 
@@ -589,11 +584,10 @@ class AttachmentService {
             totalBytesDownloaded += bytesDownloaded;
             currentPosition += bytesDownloaded;
 
-            final downloadProgress =
-            fileSize > 0 ? totalBytesDownloaded / fileSize : 0.0;
-            print(
-                '📊 Progress: ${(downloadProgress * 100).toStringAsFixed(0)}%, Downloaded: $totalBytesDownloaded/$fileSize bytes');
+            final downloadProgress = fileSize > 0 ? totalBytesDownloaded / fileSize : 0.0;
+            print('📊 Progress: ${(downloadProgress * 100).toStringAsFixed(0)}%, Downloaded: $totalBytesDownloaded/$fileSize bytes');
 
+            // Update progress without recreating dialog
             updateProgress(downloadProgress);
 
             retryCount = 0;

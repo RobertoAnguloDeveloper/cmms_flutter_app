@@ -849,32 +849,44 @@ class _FormDetailScreenState extends State<FormDetailHelper> {
     }
   }
 
+  // lib/screens/modules/form_management/form_management_helpers/FormDetailHelper.dart
+
   void _showExportDialog() {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return ExportFormDialog(
           onExport: (int signatureCount) async {
             try {
+              // Store the original context
+              final scaffoldContext = context;
+
               await _formApiService.exportFormAsPDF(
-                context,
+                scaffoldContext,
                 widget.form['id'],
                 signatureCount: signatureCount,
                 signatureDetails: {},
               );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('PDF export initiated successfully'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+
+              // Check if the widget is still mounted before using ScaffoldMessenger
+              if (mounted) {
+                ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('PDF export initiated successfully'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error exporting PDF: $e'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              // Check if the widget is still mounted before using ScaffoldMessenger
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error exporting PDF: $e'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
             }
           },
         );

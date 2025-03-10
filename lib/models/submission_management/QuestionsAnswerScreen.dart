@@ -686,6 +686,13 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     final bool isRequired = question['is_required'] ?? false;
     final bool isRequiredByTilde = question['text'].toString().endsWith('~');
     final bool questionIsRequired = isRequired || isRequiredByTilde;
+    final String questionType = question['type']?.toString().toLowerCase() ?? '';
+
+    // Format the question type for display (capitalize first letter, replace underscores with spaces)
+    String formattedType = questionType.isEmpty ? "Text" : questionType;
+    formattedType = formattedType.split('_').map((word) =>
+    word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1)}' : ''
+    ).join(' ');
 
     // Display question text without the tilde
     String displayText = question['text'] ?? 'No question text';
@@ -714,6 +721,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           children: [
             Row(
               children: [
+                // Question type badge in top-right corner
                 Expanded(
                   child: Row(
                     children: [
@@ -738,6 +746,26 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                     ],
                   ),
                 ),
+                // Question type chip with consistent blue color scheme
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[100], // Light blue background
+                    border: Border.all(
+                      color: Colors.blue[700]!, // Dark blue border
+                      width: 1.0,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    formattedType,
+                    style: TextStyle(
+                      color: Colors.blue[800], // Dark blue text
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
             ),
             if (isInvalid)
@@ -755,6 +783,8 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       ),
     );
   }
+
+
 
   // Update your _buildAnswerField method in QuestionsAnswerScreen.dart
 

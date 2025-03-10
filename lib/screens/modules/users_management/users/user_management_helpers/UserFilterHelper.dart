@@ -140,6 +140,37 @@ class UserFilterHelper {
                       style: ButtonStyle(
                         padding: MaterialStateProperty.all<EdgeInsets>(
                             EdgeInsets.symmetric(vertical: 16)),
+                        backgroundColor:
+                            MaterialStateProperty.all<Color>(Color(0xFFD2EFFC)),
+                        side: MaterialStateProperty.all<BorderSide>(
+                          BorderSide(color: Color(0xFF2276BA), width: 2),
+                        ),
+                        shape:
+                            MaterialStateProperty.all<RoundedRectangleBorder>(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onApply();
+                      },
+                      child: Text('Apply',
+                          style: TextStyle(
+                              fontSize: 18, color: Color(0xFF2276BA))),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    child: OutlinedButton(
+                      style: ButtonStyle(
+                        padding: MaterialStateProperty.all<EdgeInsets>(
+                            EdgeInsets.symmetric(vertical: 16)),
                         backgroundColor: MaterialStateProperty.all<Color>(
                             Color.fromARGB(255, 214, 217, 219)),
                         side: MaterialStateProperty.all<BorderSide>(
@@ -162,37 +193,6 @@ class UserFilterHelper {
                           style: TextStyle(
                               fontSize: 18,
                               color: Color.fromARGB(255, 113, 120, 127))),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    child: OutlinedButton(
-                      style: ButtonStyle(
-                        padding: MaterialStateProperty.all<EdgeInsets>(
-                            EdgeInsets.symmetric(vertical: 16)),
-                        backgroundColor:
-                            MaterialStateProperty.all<Color>(Color(0xFFD2EFFC)),
-                        side: MaterialStateProperty.all<BorderSide>(
-                          BorderSide(color: Color(0xFF2276BA), width: 2),
-                        ),
-                        shape:
-                            MaterialStateProperty.all<RoundedRectangleBorder>(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        onApply();
-                      },
-                      child: Text('Apply',
-                          style: TextStyle(
-                              fontSize: 18, color: Color(0xFF2276BA))),
                     ),
                   ),
                 ),
