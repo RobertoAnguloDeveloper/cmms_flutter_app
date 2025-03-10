@@ -2,24 +2,31 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'dart:convert';
 
-/// A callback function that provides the [file] of the signature
-/// plus optional [author] and [position] metadata
+/// A callback function that provides the signature data
+/// It may return a File or a Uint8List (for web) plus optional metadata
 typedef SignatureCallback = void Function(
-    File? file, {
+    {File? file,
+    Uint8List? bytes,
+    String? webImageData,
     String? author,
     String? position,
     });
 
 class CustomSignaturePad extends StatefulWidget {
   /// The callback that fires whenever the user saves a signature.
-  /// It provides the [File] plus optional metadata fields.
+  /// It provides the File (mobile) or Uint8List/base64 (web) plus optional metadata fields.
   final SignatureCallback onSignatureCaptured;
 
   /// If there's an existing signature file path, you can show it as a background.
   final String? initialSignaturePath;
+
+  /// Initial base64 signature data for web
+  final String? initialSignatureWebData;
 
   /// Optional initial metadata (if you want to show it in the text fields).
   final String? signatureAuthor;
@@ -37,6 +44,7 @@ class CustomSignaturePad extends StatefulWidget {
     Key? key,
     required this.onSignatureCaptured,
     this.initialSignaturePath,
+    this.initialSignatureWebData,
     this.signatureAuthor,
     this.signaturePosition,
     required this.questionTitle,
@@ -82,8 +90,9 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
       _positionController.text = "Form Signature"; // Default fallback
     }
 
-    // If there's an existing signature file path, flag that we already have a signature
-    if (widget.initialSignaturePath != null) {
+    // If there's an existing signature (file path for mobile or web data)
+    if ((widget.initialSignaturePath != null && !kIsWeb) ||
+        (widget.initialSignatureWebData != null && kIsWeb)) {
       _hasSignature = true;
     }
 
@@ -143,7 +152,7 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
               child: Stack(
                 children: [
                   // If there's an existing signature image, show it
-                  if (widget.initialSignaturePath != null && _hasSignature)
+                  if (!kIsWeb && widget.initialSignaturePath != null && _hasSignature)
                     Center(
                       child: Image.file(
                         File(widget.initialSignaturePath!),
@@ -151,8 +160,18 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
                       ),
                     ),
 
+                  // For web, show base64 image data if available
+                  if (kIsWeb && widget.initialSignatureWebData != null && _hasSignature)
+                    Center(
+                      child: Image.memory(
+                        base64Decode(widget.initialSignatureWebData!.split(',').last),
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+
                   // Otherwise, show the signature pad for drawing in non-expanded view
-                  if ((widget.initialSignaturePath == null || !_hasSignature) && !_isExpanded)
+                  if ((!kIsWeb && (widget.initialSignaturePath == null || !_hasSignature)) ||
+                      (kIsWeb && (widget.initialSignatureWebData == null || !_hasSignature)) && !_isExpanded)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: CustomPaint(
@@ -240,7 +259,7 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
             ElevatedButton.icon(
               onPressed: _isProcessing
                   ? null
-                  : (_strokes.isEmpty && widget.initialSignaturePath == null)
+                  : (_strokes.isEmpty && widget.initialSignaturePath == null && widget.initialSignatureWebData == null)
                   ? null
                   : _saveSignature,
               icon: _isProcessing
@@ -551,14 +570,18 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
       _overlayEntry?.markNeedsBuild();
 
       // Notify parent that there's no valid signature now
-      widget.onSignatureCaptured(null);
+      widget.onSignatureCaptured(
+        file: null,
+        bytes: null,
+        webImageData: null,
+      );
     });
   }
 
   void _saveExpandedSignature() async {
     if (_strokes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, dibuja una firma primero')),
+        const SnackBar(content: Text('Please draw a signature first')),
       );
       return;
     }
@@ -575,14 +598,19 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
       _strokes = <List<Offset>>[];
       _currentStroke = null;
       _hasSignature = false;
+
       // Notify parent that there's no valid signature now
-      widget.onSignatureCaptured(null);
+      widget.onSignatureCaptured(
+        file: null,
+        bytes: null,
+        webImageData: null,
+      );
     });
   }
 
   Future<void> _saveSignature() async {
     // If we have no strokes and no initial signature, user hasn't drawn anything yet.
-    if (_strokes.isEmpty && widget.initialSignaturePath == null) {
+    if (_strokes.isEmpty && widget.initialSignaturePath == null && widget.initialSignatureWebData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please draw a signature first')),
       );
@@ -604,9 +632,23 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
     try {
       // If there's an existing signature path and we haven't cleared/drawn over it,
       // just return that existing file.
-      if (widget.initialSignaturePath != null && _hasSignature) {
+      if (!kIsWeb && widget.initialSignaturePath != null && _hasSignature) {
         widget.onSignatureCaptured(
-          File(widget.initialSignaturePath!),
+          file: File(widget.initialSignaturePath!),
+          author: _authorController.text.trim(),
+          position: _positionController.text.trim(),
+        );
+        setState(() {
+          _isProcessing = false;
+        });
+        return;
+      }
+
+      // If there's an existing web signature data and we haven't cleared/drawn over it,
+      // just return that existing data.
+      if (kIsWeb && widget.initialSignatureWebData != null && _hasSignature) {
+        widget.onSignatureCaptured(
+          webImageData: widget.initialSignatureWebData,
           author: _authorController.text.trim(),
           position: _positionController.text.trim(),
         );
@@ -667,20 +709,35 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
         throw Exception("Failed to convert signature to image");
       }
 
-      final buffer = pngBytes.buffer.asUint8List();
+      final Uint8List buffer = pngBytes.buffer.asUint8List();
 
-      // Save to a temporary file
-      final tempDir = await getTemporaryDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final file = File('${tempDir.path}/signature_$timestamp.png');
-      await file.writeAsBytes(buffer);
+      if (kIsWeb) {
+        // For web platform, convert to base64 data URL
+        final String base64Data = base64Encode(buffer);
+        final String dataUrl = 'data:image/png;base64,$base64Data';
 
-      // Notify the parent widget with the newly created signature file + metadata
-      widget.onSignatureCaptured(
-        file,
-        author: _authorController.text.trim(),
-        position: _positionController.text.trim(),
-      );
+        // Notify the parent widget with the data URL and metadata
+        widget.onSignatureCaptured(
+          bytes: buffer,
+          webImageData: dataUrl,
+          author: _authorController.text.trim(),
+          position: _positionController.text.trim(),
+        );
+      } else {
+        // For mobile platforms, save to a temporary file
+        final tempDir = await getTemporaryDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final file = File('${tempDir.path}/signature_$timestamp.png');
+        await file.writeAsBytes(buffer);
+
+        // Notify the parent widget with the newly created signature file + metadata
+        widget.onSignatureCaptured(
+          file: file,
+          bytes: buffer,
+          author: _authorController.text.trim(),
+          position: _positionController.text.trim(),
+        );
+      }
 
       setState(() {
         _hasSignature = true;
@@ -699,54 +756,6 @@ class CustomSignaturePadState extends State<CustomSignaturePad> {
       });
     }
   }
-
-  /// Calculate the bounding box of the signature
-  Rect? _calculateSignatureBounds() {
-    if (_strokes.isEmpty) {
-      return null;
-    }
-
-    double minX = double.infinity;
-    double minY = double.infinity;
-    double maxX = double.negativeInfinity;
-    double maxY = double.negativeInfinity;
-
-    // Find the min and max points to determine the bounding box
-    for (final stroke in _strokes) {
-      for (final point in stroke) {
-        minX = point.dx < minX ? point.dx : minX;
-        minY = point.dy < minY ? point.dy : minY;
-        maxX = point.dx > maxX ? point.dx : maxX;
-        maxY = point.dy > maxY ? point.dy : maxY;
-      }
-    }
-
-    // Return the bounding rectangle
-    return Rect.fromLTRB(minX, minY, maxX, maxY);
-  }
-}
-
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.grey.withOpacity(0.1)
-      ..strokeWidth = 0.5;
-
-    // Draw horizontal grid lines
-    const double gridSpacing = 20.0;
-    for (double y = gridSpacing; y < size.height; y += gridSpacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-
-    // Draw vertical grid lines
-    for (double x = gridSpacing; x < size.width; x += gridSpacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class SignaturePainter extends CustomPainter {

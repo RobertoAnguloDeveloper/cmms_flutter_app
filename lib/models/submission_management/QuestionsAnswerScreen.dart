@@ -367,8 +367,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         isLoading = true;
       });
 
-      final submissionResult =
-          await _formSubmissionService.createFormSubmission(
+      final submissionResult = await _formSubmissionService.createFormSubmission(
         context: context,
         formId: selectedForm!['id'],
       );
@@ -376,60 +375,130 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       final int submissionId = submissionResult['submission_id'];
       print('Extracted submission ID: $submissionId');
 
-      // Upload signatures
+      // Set to track already processed signatures to avoid duplicates
+      final Set<String> processedSignatures = {};
+
+      // Upload signatures - only once per signature
       if (signatureFiles.isNotEmpty) {
         final attachmentService = AttachmentService();
 
         for (var entry in signatureFiles.entries) {
-          final questionId = int.parse(entry.key);
+          final questionId = entry.key;
           final signatureData = entry.value;
 
-          final filePath = signatureData['path'] as String;
-          final signatureAuthor = signatureData['author'] as String?;
-          final signaturePosition = (signatureData['position'] != null &&
-                  (signatureData['position'] as String).isNotEmpty)
-              ? signatureData['position']
-              : 'Form Signature';
+          // Generate a unique key for this signature to avoid duplication
+          final signatureKey = 'signature_${questionId}';
 
-          try {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Uploading signature: ${path.basename(filePath)}...',
+          // Skip if we've already processed this signature
+          if (processedSignatures.contains(signatureKey)) {
+            continue;
+          }
+
+          // Mark this signature as processed
+          processedSignatures.add(signatureKey);
+
+          if (kIsWeb) {
+            // Web platform - handle web signatures
+            final webImageData = signatureData['webData'] as String?;
+
+            if (webImageData != null && webImageData.isNotEmpty) {
+              // Extract the base64 part (after the comma)
+              String base64Data = webImageData;
+              if (base64Data.contains(',')) {
+                base64Data = base64Data.split(',').last;
+              }
+
+              try {
+                // Convert base64 to bytes
+                final bytes = base64Decode(base64Data);
+                final signatureAuthor = signatureData['author'] as String?;
+                final signaturePosition = signatureData['position'] as String?;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Uploading signature: Signature_$questionId...'),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+
+                await attachmentService.createAttachmentFromBytes(
+                  context,
+                  submissionId,
+                  'signature_${questionId}_${DateTime.now().millisecondsSinceEpoch}.png',
+                  bytes,
+                  true, // isSignature
+                  signatureAuthor: signatureAuthor,
+                  signaturePosition: signaturePosition,
+                );
+
+                setState(() {
+                  _uploadedFiles++;
+                });
+              } catch (e) {
+                print('Error uploading web signature: $e');
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to upload signature: Signature_$questionId'),
+                    backgroundColor: Colors.orange,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            }
+          } else {
+            // Mobile platform - handle file-based signatures
+            final filePath = signatureData['path'] as String;
+            final signatureAuthor = signatureData['author'] as String?;
+            final signaturePosition = (signatureData['position'] != null &&
+                (signatureData['position'] as String).isNotEmpty)
+                ? signatureData['position']
+                : 'Form Signature';
+
+            try {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Uploading signature: ${path.basename(filePath)}...',
+                  ),
+                  duration: const Duration(seconds: 1),
                 ),
-                duration: const Duration(seconds: 1),
-              ),
-            );
+              );
 
-            await attachmentService.createAttachment(
-              context,
-              submissionId,
-              File(filePath),
-              true, // isSignature
-              signatureAuthor: signatureAuthor,
-              signaturePosition: signaturePosition,
-            );
+              await attachmentService.createAttachment(
+                context,
+                submissionId,
+                File(filePath),
+                true, // isSignature
+                signatureAuthor: signatureAuthor,
+                signaturePosition: signaturePosition,
+              );
 
-            setState(() {
-              _uploadedFiles++;
-            });
-          } catch (e) {
-            print('Error uploading signature: $e');
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Failed to upload signature: ${path.basename(filePath)}',
+              setState(() {
+                _uploadedFiles++;
+              });
+
+              // Important: After uploading, remove this filepath from _attachedFiles
+              // to avoid double-uploading
+              _attachedFiles.remove(filePath);
+            } catch (e) {
+              print('Error uploading signature: $e');
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Failed to upload signature: ${path.basename(filePath)}',
+                  ),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 3),
                 ),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 3),
-              ),
-            );
+              );
+            }
           }
         }
       }
 
-      // Upload attachments
+      // Upload other attachments
       if (_attachedFiles.isNotEmpty) {
         setState(() {
           _isUploadingFiles = true;
@@ -441,29 +510,19 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         final attachmentService = AttachmentService();
 
         for (var filePath in _attachedFiles) {
-          // Skip files that are already handled as signatures
-          bool isSignatureFile = false;
-          for (var entry in signatureFiles.entries) {
-            if (entry.value['path'] == filePath) {
-              isSignatureFile = true;
-              break;
-            }
-          }
-
-          if (isSignatureFile) {
-            // Skip this file as it's already processed as a signature
+          // Skip if this path contains "signature_" as those should have been handled above
+          if (filePath.contains("signature_")) {
+            print("Skipping signature file that should have been handled: $filePath");
             continue;
           }
 
           try {
             // Check if this is a web file
             bool isWebFile = filePath.startsWith('web_file_');
-            String fileName = path.basename(filePath);
+            String fileName = isWebFile ? filePath.split('_').last : path.basename(filePath);
 
             // Get the actual file name to display to the user
-            String displayName = isWebFile
-                ? fileName.substring(fileName.indexOf('_', 9) + 1)
-                : fileName;
+            String displayName = fileName;
 
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -481,25 +540,21 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
                 throw Exception('File data not found for $filePath');
               }
 
-              // Extract the actual file name from the web file path
-              final actualFileName = displayName;
-              final isSignature = filePath.contains("signature_");
+              final isSignature = false; // Force to false since signatures were handled separately
 
               // Use the fixed attachment service method
-              uploadResponse =
-                  await _attachmentService.createAttachmentFromBytes(
+              uploadResponse = await attachmentService.createAttachmentFromBytes(
                 context,
                 submissionId,
-                actualFileName,
+                displayName,
                 bytes,
                 isSignature,
               );
             } else {
               // For normal files, use the regular method
-              final fileExt = path.extension(filePath).toLowerCase();
-              final isSignature = filePath.contains("signature_");
+              final isSignature = false; // Force to false since signatures were handled separately
 
-              uploadResponse = await _attachmentService.createAttachment(
+              uploadResponse = await attachmentService.createAttachment(
                 context,
                 submissionId,
                 File(filePath),
@@ -546,7 +601,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         final answerValue = entry.value;
 
         Map<String, dynamic>? question = questions.firstWhere(
-          (q) => q['id'] == questionId,
+              (q) => q['id'] == questionId,
           orElse: () => null,
         );
 
@@ -555,26 +610,32 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           continue;
         }
 
-        final questionType =
-            question['type']?.toString().toLowerCase() ?? 'text';
+        final questionType = question['type']?.toString().toLowerCase() ?? 'text';
 
         // Remove the tilde from the question text before submission
-        String questionText =
-            question['text']?.toString() ?? 'Unknown Question';
+        String questionText = question['text']?.toString() ?? 'Unknown Question';
         if (questionText.endsWith('~')) {
           questionText = questionText.substring(0, questionText.length - 1);
         }
 
+        // Process signature type questions specially
+        if (questionType == 'signature') {
+          // For signatures, just add a placeholder text
+          formattedSubmissions.add({
+            'question_text': questionText,
+            'question_type_text': questionType,
+            'answer_text': 'Signature uploaded'
+          });
+        }
         // Handle multiple choice/checkbox
-        if (questionType.contains('multiple_choice') ||
+        else if (questionType.contains('multiple_choice') ||
             questionType.contains('checkbox')) {
-          List<dynamic> selectedIds =
-              (answerValue is List) ? answerValue : [answerValue];
+          List<dynamic> selectedIds = (answerValue is List) ? answerValue : [answerValue];
           List<dynamic> possibleAnswers = question['possible_answers'] ?? [];
 
           for (var selectedId in selectedIds) {
             var selectedAnswer = possibleAnswers.firstWhere(
-              (ans) => ans['id'] == selectedId,
+                  (ans) => ans['id'] == selectedId,
               orElse: () => null,
             );
 
@@ -818,121 +879,126 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
     // Signature field
     if (questionType == 'signature') {
-// In the _buildAnswerField method, modify the onSignatureCaptured callback:
+      // Check if we already have a web signature data stored for this question
+      String? initialWebSignatureData;
+      if (kIsWeb && signatureFiles.containsKey(questionId.toString())) {
+        initialWebSignatureData = signatureFiles[questionId.toString()]?['webData'];
+      }
+
       return CustomSignaturePad(
         questionTitle: questionText,
-        onSignatureCaptured: (file, {String? author, String? position}) {
-          if (file != null) {
-            // Step 1: Check if we already have a signature file path stored
-            String? oldPath;
-            if (answers.containsKey(questionId)) {
-              oldPath = answers[questionId];
-            }
+        initialSignatureWebData: initialWebSignatureData,
+        initialSignaturePath: !kIsWeb && answers.containsKey(questionId) ? answers[questionId] : null,
+        onSignatureCaptured: ({File? file, Uint8List? bytes, String? webImageData, String? author, String? position}) {
+          setState(() {
+            if (kIsWeb) {
+              if (webImageData != null) {
+                // For web platform, store the base64 data
+                answers[questionId] = webImageData;
+                signatureFiles[questionId.toString()] = {
+                  'webData': webImageData,
+                  'author': author ?? widget.sessionData['fullname'] ?? '',
+                  'position': position ?? questionText,
+                };
 
-            // Step 2: If we have an old path, remove it from _attachedFiles
-            if (oldPath != null && _attachedFiles.contains(oldPath)) {
-              setState(() {
-                _attachedFiles.remove(oldPath);
-              });
-            }
+                // If we have the bytes, store them in the web file bytes map for later upload
+                if (bytes != null) {
+                  final timestamp = DateTime.now().millisecondsSinceEpoch;
+                  final webFilePath = 'web_file_${timestamp}_signature_${questionId}.png';
 
-            // Step 3: Store only the file path in answers, not the file object
-            setState(() {
-              answers[questionId] = file.path;
+                  // Remove any existing web signature files for this question
+                  _webFileBytes.keys
+                      .where((key) => key.contains('_signature_${questionId}.png'))
+                      .toList()
+                      .forEach((key) => _webFileBytes.remove(key));
 
-              // Step 4: Store signature metadata separately
-              signatureFiles[questionId.toString()] = {
-                'path': file.path,
-                'author': author ?? widget.sessionData['fullname'] ?? '',
-                'position': position ?? questionText,
-              };
+                  _attachedFiles.removeWhere((path) =>
+                      path.contains('_signature_${questionId}.png'));
 
-              // Step 5: Only add to _attachedFiles if not already there
-              if (!_attachedFiles.contains(file.path)) {
-                _attachedFiles.add(file.path);
+                  // Add the new web signature file
+                  _webFileBytes[webFilePath] = bytes;
+                  _attachedFiles.add(webFilePath);
+                }
+              } else {
+                // Clear the signature
+                if (answers.containsKey(questionId)) {
+                  answers.remove(questionId);
+                }
+                signatureFiles.remove(questionId.toString());
+
+                // Remove any associated web file paths
+                _attachedFiles.removeWhere((path) =>
+                    path.contains('_signature_${questionId}.png'));
+
+                // Remove any associated web file bytes
+                _webFileBytes.keys
+                    .where((key) => key.contains('_signature_${questionId}.png'))
+                    .toList()
+                    .forEach((key) => _webFileBytes.remove(key));
               }
-
-              // Validate form after signing
-              _validateFormSubmission();
-            });
-          } else {
-            // Handle clearing the signature
-            setState(() {
-              if (answers.containsKey(questionId)) {
-                // Get the old path
-                String? oldPath = answers[questionId];
-
-                // Remove from _attachedFiles if it exists
-                if (oldPath != null && _attachedFiles.contains(oldPath)) {
-                  _attachedFiles.remove(oldPath);
+            } else {
+              // Mobile platform - handle file-based signatures
+              if (file != null) {
+                // First, remove any existing signature file for this question
+                if (answers.containsKey(questionId)) {
+                  String? oldPath = answers[questionId];
+                  if (oldPath != null) {
+                    _attachedFiles.remove(oldPath);
+                  }
                 }
 
-                // Remove from other tracking structures
-                answers.remove(questionId);
-                signatureFiles.remove(questionId.toString());
+                // Store only the file path in answers, not the file object
+                answers[questionId] = file.path;
 
-                // Validate form after removing signature
-                _validateFormSubmission();
+                // Store signature metadata separately
+                signatureFiles[questionId.toString()] = {
+                  'path': file.path,
+                  'author': author ?? widget.sessionData['fullname'] ?? '',
+                  'position': position ?? questionText,
+                };
+
+                // Add path to attachedFiles ONLY IF NEEDED FOR WEB PREVIEW
+                // We will handle the actual file upload separately in _submitAnswers
+                // This is optional and might not be needed
+                // if (!_attachedFiles.contains(file.path)) {
+                //   _attachedFiles.add(file.path);
+                // }
+              } else {
+                // Handle clearing the signature
+                if (answers.containsKey(questionId)) {
+                  // Get the old path
+                  String? oldPath = answers[questionId];
+
+                  // Remove from _attachedFiles if it exists
+                  if (oldPath != null && _attachedFiles.contains(oldPath)) {
+                    _attachedFiles.remove(oldPath);
+                  }
+
+                  // Remove from other tracking structures
+                  answers.remove(questionId);
+                  signatureFiles.remove(questionId.toString());
+                }
               }
-            });
-          }
+            }
+
+            // Validate form after signing or clearing
+            _validateFormSubmission();
+          });
         },
       );
-
-      /*return CustomSignaturePad(
-        questionTitle: questionText, // Pass the question title to use as position
-        onSignatureCaptured: (file, {String? author, String? position}) {
-          if (file != null) {
-            setState(() {
-              answers[questionId] = file.path;
-              signatureFiles[questionId.toString()] = {
-                'path': file.path,
-                'author': author ?? widget.sessionData['fullname'] ?? '',
-                'position': position ?? questionText, // Use question title as fallback
-              };
-              // Validate form after signing
-              _validateFormSubmission();
-            });
-          } else {
-            setState(() {
-              if (answers.containsKey(questionId)) {
-                answers.remove(questionId);
-                signatureFiles.remove(questionId.toString());
-                // Validate form after removing signature
-                _validateFormSubmission();
-              }
-            });
-          }
-        },
-      );*/
     }
 
-    // User field - procesar el currentValue de manera especial
-    dynamic currentValue = answers[questionId];
-    if (questionType == 'user' && currentValue is Map) {
-      // Si ya tenemos un objeto con información del usuario, extraer solo el ID
-      // para pasarlo al componente DynamicQuestionInput
-      currentValue = currentValue['id'];
-    }
-
-    // Other question types
+    // Other question types...
     return DynamicQuestionInput(
       question: question,
-      currentValue: currentValue,
+      currentValue: answers[questionId],
       sessionData: widget.sessionData,
       onAnswerChanged: (value) {
         setState(() {
           if (value == null || (value is String && value.isEmpty)) {
             answers.remove(questionId);
           } else {
-            // Para preguntas de tipo 'user', podemos recibir un objeto con información del usuario
-            if (questionType == 'user' && value is Map) {
-              // Guardar el objeto completo (que incluye el ID y la información del usuario)
-              answers[questionId] = value;
-            } else {
-              // Para otros tipos de preguntas, guardar el valor directamente
-              answers[questionId] = value;
-            }
+            answers[questionId] = value;
           }
           // Validate form on every answer change
           _validateFormSubmission();
@@ -940,7 +1006,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       },
     );
   }
-
   Widget _buildAttachmentButtons() {
     return Column(
       children: [
@@ -1155,8 +1220,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       // En dispositivos móviles, usamos la implementación existente
       else {
         print('Executing mobile camera implementation');
-        final PermissionStatus cameraPermission =
-            await Permission.camera.request();
+        final PermissionStatus cameraPermission = await Permission.camera.request();
 
         if (cameraPermission != PermissionStatus.granted) {
           throw Exception('Camera permission not granted');
@@ -1175,8 +1239,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           final File originalFile = File(photo.path);
 
           // Create a renamed file with a shorter name
-          final File renamedFile =
-              await FileUtils.createRenamedImageFile(originalFile);
+          final File renamedFile = await FileUtils.createRenamedImageFile(originalFile);
 
           setState(() {
             _attachedFiles.add(renamedFile.path);
@@ -1185,8 +1248,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content:
-                    Text('Photo added: ${path.basename(renamedFile.path)}'),
+                content: Text('Photo added: ${path.basename(renamedFile.path)}'),
                 backgroundColor: Colors.green,
                 duration: const Duration(seconds: 1),
               ),
@@ -1206,14 +1268,14 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
         if (e.toString().contains('channel-error')) {
           errorMessage =
-              'Camera connection failed. Please try again or use file attachment instead.';
+          'Camera connection failed. Please try again or use file attachment instead.';
         } else if (e.toString().contains('permission')) {
           errorMessage =
-              'Camera permission denied. Please enable camera access in settings.';
+          'Camera permission denied. Please enable camera access in settings.';
         } else if (e.toString().contains('NotAllowedError') ||
             e.toString().contains('NotFoundError')) {
           errorMessage =
-              'Camera access denied by browser. Please check your camera permissions.';
+          'Camera access denied by browser. Please check your camera permissions.';
         } else {
           errorMessage = 'Error accessing camera: $e';
         }
@@ -1248,37 +1310,59 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
   // Método completo de cámara web sin referencias a videoWidth/videoHeight
   // Método completo para mostrar la cámara web con captura precisa de toda la imagen
   Future<void> _showWebCameraDialog() async {
-    // Solo ejecutar en web
+    // Only execute in web
     if (!kIsWeb) return;
 
-    html.MediaStream? stream = await _safeGetWebCameraStream();
+    // Add a variable to track current camera mode
+    bool usingFrontCamera = false;
+
+    // Create a function to get the camera stream with specified facing mode
+    Future<html.MediaStream?> getCameraStream(bool frontCamera) async {
+      try {
+        final mediaDevices = html.window.navigator.mediaDevices;
+        if (mediaDevices == null) {
+          print('MediaDevices API not available');
+          return null;
+        }
+
+        return await mediaDevices.getUserMedia({
+          'video': {
+            'facingMode': frontCamera ? 'user' : 'environment',
+          }
+        });
+      } catch (e) {
+        print('Error accessing camera: $e');
+        return null;
+      }
+    }
+
+    // Get initial camera stream
+    html.MediaStream? stream = await getCameraStream(usingFrontCamera);
 
     if (stream == null) {
       throw Exception('Could not access camera stream');
     }
 
-    // Captura de imagen y vista previa
+    // Image capture variables
     html.ImageElement? capturedImageElement;
     Uint8List? capturedImageBytes;
 
-    // Crear un video element para mostrar la vista previa de la cámara
+    // Create a video element to display the camera preview
     final videoElement = html.VideoElement()
       ..srcObject = stream
       ..autoplay = true
       ..style.width = '100%'
-      ..style.height =
-          '100%' // Asegúrate de que sea 100% para llenar el contenedor
-      ..style.objectFit =
-          'cover'; // Usa 'cover' para llenar el área sin distorsión
+      ..style.height = '100%'
+      ..style.objectFit = 'cover';
 
-    // Esperamos a que el video esté listo
+    // Wait for video to be ready
     bool videoReady = false;
     videoElement.onLoadedMetadata.listen((_) {
       videoReady = true;
       print('Video ready for capture');
     });
 
-    // Crear un div para contener todo
+    // Create a div to contain everything
     final container = html.DivElement()
       ..style.position = 'fixed'
       ..style.top = '0'
@@ -1292,7 +1376,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       ..style.alignItems = 'center'
       ..style.justifyContent = 'center';
 
-    // Contenedor para el video y la imagen capturada
+    // Container for the video and captured image
     final cameraContainer = html.DivElement()
       ..style.width = '90%'
       ..style.maxWidth = '500px'
@@ -1302,22 +1386,34 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       ..style.overflow = 'hidden'
       ..style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
 
-    // Cabecera del diálogo
+    // Header of the dialog
     final headerContainer = html.DivElement()
       ..style.width = '100%'
       ..style.padding = '12px 1px'
       ..style.backgroundColor = '#1976D2'
       ..style.color = 'white'
       ..style.display = 'flex'
-      ..style.justifyContent = 'space-between' // Cambia esto
-      ..style.alignItems = 'center'; // Cambiado para mejor alineación
+      ..style.justifyContent = 'space-between'
+      ..style.alignItems = 'center';
 
     final headerTitle = html.HeadingElement.h3()
       ..innerText = 'Take Photo'
       ..style.margin = '0'
       ..style.fontSize = '18px'
-      ..style.flex = '1' // Hace que el título ocupe el espacio restante
-      ..style.textAlign = 'center'; // Centra el título
+      ..style.flex = '1'
+      ..style.textAlign = 'center';
+
+    // Add camera toggle button
+    final toggleCameraButton = html.ButtonElement()
+      ..innerText = 'Switch Camera'
+      ..style.backgroundColor = '#1565C0'
+      ..style.color = 'white'
+      ..style.border = 'none'
+      ..style.borderRadius = '4px'
+      ..style.padding = '6px 12px'
+      ..style.marginLeft = '15px'
+      ..style.fontSize = '14px'
+      ..style.cursor = 'pointer';
 
     final closeButton = html.ButtonElement()
       ..innerText = ''
@@ -1326,23 +1422,23 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       ..style.border = 'none'
       ..style.borderRadius = '4px'
       ..style.padding = '8px 12px'
-      ..style.marginRight = '15px' // Espacio entre el botón y el título
+      ..style.marginRight = '15px'
       ..style.fontSize = '14px'
       ..style.fontWeight = 'bold'
       ..style.cursor = 'pointer'
       ..style.display = 'flex'
       ..style.alignItems = 'center'
       ..style.justifyContent = 'center'
-      ..style.minWidth = '20px'; // Asegurar un ancho mínimo para el botón
+      ..style.minWidth = '20px';
 
     final closeSpan = html.SpanElement()
       ..innerText = '✕'
       ..style.fontSize = '16px';
     closeButton.append(closeSpan);
 
-    headerContainer.children.addAll([headerTitle, closeButton]);
+    headerContainer.children.addAll([toggleCameraButton, headerTitle, closeButton]);
 
-    // Contenedor para el visor de la cámara - aumentada a 400px
+    // Container for the camera viewfinder
     final viewfinderContainer = html.DivElement()
       ..style.position = 'relative'
       ..style.width = '100%'
@@ -1355,17 +1451,17 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
     viewfinderContainer.append(videoElement);
 
-    // Crear elemento canvas para captura (no lo agregamos al DOM)
+    // Create canvas element for capture (not added to DOM)
     final canvas = html.CanvasElement();
 
-    // Botones para las acciones principales
+    // Buttons for main actions
     final buttonContainer = html.DivElement()
       ..style.display = 'flex'
       ..style.justifyContent = 'space-around'
       ..style.padding = '16px'
       ..style.backgroundColor = '#f5f5f5';
 
-    // Contenedor para el botón de captura (inicialmente visible)
+    // Container for capture button (initially visible)
     final captureButtonContainer = html.DivElement()
       ..style.width = '100%'
       ..style.display = 'flex'
@@ -1384,7 +1480,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
     captureButtonContainer.append(captureButton);
 
-    // Contenedor para los botones post-captura (inicialmente oculto)
+    // Container for post-capture buttons (initially hidden)
     final postCaptureContainer = html.DivElement()
       ..style.width = '100%'
       ..style.display = 'none'
@@ -1416,7 +1512,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
     buttonContainer.append(captureButtonContainer);
     buttonContainer.append(postCaptureContainer);
 
-    // Instrucciones
+    // Instructions
     final instructionContainer = html.DivElement()
       ..style.padding = '8px 16px'
       ..style.backgroundColor = '#E3F2FD'
@@ -1424,13 +1520,12 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       ..style.color = '#0D47A1';
 
     final instructionText = html.ParagraphElement()
-      ..innerText =
-          'Position your camera to get a clear view, then tap the capture button.'
+      ..innerText = 'Position your camera to get a clear view, then tap the capture button.'
       ..style.margin = '0';
 
     instructionContainer.append(instructionText);
 
-    // Ensamblar todo
+    // Assemble everything
     cameraContainer.children.addAll([
       headerContainer,
       viewfinderContainer,
@@ -1440,28 +1535,69 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
     container.append(cameraContainer);
 
-    // Agregar a la página
+    // Add to the page
     html.document.body!.append(container);
 
-    // Establecer un completer para manejar la asincronía
+    // Set up a completer to handle async
     final completer = Completer<void>();
 
-    // Evento para cerrar
+    // Event handler for camera toggle button
+    toggleCameraButton.onClick.listen((_) async {
+      try {
+        // Stop current stream
+        _safeStopWebCameraStream(stream!);
+
+        // Toggle camera mode
+        usingFrontCamera = !usingFrontCamera;
+
+        // Update button text to indicate current camera
+        toggleCameraButton.innerText = usingFrontCamera ? 'Use Back Camera' : 'Use Front Camera';
+
+        // Get new stream with the opposite camera
+        final newStream = await getCameraStream(usingFrontCamera);
+
+        if (newStream != null) {
+          // Update the video element with the new stream
+          videoElement.srcObject = newStream;
+          stream = newStream; // Update the stream reference
+        } else {
+          // If we couldn't get the new camera, try to revert
+          usingFrontCamera = !usingFrontCamera;
+          toggleCameraButton.innerText = usingFrontCamera ? 'Use Back Camera' : 'Use Front Camera';
+
+          final revertStream = await getCameraStream(usingFrontCamera);
+          if (revertStream != null) {
+            videoElement.srcObject = revertStream;
+            stream = revertStream;
+          }
+
+          // Show error message
+          instructionText.innerText = 'Failed to switch camera. This may not be supported on your device.';
+          instructionText.style.color = 'red';
+        }
+      } catch (e) {
+        print('Error toggling camera: $e');
+        instructionText.innerText = 'Error switching camera: $e';
+        instructionText.style.color = 'red';
+      }
+    });
+
+    // Close button event
     closeButton.onClick.listen((_) {
       _safeStopWebCameraStream(stream);
       container.remove();
       completer.complete();
     });
 
-    // Evento para capturar
+    // Capture button event
     captureButton.onClick.listen((_) {
       try {
-        // Usar un delay para asegurar que tengamos un frame de video
+        // Use a delay to ensure we have a video frame
         Future.delayed(Duration(milliseconds: 500), () {
-          // Obtener dimensiones exactas del contenedor de visualización
+          // Get exact dimensions of the viewing container
           final containerRect = viewfinderContainer.getBoundingClientRect();
 
-          // Configurar canvas con las dimensiones del contenedor - valores seguros
+          // Configure canvas with container dimensions
           final int canvasWidth = containerRect.width.toInt();
           final int canvasHeight = containerRect.height.toInt();
           canvas.width = canvasWidth;
@@ -1469,14 +1605,14 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
 
           print('Canvas dimensions: ${canvasWidth}x${canvasHeight}');
 
-          // Dibujar el video en el canvas exactamente como se ve en pantalla
+          // Draw the video to the canvas exactly as seen on screen
           final ctx = canvas.context2D;
 
-          // Usar toda el área del canvas
+          // Use the entire canvas area
           ctx.fillStyle = 'black';
           ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-          // Dibujar el video manteniendo la relación de aspecto y centrado
+          // Draw the video maintaining aspect ratio and centered
           ctx.drawImageScaled(
             videoElement,
             0,
@@ -1485,71 +1621,67 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
             canvasHeight,
           );
 
-          // Convertir a dataURL con alta calidad
+          // Convert to dataURL with high quality
           final dataUrl = canvas.toDataUrl('image/jpeg', 0.95);
 
-          // Detener el stream anterior para ahorrar recursos
+          // Stop the stream to save resources
           _safeStopWebCameraStream(stream!);
 
-          // Mostrar la imagen capturada en lugar del video
+          // Show the captured image instead of the video
           capturedImageElement = html.ImageElement()
             ..src = dataUrl
             ..style.width = '100%'
             ..style.height = '100%'
             ..style.objectFit = 'contain';
 
-          // Convertir dataUrl a Uint8List
+          // Convert dataUrl to Uint8List
           capturedImageBytes = _safeDataUriToBytes(dataUrl);
 
-          // Cambiar la UI a modo de vista previa
+          // Change UI to preview mode
           viewfinderContainer.children.clear();
           viewfinderContainer.append(capturedImageElement!);
 
-          // Cambiar botones
+          // Change buttons
           captureButtonContainer.style.display = 'none';
           postCaptureContainer.style.display = 'flex';
 
-          // Actualizar instrucciones
-          instructionText.innerText =
-              'Verify the photo and tap "Use Photo" to continue or "Retake" to try again.';
+          // Update instructions
+          instructionText.innerText = 'Verify the photo and tap "Use Photo" to continue or "Retake" to try again.';
         });
       } catch (e) {
         print('Error capturing photo: $e');
-
-        // Mostrar error al usuario
         html.window.alert('Error capturing photo: $e');
       }
     });
 
-    // Evento para volver a tomar la foto
+    // Retake photo event
     retakeButton.onClick.listen((_) async {
       try {
-        // Volver a obtener acceso a la cámara
-        final newStream = await _safeGetWebCameraStream();
+        // Get access to the camera again with the current camera mode
+        final newStream = await getCameraStream(usingFrontCamera);
 
         if (newStream != null) {
-          // Actualizar el stream del video
+          // Update the video element
           videoElement.srcObject = newStream;
 
-          // Asegurar que el video está reproduciéndose
+          // Ensure the video is playing
           videoElement.play();
 
-          // Actualizar la referencia del stream para detenerlo correctamente después
+          // Update the stream reference to stop it correctly later
           stream = newStream;
 
-          // Volver a mostrar el video
+          // Show the video again
           viewfinderContainer.children.clear();
           viewfinderContainer.append(videoElement);
 
-          // Cambiar botones
+          // Change buttons
           captureButtonContainer.style.display = 'flex';
           postCaptureContainer.style.display = 'none';
 
-          // Actualizar instrucciones
-          instructionText.innerText =
-              'Position your camera to get a clear view, then tap the capture button.';
+          // Update instructions
+          instructionText.innerText = 'Position your camera to get a clear view, then tap the capture button.';
 
-          // Limpiar la imagen capturada
+          // Clear the captured image
           capturedImageElement = null;
           capturedImageBytes = null;
         } else {
@@ -1557,26 +1689,25 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
         }
       } catch (e) {
         print('Error retaking photo: $e');
-        html.window.alert(
-            'Error reactivating camera. Please try again or close and reopen the camera.');
+        html.window.alert('Error reactivating camera. Please try again or close and reopen the camera.');
       }
     });
 
-    // Evento para enviar la foto
+    // Send photo event
     sendButton.onClick.listen((_) async {
       if (capturedImageBytes != null) {
         try {
-          // Generar nombre de archivo con timestamp
+          // Generate file name with timestamp
           final timestamp = DateTime.now().millisecondsSinceEpoch;
           final fileName = 'web_file_${timestamp}_photo_${timestamp}.jpg';
 
-          // Almacenar en el mapa de archivos web
+          // Store in the web files map
           setState(() {
             _webFileBytes[fileName] = capturedImageBytes!;
             _attachedFiles.add(fileName);
           });
 
-          // Cerrar el diálogo
+          // Close the dialog
           _safeStopWebCameraStream(stream!);
           container.remove();
 
@@ -1591,7 +1722,6 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
           completer.complete();
         } catch (e) {
           print('Error saving captured photo: $e');
-
           html.window.alert('Error saving photo: $e');
         }
       } else {
@@ -1621,15 +1751,13 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       }
 
       return await mediaDevices.getUserMedia({
-        'video': true, // Simplificado para evitar problemas de compilación
+        'video': true,  // Simplificado para evitar problemas de compilación
       });
     } catch (e) {
       print('Error accessing camera: $e');
       return null;
     }
   }
-
-
 
 // Método de detención seguro sin referencias a JS
   void _safeStopWebCameraStream(html.MediaStream? stream) {
@@ -1660,6 +1788,7 @@ class _QuestionsAnswerScreenState extends State<QuestionsAnswerScreen> {
       return Uint8List(0);
     }
   }
+
 
 // Método para detener el stream de la cámara
   void _stopWebCameraStream(html.MediaStream stream) {
